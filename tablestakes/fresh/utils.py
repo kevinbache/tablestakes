@@ -3,7 +3,7 @@ from typing import *
 from collections.abc import Iterable
 
 
-StrDict = Dict[str, str]
+StrDict = Dict[str, Union[str, int, float]]
 
 
 def to_list(v: Any):
@@ -14,3 +14,13 @@ def to_list(v: Any):
     else:
         v = [v]
     return v
+
+
+def dict_to_str(d: Dict, indent_width=2, extra_key_width=0, do_norm_key_width=True, line_end=''):
+    indent = ' ' * indent_width
+    if do_norm_key_width:
+        k_width = max(len(k) for k in d.keys()) + extra_key_width
+        return '\n'.join(f'{indent}{k:{k_width}}: {v}{line_end}' for k, v in d.items())
+    else:
+        return '\n'.join(f'{indent}{k}: {v}{line_end}' for k, v in d.items())
+
