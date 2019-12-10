@@ -1,11 +1,27 @@
 import enum
-from typing import Optional, Tuple
+from typing import *
 
-from tablestakes.fresh import utils, constants, html_css
+from tablestakes.fresh import utils, html_css
+from tablestakes.fresh.creators import ChoiceCreator, MultiCreator, AddressCreator, KvCssCreator, KeyValueCreator
 
 KEY_HTML_CLASS = 'key'
 VALUE_HTML_CLASS = 'value'
 CONTAINER_HTML_CLASS = 'container'
+
+
+ProbDict = Dict[Any, float]
+
+
+def get_container_selector(kv_name: str):
+    return html_css.HtmlClassesAll([kv_name, CONTAINER_HTML_CLASS])
+
+
+def get_key_selector(kv_name: str):
+    return html_css.HtmlClassesAll([kv_name, KEY_HTML_CLASS])
+
+
+def get_value_selector(kv_name: str):
+    return html_css.HtmlClassesAll([kv_name, VALUE_HTML_CLASS])
 
 
 class KVHtml(html_css.Div):
@@ -20,18 +36,6 @@ class KVHtml(html_css.Div):
         self._k_tag = k_tag
         self._v_tag = v_tag
 
-    @staticmethod
-    def _get_container_classes(kv_name: str):
-        return html_css.HtmlClassesAll([kv_name, CONTAINER_HTML_CLASS])
-
-    @staticmethod
-    def _get_key_classes(kv_name: str):
-        return html_css.HtmlClassesAll([kv_name, KEY_HTML_CLASS])
-
-    @staticmethod
-    def _get_value_classes(kv_name: str):
-        return html_css.HtmlClassesAll([kv_name, VALUE_HTML_CLASS])
-
     @classmethod
     def from_strs(
             cls,
@@ -40,9 +44,9 @@ class KVHtml(html_css.Div):
             v_contents: html_css.DirtyHtmlChunk,
     ) -> 'KVHtml':
         return cls(
-            container_classes=cls._get_container_classes(kv_name),
-            k_tag=html_css.Div(k_contents, classes=cls._get_key_classes(kv_name)),
-            v_tag=html_css.Div(v_contents, classes=cls._get_value_classes(kv_name)),
+            container_classes=get_container_selector(kv_name),
+            k_tag=html_css.Div(k_contents, classes=get_key_selector(kv_name)),
+            v_tag=html_css.Div(v_contents, classes=get_value_selector(kv_name)),
         )
 
     def get_container_classes(self):
@@ -76,26 +80,18 @@ class KLoc(enum.Enum):
         self.value_row = value_row_col[1]
 
     @property
-    def num_cols(self):
+    def num_cols(self) -> int:
         return max(self.key_col, self.value_col)
 
     @property
-    def num_rows(self):
+    def num_rows(self) -> int:
         return max(self.key_row, self.value_row)
 
-
-class KvCss:
-    def __init__(self):
-        pass
-
-    def create(self, kv_name: str, kloc: KLoc):
-        # kv_name = 'address_to'
-        # kloc = KLoc.UL
-
+    def get_css(self, kv_name: str) -> html_css.Css:
         kv_css = html_css.Css()
 
         kv_css += html_css.CssChunk(
-            html_css.HtmlClassesAll([kv_name, self.CONTAINER_CLASS]),
+            get_container_selector(kv_name),
             {
                 'display': 'grid',
                 'grid-template-columns': ' '.join(['auto'] * kloc.num_cols),
@@ -104,7 +100,7 @@ class KvCss:
         )
 
         kv_css += html_css.CssChunk(
-            html_css.HtmlClassesAll([kv_name, self.KEY_CLASS]),
+            get_key_selector(kv_name),
             {
                 'grid-column-start': kloc.key_col,
                 'grid-row-start': kloc.key_row,
@@ -112,7 +108,7 @@ class KvCss:
         )
 
         kv_css += html_css.CssChunk(
-            html_css.HtmlClassesAll([kv_name, self.VALUE_CLASS]),
+            get_value_selector(kv_name),
             {
                 'grid-column-start': kloc.value_col,
                 'grid-row-start': kloc.value_row,
@@ -122,13 +118,59 @@ class KvCss:
         return kv_css
 
 
+class KvCss(html_css.Css):
+    def __init__(
+            self,
+            kv_name: str,
+            key_css_values: utils.StrDict,
+            value_css_values: utils.StrDict,
+            container_css_values: utils.StrDict,
+    ):
+        super().__init__(chunks=[
+            html_css.CssChunk(get_container_selector(kv_name), container_css_values),
+            html_css.CssChunk(get_key_selector(kv_name), key_css_values),
+            html_css.CssChunk(get_value_selector(kv_name), value_css_values),
+        ])
+
+
 if __name__ == '__main__':
-    kv_css = html_css.Css([
-        html_css.CssChunk(html_css.HtmlClass('asdf'), {'style': 'grid'}),
-        html_css.CssChunk(html_css.HtmlClass('2qwer'), {'style2': 'grid2'}),
-    ])
-    for chunk in kv_css:
-        print(chunk)
+    # make a style generator that uses the KLoc CSS and adds extra styling to it
+
+    # make a kv creator loop over KVConfigs
+
+    # make a css grid
+    # pack css grid with KVs
+
+    # kv_css = html_css.Css([
+    #     html_css.CssChunk(html_css.HtmlClass('asdf'), {'style': 'grid'}),
+    #     html_css.CssChunk(html_css.HtmlClass('2qwer'), {'style2': 'grid2'}),
+    # ])
+    # for chunk in kv_css:
+    #     print(chunk)
+
+    position_probabilities = {
+        KLoc.UL: 0.3,
+        KLoc.U:  1.0,
+        KLoc.UR: 0.01,
+        KLoc.R:  0.1,
+        KLoc.BR: 0.01,
+        KLoc.B:  0.2,
+        KLoc.BL: 0.01,
+        KLoc.L:  1.0,
+    }
+
+
+    KeyValueCreator(
+        name='receiving_address',
+        key_contents_creator=MultiCreator([
+            ChoiceCreator(['Receiving', 'Receiving Address', 'Address To', 'To']),
+            ChoiceCreator([':', '']),
+        ]),
+        value_contents_creator=AddressCreator(),
+        style_creator=KvCssCreator(
+        ),
+    )
+
 
     kvh = KVHtml.from_strs('address_to', 'Address To:', '1232 Apache Ave </br>Santa Fe, NM 87505')
 
@@ -140,35 +182,8 @@ if __name__ == '__main__':
     kv_name = 'address_to'
     kloc = KLoc.UL
 
-    kv_css = html_css.Css()
-
-    kv_css += html_css.CssChunk(
-        html_css.HtmlClassesAll([kv_name, constants.CONTAINER_CLASS]),
-        {
-            'display': 'grid',
-            'grid-template-columns': ' '.join(['auto'] * kloc.num_cols),
-            'grid-template-rows': ' '.join(['auto'] * kloc.num_rows),
-        },
-    )
-
-    kv_css += html_css.CssChunk(
-        html_css.HtmlClassesAll([kv_name, constants.KEY_CLASS]),
-        {
-            'grid-column-start': kloc.key_col,
-            'grid-row-start': kloc.key_row,
-        },
-    )
-
-    kv_css += html_css.CssChunk(
-        html_css.HtmlClassesAll([kv_name, constants.VALUE_CLASS]),
-        {
-            'grid-column-start': kloc.value_col,
-            'grid-row-start': kloc.value_row,
-        },
-    )
-
     print('')
     print("======")
     print(" css:")
     print("======")
-    print(kv_css)
+    print(kloc.get_css(kv_name))

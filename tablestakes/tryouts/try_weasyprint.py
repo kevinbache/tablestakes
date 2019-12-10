@@ -18,4 +18,4 @@ html.write_pdf(
 	stylesheets=[css],
 )
 print('done')
-Ω
+

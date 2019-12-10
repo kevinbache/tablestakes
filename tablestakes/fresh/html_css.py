@@ -24,10 +24,6 @@ class CssSelector:
     def to_selector_str(self): return self.name
 
 
-class HtmlClass(CssSelector):
-    def to_selector_str(self): return f'.{self.name}'
-
-
 class AbstractHtmlClasses(CssSelector, abc.ABC):
     def __init__(self, classes: List[str]):
         super().__init__('')
@@ -51,6 +47,11 @@ class HtmlClassesAll(AbstractHtmlClasses):
     def get_join_str(self): return ''
 
 
+class HtmlClass(HtmlClassesAll):
+    def __init__(self, name: str):
+        super().__init__([name])
+
+
 class HtmlClassesNested(AbstractHtmlClasses):
     def get_join_str(self): return ' '
 
@@ -59,10 +60,12 @@ class HtmlId(CssSelector):
     def to_selector_str(self): return f'#{self.name}'
 
 
-HtmlClassesType = Union[List[HtmlClass], HtmlClass, AbstractHtmlClasses]
+HtmlClassesType = Optional[Union[List[HtmlClass], AbstractHtmlClasses]]
 
 
 class CssChunk:
+    """Chunk of CSS with a single selector."""
+
     def __init__(self, selector: CssSelector, values: utils.StrDict):
         self.selector = selector
         self.values = values
@@ -81,6 +84,7 @@ class CssChunk:
 
 
 class Css:
+    """A group of CSS Chunks; i.e.: multiple selectors and values."""
     def __init__(self, chunks: Optional[List[CssChunk]] = None):
         self._selector_to_chunk = {}
 
@@ -139,10 +143,19 @@ class HtmlTag:
     ):
         self.tag_name = tag_name
         self.contents = _clean_dirty_html_chunk(contents)
-        if isinstance(classes, AbstractHtmlClasses):
+        if classes is None:
+            self.classes = []
+        elif isinstance(classes, AbstractHtmlClasses):
             self.classes = classes.get_class_list()
-        else:
-            self.classes = utils.to_list(classes)
+        elif isinstance(classes, list):
+            self.classes = []
+            for c in classes:
+                if isinstance(c, HtmlClass):
+                    self.classes.append(c.name)
+                elif isinstance(c, str):
+                    self.classes.append(c)
+                else:
+                    raise ValueError(f'Got unknown classes type: {type(c)}.  Classes: {classes}')
         self.attributes = attributes or {}
 
     def get_class_str(self):
@@ -161,3 +174,34 @@ class Div(HtmlTag):
     def __init__(self, contents: DirtyHtmlChunk, classes: HtmlClassesType, attributes: Optional[utils.StrDict] = None):
         super().__init__('div', contents, classes, attributes)
 
+class Body(HtmlTag):
+    def __init__(self, contents: DirtyHtmlChunk, classes: HtmlClassesType, attributes: Optional[utils.StrDict] = None):
+        super().__init__('body', contents, classes, attributes)
+
+
+class Document:
+    def __init__(self, contents: DirtyHtmlChunk, style: Css):
+        self.body = Body(contents, classes=None)
+
+    def __str__(self):
+        doc = yattag.Doc()
+        doc.asis('<!DOCTYPE html>')
+
+        with doc.tag('html'):
+            pass
+
+        return yattag.indent(doc.getvalue())
+
+
+    '''
+<!DOCTYPE html>
+<html>
+<body>
+
+<h1>My First Heading</h1>
+
+<p>My first paragraph.</p>
+
+</body>
+</html>
+    '''
