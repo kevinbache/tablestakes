@@ -19,19 +19,44 @@ class Creator(abc.ABC):
         pass
 
 
+class CssCreator(Creator):
+    @abc.abstractmethod
+    def __call__(self, *args, **kwargs) -> html_css.Css:
+        pass
+
+
 class ChoiceCreator(Creator):
     def __init__(self, choices: Union[list, kv.ProbDict]):
         if isinstance(choices, dict):
-            choices = choices.keys()
-            probs = choices.values()
-            probs /= sum(probs)
+            probs = np.array([v for v in choices.values()])
+            probs /= np.sum(probs)
+            probs = list(probs)
+            choices = [c for c in choices.keys()]
         else:
             probs = None
         self.choices = choices
         self.probs = probs
 
     def __call__(self, *args, **kwargs):
-        return np.random.choice(self.choices, p=self.probs)
+        try:
+            c = np.random.choice(self.choices, p=self.probs)
+        except:
+            print(self.choices)
+            print(self.probs)
+            print('error')
+        return c
+
+
+
+class CssProbCreator(ChoiceCreator):
+    def __init__(self, css: Union[html_css.Css, html_css.CssChunk], prob: float = 0.5):
+        if isinstance(css, html_css.CssChunk):
+            css = html_css.Css([css])
+        choices = {
+            css:            prob,
+            html_css.Css(): 1 - prob,
+        }
+        super().__init__(choices)
 
 
 class ConstantCreator(Creator):
@@ -48,12 +73,20 @@ class Combiner(abc.ABC):
         pass
 
 
-class StrCombiner(abc.ABC):
+class StrCombiner(Combiner):
     def __init__(self, join_str: str = ''):
         self.join_str = join_str
 
     def __call__(self, values: Iterable, *args, **kwargs):
         return self.join_str.join([str(v) for v in values])
+
+
+class CssCombiner(Combiner):
+    def __call__(self, values: Iterable[html_css.Css], *args, **kwargs):
+        css = html_css.Css()
+        for c in values:
+            css.add_style(c)
+        return css
 
 
 class ParallelCreators(Creator):
@@ -179,12 +212,6 @@ class IntCreator(AbstractFakerCreator):
             return f'{num:0{self.zero_pad_to_width}d}'
 
 
-class CssCreator(Creator):
-    @abc.abstractmethod
-    def __call__(self, *args, **kwargs) -> html_css.Css:
-        pass
-
-
 class KvCssCreator(Creator):
     def __init__(self, kv_loc: kv.KLoc, extra_css_creator: Optional[CssCreator] = None):
         # self.kv_name = kv_name
@@ -253,71 +280,29 @@ class KeyValueCreator(Creator):
 
 
 if __name__ == '__main__':
-    # # make a style generator that uses the KLoc CSS and adds extra styling to it
-    #
-    # # make a kv creator loop over KVConfigs
-    #
-    # # make a css grid
-    # # pack css grid with KVs
-    #
-    # # kv_css = html_css.Css([
-    # #     html_css.CssChunk(html_css.HtmlClass('asdf'), {'style': 'grid'}),
-    # #     html_css.CssChunk(html_css.HtmlClass('2qwer'), {'style2': 'grid2'}),
-    # # ])
-    # # for chunk in kv_css:
-    # #     print(chunk)
-    #
-    # colon_adder = html_css.CssChunk(
-    #     html_css.CssSelector('.key.U:after'),
-    #     {'content': ':'}
-    # ),
-    #
-    # d = {
-    #     'border-bottom-style': 'solid',
-    #     'font-weight': 'bold',
-    #     '': '',
-    # }
-    #
-    # position_probabilities = {
-    #     kv.KLoc.UL: 0.3,
-    #     kv.KLoc.U:  1.0,
-    #     kv.KLoc.UR: 0.01,
-    #     kv.KLoc.R:  0.1,
-    #     kv.KLoc.BR: 0.01,
-    #     kv.KLoc.B:  0.2,
-    #     kv.KLoc.BL: 0.01,
-    #     kv.KLoc.L:  1.0,
-    # }
-    #
-    # kvc = KeyValueCreator(
-    #     name='receiving_address',
-    #     key_contents_creator=ChoiceCreator(['Receiving', 'Receiving Address', 'Address To', 'To']),
-    #     value_contents_creator=AddressCreator(),
-    #     # TODO: don't add creator here, add CSS.
-    #     #       CSS is created once by global random gen and then static?
-    #     style_creator=KvCssCreator(kv.KLoc.L),
-    # )
-    # html, css = kvc()
-    #
-    # print('html:')
-    # print(html)
-    #
-    # print('css:')
-    # print(css)
-    #
-    # kvh = kv.KVHtml.from_strs('address_to', 'Address To:', '1232 Apache Ave </br>Santa Fe, NM 87505')
-    #
-    # # "https://css-tricks.com/snippets/css/complete-guide-grid/#prop-grid-auto-flow"
-    #
-    # kvc = KeyValueCreator(
-    #     name='receiving_address',
-    #     key_contents_creator=ChoiceCreator(['Receiving', 'Receiving Address', 'Address To', 'To']),
-    #     value_contents_creator=AddressCreator(),
-    #     # TODO: don't add creator here, add CSS.
-    #     #       CSS is created once by global random gen and then static?
-    #     # style_creator=KvCssCreator(kv.KLoc.L),
-    # )
-    # html, css = kvc()
+    # TODO: make styles
+    #   key box over value box (white and black key variants)
+    #   k/v in same box, key small top left or top middle or left
+    #   small key under underline value (left, center, right).  needs baseline font size
+    #   key font variantes:
+    #       bold, italics, bold / italics, smallcaps, all caps
+    #   font size variants
+    #       8-24 for key
+    #       +/- 4 for value
+    #   spacing variants
+    #       horizontal left / center
+    #       vertical left / center
+
+    position_probabilities = {
+        kv.KLoc.UL: 0.3,
+        kv.KLoc.U:  1.0,
+        kv.KLoc.UR: 0.01,
+        kv.KLoc.R:  0.1,
+        kv.KLoc.BR: 0.01,
+        kv.KLoc.B:  0.2,
+        kv.KLoc.BL: 0.01,
+        kv.KLoc.L:  1.0,
+    }
     np.random.seed(42)
 
     my_date_creator = DateCreator()
@@ -364,12 +349,28 @@ if __name__ == '__main__':
     kvcssc = KvCssCreator(kv.KLoc.U)
     doc.add_style(kvcssc())
 
-    extra_css = html_css.Css([
-        chunks.Keys.add_colon,
-        chunks.Keys.bold,
-        chunks.Body.font_sans_serif,
-    ])
-    doc.add_style(extra_css)
+    global_css_creator = ParallelCreators(
+        creators=[
+            CssProbCreator(chunks.Keys.bold, prob=0.7),
+            CssProbCreator(chunks.Keys.add_colon, prob=0.5),
+            ChoiceCreator({
+                chunks.Body.font_sans_serif: 1. / 3,
+                chunks.Body.font_serif:      1. / 3,
+                chunks.Body.font_mono:       1. / 3,
+            })
+        ],
+        combiner=CssCombiner(),
+    )
+
+    global_css = global_css_creator()
+    doc.add_style(global_css)
+
+    # extra_css = html_css.Css([
+    #     chunks.Keys.add_colon,
+    #     chunks.Keys.bold,
+    #     chunks.Body.font_sans_serif,
+    # ])
+    # doc.add_style(extra_css)
 
     print(str(doc))
     html_css.open_html_str(str(doc))
