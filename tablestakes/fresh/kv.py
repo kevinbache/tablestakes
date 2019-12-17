@@ -2,26 +2,38 @@ import enum
 from typing import *
 
 from tablestakes.fresh import utils, html_css
-from tablestakes.fresh.creators import ChoiceCreator, MultiCreator, AddressCreator, KvCssCreator, KeyValueCreator
 
-KEY_HTML_CLASS = 'key'
-VALUE_HTML_CLASS = 'value'
-CONTAINER_HTML_CLASS = 'container'
+
+CONTAINER_HTML_CLASS = 'kv_container'
+KEY_HTML_CLASS = 'kv_key'
+VALUE_HTML_CLASS = 'kv_value'
 
 
 ProbDict = Dict[Any, float]
 
 
-def get_container_selector(kv_name: str):
-    return html_css.HtmlClassesAll([kv_name, CONTAINER_HTML_CLASS])
+def get_container_selector(kv_name: Optional[str] = None):
+    classes = []
+    if kv_name is not None:
+        classes.append(kv_name)
+    classes.append(CONTAINER_HTML_CLASS)
+    return html_css.HtmlClassesAll(classes)
 
 
-def get_key_selector(kv_name: str):
-    return html_css.HtmlClassesAll([kv_name, KEY_HTML_CLASS])
+def get_key_selector(kv_name: Optional[str] = None):
+    classes = []
+    if kv_name is not None:
+        classes.append(kv_name)
+    classes.append(KEY_HTML_CLASS)
+    return html_css.HtmlClassesAll(classes)
 
 
-def get_value_selector(kv_name: str):
-    return html_css.HtmlClassesAll([kv_name, VALUE_HTML_CLASS])
+def get_value_selector(kv_name: Optional[str] = None):
+    classes = []
+    if kv_name is not None:
+        classes.append(kv_name)
+    classes.append(VALUE_HTML_CLASS)
+    return html_css.HtmlClassesAll(classes)
 
 
 class KVHtml(html_css.Div):
@@ -39,9 +51,9 @@ class KVHtml(html_css.Div):
     @classmethod
     def from_strs(
             cls,
-            kv_name: str,
             k_contents: html_css.DirtyHtmlChunk,
             v_contents: html_css.DirtyHtmlChunk,
+            kv_name: Optional[str] = None,
     ) -> 'KVHtml':
         return cls(
             container_classes=get_container_selector(kv_name),
@@ -49,14 +61,14 @@ class KVHtml(html_css.Div):
             v_tag=html_css.Div(v_contents, classes=get_value_selector(kv_name)),
         )
 
-    def get_container_classes(self):
-        return self.classes
+    def get_container_class_list(self):
+        return self.get_class_list()
 
-    def get_key_classes(self):
-        return self._k_tag.classes
+    def get_key_class_list(self):
+        return self._k_tag.get_class_list()
 
-    def get_value_classes(self):
-        return self._v_tag.classes
+    def get_value_class_list(self):
+        return self._v_tag.get_class_list()
 
 
 class KLoc(enum.Enum):
@@ -87,33 +99,33 @@ class KLoc(enum.Enum):
     def num_rows(self) -> int:
         return max(self.key_row, self.value_row)
 
-    def get_css(self, kv_name: str) -> html_css.Css:
+    def get_css(self, kv_name: Optional[str] = None) -> html_css.Css:
         kv_css = html_css.Css()
 
-        kv_css += html_css.CssChunk(
+        kv_css.add_style(html_css.CssChunk(
             get_container_selector(kv_name),
             {
                 'display': 'grid',
-                'grid-template-columns': ' '.join(['auto'] * kloc.num_cols),
-                'grid-template-rows': ' '.join(['auto'] * kloc.num_rows),
+                'grid-template-columns': ' '.join(['auto'] * self.num_cols),
+                'grid-template-rows': ' '.join(['auto'] * self.num_rows),
             },
-        )
+        ))
 
-        kv_css += html_css.CssChunk(
+        kv_css.add_style(html_css.CssChunk(
             get_key_selector(kv_name),
             {
-                'grid-column-start': kloc.key_col,
-                'grid-row-start': kloc.key_row,
+                'grid-column-start': self.key_col,
+                'grid-row-start': self.key_row,
             },
-        )
+        ))
 
-        kv_css += html_css.CssChunk(
+        kv_css.add_style(html_css.CssChunk(
             get_value_selector(kv_name),
             {
-                'grid-column-start': kloc.value_col,
-                'grid-row-start': kloc.value_row,
+                'grid-column-start': self.value_col,
+                'grid-row-start': self.value_row,
             },
-        )
+        ))
 
         return kv_css
 
@@ -133,57 +145,3 @@ class KvCss(html_css.Css):
         ])
 
 
-if __name__ == '__main__':
-    # make a style generator that uses the KLoc CSS and adds extra styling to it
-
-    # make a kv creator loop over KVConfigs
-
-    # make a css grid
-    # pack css grid with KVs
-
-    # kv_css = html_css.Css([
-    #     html_css.CssChunk(html_css.HtmlClass('asdf'), {'style': 'grid'}),
-    #     html_css.CssChunk(html_css.HtmlClass('2qwer'), {'style2': 'grid2'}),
-    # ])
-    # for chunk in kv_css:
-    #     print(chunk)
-
-    position_probabilities = {
-        KLoc.UL: 0.3,
-        KLoc.U:  1.0,
-        KLoc.UR: 0.01,
-        KLoc.R:  0.1,
-        KLoc.BR: 0.01,
-        KLoc.B:  0.2,
-        KLoc.BL: 0.01,
-        KLoc.L:  1.0,
-    }
-
-
-    KeyValueCreator(
-        name='receiving_address',
-        key_contents_creator=MultiCreator([
-            ChoiceCreator(['Receiving', 'Receiving Address', 'Address To', 'To']),
-            ChoiceCreator([':', '']),
-        ]),
-        value_contents_creator=AddressCreator(),
-        style_creator=KvCssCreator(
-        ),
-    )
-
-
-    kvh = KVHtml.from_strs('address_to', 'Address To:', '1232 Apache Ave </br>Santa Fe, NM 87505')
-
-    print(kvh)
-    print(kvh.get_container_classes())
-    print(kvh.get_key_classes())
-    print(kvh.get_value_classes())
-
-    kv_name = 'address_to'
-    kloc = KLoc.UL
-
-    print('')
-    print("======")
-    print(" css:")
-    print("======")
-    print(kloc.get_css(kv_name))
