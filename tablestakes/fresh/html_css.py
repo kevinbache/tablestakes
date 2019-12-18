@@ -253,6 +253,16 @@ class Style(HtmlTag):
         super().__init__('style', contents, classes, attributes)
 
 
+class Head(HtmlTag):
+    def __init__(
+            self,
+            contents: DirtyHtmlChunk,
+            classes: HtmlClassesType = None,
+            attributes: Optional[utils.StrDict] = None,
+    ):
+        super().__init__('head', contents, classes, attributes)
+
+
 class Html(HtmlTag):
     def __init__(
             self,
@@ -360,7 +370,7 @@ class Document:
 
     def __str__(self):
         html = Html([
-            Style(f'\n{str(self.css)}\n'),
+            Head(Style(f'\n{str(self.css)}\n')),
             Body(_html_chunk_to_str(self.contents)),
         ])
 

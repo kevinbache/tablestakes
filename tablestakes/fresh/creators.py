@@ -251,9 +251,9 @@ if __name__ == '__main__':
     #       vertical left / center
 
     position_probabilities = {
-        kv.KLoc.UL: 0.3,
-        kv.KLoc.U:  1.0,
-        kv.KLoc.UR: 0.01,
+        kv.KLoc.AL: 0.3,
+        kv.KLoc.A:  1.0,
+        kv.KLoc.AR: 0.01,
         kv.KLoc.R:  0.1,
         kv.KLoc.BR: 0.01,
         kv.KLoc.B:  0.2,
@@ -306,7 +306,7 @@ if __name__ == '__main__':
     doc = hc.Document()
     doc.add_styled_html(grid)
 
-    kvcssc = KvCssCreator(kv.KLoc.U)
+    kvcssc = KvCssCreator(kv.KLoc.A)
     doc.add_style(kvcssc())
 
     global_css_creator = ParallelCreators(

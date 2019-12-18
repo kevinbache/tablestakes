@@ -12,15 +12,15 @@ VALUE_HTML_CLASS = 'kv_value'
 ProbDict = Dict[Any, float]
 
 
-def get_container_selector(kv_name: Optional[str] = None):
+def get_all_classes_container_selector(other_class_name: Optional[str] = None):
     classes = []
-    if kv_name is not None:
-        classes.append(kv_name)
+    if other_class_name is not None:
+        classes.append(other_class_name)
     classes.append(CONTAINER_HTML_CLASS)
     return html_css.HtmlClassesAll(classes)
 
 
-def get_key_selector(kv_name: Optional[str] = None):
+def get_all_classes_key_selector(kv_name: Optional[str] = None):
     classes = []
     if kv_name is not None:
         classes.append(kv_name)
@@ -28,7 +28,7 @@ def get_key_selector(kv_name: Optional[str] = None):
     return html_css.HtmlClassesAll(classes)
 
 
-def get_value_selector(kv_name: Optional[str] = None):
+def get_all_classes_value_selector(kv_name: Optional[str] = None):
     classes = []
     if kv_name is not None:
         classes.append(kv_name)
@@ -56,9 +56,9 @@ class KVHtml(html_css.Div):
             kv_name: Optional[str] = None,
     ) -> 'KVHtml':
         return cls(
-            container_classes=get_container_selector(kv_name),
-            k_tag=html_css.Div(k_contents, classes=get_key_selector(kv_name)),
-            v_tag=html_css.Div(v_contents, classes=get_value_selector(kv_name)),
+            container_classes=get_all_classes_container_selector(kv_name),
+            k_tag=html_css.Div(k_contents, classes=get_all_classes_key_selector(kv_name)),
+            v_tag=html_css.Div(v_contents, classes=get_all_classes_value_selector(kv_name)),
         )
 
     def get_container_class_list(self):
@@ -76,9 +76,9 @@ class KLoc(enum.Enum):
     # start in the upper left left, go clockwise
     # UL: Label is in the upper left.
     #    Key   col, row    Value col,  row
-    UL =       ((1,   1),         (2,    2))
-    U =        ((1,   1),         (1,    2))
-    UR =       ((2,   1),         (1,    2))
+    AL =       ((1,   1),         (2,    2))
+    A =        ((1,   1),         (1,    2))
+    AR =       ((2,   1),         (1,    2))
     R =        ((2,   1),         (1,    1))
     BR =       ((2,   2),         (1,    1))
     B =        ((1,   2),         (1,    1))
@@ -99,11 +99,35 @@ class KLoc(enum.Enum):
     def num_rows(self) -> int:
         return max(self.key_row, self.value_row)
 
-    def get_css(self, kv_name: Optional[str] = None) -> html_css.Css:
+    def get_css(
+            self,
+            kv_name: Optional[str] = None,
+            containing_class: Optional[Union[html_css.HtmlClass, str]] = None,
+    ) -> html_css.Css:
         kv_css = html_css.Css()
 
+        # TODO: clean this selector creation business up
+        if kv_name is not None and containing_class is not None:
+            raise ValueError(f'Only one of kv_name and containing_class may be set')
+        elif containing_class is not None:
+            if isinstance(containing_class, html_css.HtmlClass):
+                class_name = containing_class.name
+            elif isinstance(containing_class, str):
+                class_name = containing_class
+            else:
+                raise ValueError(f'containing_class should be either an HtmlClass or str.  '
+                                 f'Got {type(containing_class)}')
+            container_selector = html_css.HtmlClassesNested([class_name, CONTAINER_HTML_CLASS])
+            key_selector = html_css.HtmlClassesNested([class_name, KEY_HTML_CLASS])
+            value_selector = html_css.HtmlClassesNested([class_name, VALUE_HTML_CLASS])
+        else:
+            # still fine if kv_name is None
+            container_selector = get_all_classes_container_selector(kv_name)
+            key_selector = get_all_classes_key_selector(kv_name)
+            value_selector = get_all_classes_value_selector(kv_name)
+
         kv_css.add_style(html_css.CssChunk(
-            get_container_selector(kv_name),
+            container_selector,
             {
                 'display': 'grid',
                 'grid-template-columns': ' '.join(['auto'] * self.num_cols),
@@ -112,7 +136,7 @@ class KLoc(enum.Enum):
         ))
 
         kv_css.add_style(html_css.CssChunk(
-            get_key_selector(kv_name),
+            key_selector,
             {
                 'grid-column-start': self.key_col,
                 'grid-row-start': self.key_row,
@@ -120,7 +144,7 @@ class KLoc(enum.Enum):
         ))
 
         kv_css.add_style(html_css.CssChunk(
-            get_value_selector(kv_name),
+            value_selector,
             {
                 'grid-column-start': self.value_col,
                 'grid-row-start': self.value_row,
@@ -128,20 +152,5 @@ class KLoc(enum.Enum):
         ))
 
         return kv_css
-
-
-class KvCss(html_css.Css):
-    def __init__(
-            self,
-            kv_name: str,
-            key_css_values: utils.StrDict,
-            value_css_values: utils.StrDict,
-            container_css_values: utils.StrDict,
-    ):
-        super().__init__(chunks=[
-            html_css.CssChunk(get_container_selector(kv_name), container_css_values),
-            html_css.CssChunk(get_key_selector(kv_name), key_css_values),
-            html_css.CssChunk(get_value_selector(kv_name), value_css_values),
-        ])
 
 

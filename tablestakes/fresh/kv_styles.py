@@ -1,5 +1,8 @@
 import abc
+import enum
 from typing import *
+
+import numpy as np
 
 from tablestakes.fresh import kv, utils, chunks, creators
 from tablestakes.fresh import html_css as hc
@@ -40,7 +43,22 @@ kv_creators = [
     ),
 ]
 
-style_css = hc.Css()
+
+class SelectorType(enum.Enum):
+    GROUP_CONTAINER = 1
+    KV_CONTAINER = 2
+    KV_KEY = 3
+    KV_VALUE = 4
+
+
+class KvAlign(enum.Enum):
+    LL = ('left', 'left')
+    LR = ('left', 'right')
+    CC = ('center', 'center')
+
+    def __init__(self, key_alignment: str, value_alignment: str):
+        self.key_alignment = key_alignment
+        self.value_alignment = value_alignment
 
 
 class KvGroup(hc.StyledHtmlTag, abc.ABC):
@@ -52,38 +70,106 @@ class KvGroup(hc.StyledHtmlTag, abc.ABC):
     def add_kv(self, kv: hc.StyledHtmlTag):
         self.kvs.append(kv)
 
+    @abc.abstractmethod
+    def get_selector(self, type: SelectorType):
+        pass
 
-class LColonKvGroup(KvGroup):
-    def __init__(self, klass: Union[hc.HtmlClass, str]):
-        super().__init__(klass)
+    def set_kv_horz_alignment(self, alignment: KvAlign):
+        self.css.add_style(hc.Css([
+            hc.CssChunk(self.get_selector(SelectorType.KV_KEY), {
+                'text-align': alignment.key_alignment,
+            }),
+            hc.CssChunk(self.get_selector(SelectorType.KV_VALUE), {
+                'text-align': alignment.value_alignment,
+            }),
+        ]))
+
+    def set_kv_vert_alignment(self, alignment: KvAlign):
+        self.css.add_style(hc.Css([
+            hc.CssChunk(self.get_selector(SelectorType.KV_KEY), {
+                'display': 'flex',
+                'align-items': alignment.key_alignment,
+            }),
+            hc.CssChunk(self.get_selector(SelectorType.KV_VALUE), {
+                'display': 'flex',
+                'align-items': alignment.value_alignment,
+            }),
+        ]))
+
+    def set_key_font_style(self, style: str = 'italics', selector_type=SelectorType.KV_KEY):
         self.css.add_style(
-            # group container styles
-            hc.CssChunk(f'div.{self.klass}', {
-                '': '',
-            }),
-            # container styles
-            hc.CssChunk(hc.HtmlClassesNested([self.klass, kv.CONTAINER_HTML_CLASS]), {
-                '': '',
-            }),
-            # key styles
-            hc.CssChunk(hc.HtmlClassesNested([self.klass, kv.KEY_HTML_CLASS]), {
-                '': '',
-            }),
-            # value styles
-            hc.CssChunk(hc.HtmlClassesNested([self.klass, kv.VALUE_HTML_CLASS]), {
-                '': '',
+            hc.CssChunk(self.get_selector(selector_type), {
+                'font-style': style,
+            })
+        )
+
+    def set_font_weight(self, weight: str = 'bold', selector_type=SelectorType.KV_KEY):
+        self.css.add_style(
+            hc.CssChunk(self.get_selector(selector_type), {
+                'font-weight': weight,
+            })
+        )
+
+    def do_add_colon_to_keys(self):
+        self.css.add_style(
+            hc.CssChunk(f'{self.get_selector(SelectorType.KV_KEY).to_selector_str()}:after', {
+                'content': "':'",
             }),
         )
 
 
+class LColonKvGroup(KvGroup):
+    def __init__(
+            self,
+            klass: Union[hc.HtmlClass, str],
+    ):
+        super().__init__(klass)
+
+        self.css.add_style(kv.KLoc.L.get_css())
+
+        self.css.add_style(hc.Css([
+            # group container styles
+            hc.CssChunk(self.get_selector(SelectorType.GROUP_CONTAINER), {
+                'display': 'grid',
+                'grid-template-columns': 'auto',
+                'grid-gap': '5px 10px',  # vert, horz
+            }),
+
+            # kv key styles
+            hc.CssChunk(self.get_selector(SelectorType.KV_KEY), {
+                'text-align': 'left',
+            }),
+
+            # kv value styles
+            hc.CssChunk(self.get_selector(SelectorType.KV_VALUE), {
+                'text-align': 'right',
+            }),
+        ]))
+
+    def get_selector(self, type: SelectorType) -> hc.CssSelector:
+        if type == SelectorType.GROUP_CONTAINER:
+            return hc.HtmlClass(self.klass)
+        elif type == SelectorType.KV_CONTAINER:
+            return hc.HtmlClassesNested([self.klass, kv.CONTAINER_HTML_CLASS])
+        elif type == SelectorType.KV_KEY:
+            return hc.HtmlClassesNested([self.klass, kv.KEY_HTML_CLASS])
+        elif type == SelectorType.KV_VALUE:
+            return hc.HtmlClassesNested([self.klass, kv.VALUE_HTML_CLASS])
+        else:
+            raise ValueError(f'Got unexpected container SelectorType: {type}')
+
 
 # grid = hc.Grid(classes=['maingrid'], num_rows=4, num_cols=4)
-# for kvc in kv_creators:
-#     grid.add_both(*kvc())
+
+group = LColonKvGroup('maingroup')
+for kvc in kv_creators:
+    group.add_both(*kvc())
+
+group.set_font_weight()
+group.do_add_colon_to_keys()
 
 doc = hc.Document()
 doc.add_styled_html(group)
-doc.add_style(style_css)
 
 
 hc.open_html_str(str(doc), do_print_too=True)
