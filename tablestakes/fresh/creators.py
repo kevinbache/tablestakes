@@ -1,14 +1,11 @@
 import abc
-from functools import partial
-from typing import Callable, Union, Iterable, Optional, Dict, List, Any
+from typing import Callable, Union, Iterable, Optional, Any
 
 import faker
 import numpy as np
 
-from tablestakes.fresh import html_css, kv, utils, chunks
-
-
-# from tablestakes.fresh.kv import kv.ProbDict, kv.Kloc, kv.KVHtml
+from tablestakes.fresh import kv, utils, chunks
+from tablestakes.fresh import html_css as hc
 
 
 class Creator(abc.ABC):
@@ -21,7 +18,7 @@ class Creator(abc.ABC):
 
 class CssCreator(Creator):
     @abc.abstractmethod
-    def __call__(self, *args, **kwargs) -> html_css.Css:
+    def __call__(self, *args, **kwargs) -> hc.Css:
         pass
 
 
@@ -47,14 +44,13 @@ class ChoiceCreator(Creator):
         return c
 
 
-
 class CssProbCreator(ChoiceCreator):
-    def __init__(self, css: Union[html_css.Css, html_css.CssChunk], prob: float = 0.5):
-        if isinstance(css, html_css.CssChunk):
-            css = html_css.Css([css])
+    def __init__(self, css: Union[hc.Css, hc.CssChunk], prob: float = 0.5):
+        if isinstance(css, hc.CssChunk):
+            css = hc.Css([css])
         choices = {
             css:            prob,
-            html_css.Css(): 1 - prob,
+            hc.Css(): 1 - prob,
         }
         super().__init__(choices)
 
@@ -82,8 +78,8 @@ class StrCombiner(Combiner):
 
 
 class CssCombiner(Combiner):
-    def __call__(self, values: Iterable[html_css.Css], *args, **kwargs):
-        css = html_css.Css()
+    def __call__(self, values: Iterable[hc.Css], *args, **kwargs):
+        css = hc.Css()
         for c in values:
             css.add_style(c)
         return css
@@ -111,34 +107,11 @@ class LambdaCreator(Creator):
         return self.fn()
 
 
-# class NestedCreators(Creator):
-#     def __init__(
-#             self,
-#             creators: Union[List[Creator], Dict[Creator, float]],
-#             initial_value=None,
-#     ):
-#         if isinstance(creators, dict):
-#             self.creators = creators.keys()
-#             self.probs = creators.values()
-#         else:
-#             self.creators = creators
-#             self.probs = [1.0] * len(self.creators)
-#
-#         self.initial_value = initial_value
-#
-#     def __call__(self, *args, **kwargs):
-#         value = self.initial_value
-#         for c, p in zip(self.creators, self.probs):
-#             if np.random.uniform() < p:
-#                 value = c(value)
-#         return value
-
-
 class TagWrapperCreator(Creator):
     def __init__(
             self,
             tag_name: str,
-            classes: html_css.HtmlClassesType = None,
+            classes: hc.HtmlClassesType = None,
             attributes: Optional[utils.StrDict] = None,
             probability_of_running = 1.0,
     ):
@@ -147,16 +120,16 @@ class TagWrapperCreator(Creator):
         self.attributes = attributes
         self.probability_of_running = probability_of_running
 
-    def __call__(self, contents: html_css.DirtyHtmlChunk, *args, **kwargs):
+    def __call__(self, contents: hc.DirtyHtmlChunk, *args, **kwargs):
         if np.random.uniform() < self.probability_of_running:
-            return str(html_css.HtmlTag(
+            return str(hc.HtmlTag(
                 tag_name=self.tag_name,
                 contents=contents,
                 classes=self.classes,
                 attributes=self.attributes,
             ))
         else:
-            return html_css.clean_dirty_html_chunk(contents)
+            return hc.clean_dirty_html_chunk(contents)
 
 
 class BoldTagWrapper(TagWrapperCreator):
@@ -187,7 +160,7 @@ class DateCreator(AbstractFakerCreator):
         '%A, %B %d, %Y'  # Monday, December 17, 2019
     ]
 
-    def __init__(self, pattern: Optional[str]='%m/%d/%Y', seed=42):
+    def __init__(self, pattern: Optional[str] = '%m/%d/%Y', seed=42):
         super().__init__(seed)
         if pattern is None:
             pattern = np.random.choice(self.patterns)
@@ -218,8 +191,8 @@ class KvCssCreator(Creator):
         self.kv_loc = kv_loc
         self.extra_css_creator = extra_css_creator
 
-    def __call__(self, kv_name: Optional[str] = None, *args, **kwargs) -> html_css.Css:
-        extra_css = html_css.Css()
+    def __call__(self, kv_name: Optional[str] = None, *args, **kwargs) -> hc.Css:
+        extra_css = hc.Css()
         if self.extra_css_creator is not None:
             extra_css += self.extra_css_creator()
         return self.kv_loc.get_css(kv_name).add_style(extra_css)
@@ -256,27 +229,11 @@ class KeyValueCreator(Creator):
 
     def get_css(self):
         if self.style_generator is None:
-            return html_css.Css()
+            return hc.Css()
 
         if self._css is None:
             self._css = self.style_generator(self.name)
         return self._css
-
-
-# class ContentsModifier(Callable):
-#     @abc.abstractmethod
-#     def __call__(self, contents: html_css.DirtyHtmlChunk, *args, **kwargs) -> html_css.DirtyHtmlChunk:
-#         pass
-#
-#
-# class ColonAdderModifier(ContentsModifier):
-#     def __call__(self, contents: html_css.DirtyHtmlChunk, *args, **kwargs) -> str:
-#         return f'{html_css.clean_dirty_html_chunk(contents)}:'
-#
-#
-# class BoldWrapperModifier(ContentsModifier):
-#     def __call__(self, contents: html_css.DirtyHtmlChunk, *args, **kwargs) -> str:
-#         return f'<b>{html_css.clean_dirty_html_chunk(contents)}</b>'
 
 
 if __name__ == '__main__':
@@ -339,11 +296,14 @@ if __name__ == '__main__':
         ),
     ]
 
-    grid = html_css.Grid(classes=['maingrid'], num_rows=4, num_cols=4)
+
+
+    grid = hc.Grid(classes=['maingrid'], num_rows=4, num_cols=4)
     for kvc in kv_creators:
         grid.add_both(*kvc())
 
-    doc = html_css.Document()
+    # assemble document
+    doc = hc.Document()
     doc.add_styled_html(grid)
 
     kvcssc = KvCssCreator(kv.KLoc.U)
@@ -351,13 +311,13 @@ if __name__ == '__main__':
 
     global_css_creator = ParallelCreators(
         creators=[
-            CssProbCreator(chunks.Keys.bold, prob=0.7),
+            CssProbCreator(chunks.Keys.bold, prob=2./3),
             CssProbCreator(chunks.Keys.add_colon, prob=0.5),
             ChoiceCreator({
                 chunks.Body.font_sans_serif: 1. / 3,
                 chunks.Body.font_serif:      1. / 3,
                 chunks.Body.font_mono:       1. / 3,
-            })
+            }),
         ],
         combiner=CssCombiner(),
     )
@@ -365,13 +325,6 @@ if __name__ == '__main__':
     global_css = global_css_creator()
     doc.add_style(global_css)
 
-    # extra_css = html_css.Css([
-    #     chunks.Keys.add_colon,
-    #     chunks.Keys.bold,
-    #     chunks.Body.font_sans_serif,
-    # ])
-    # doc.add_style(extra_css)
-
     print(str(doc))
-    html_css.open_html_str(str(doc))
+    hc.open_html_str(str(doc))
 

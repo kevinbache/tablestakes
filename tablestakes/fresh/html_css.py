@@ -192,6 +192,10 @@ class HtmlTag:
                     self.classes.append(c)
                 else:
                     raise ValueError(f'Got unknown classes type: {type(c)}.  Classes: {classes}')
+        elif isinstance(classes, str):
+            self.classes = [HtmlClass(classes)]
+        else:
+            raise ValueError(f'Got unknown classes variable, {classes}, of type: {type(classes)}.')
         self.attributes = attributes or {}
 
     def get_class_list(self):
@@ -379,10 +383,13 @@ class Document:
 ####################
 
 
-def open_html_str(html_str: str):
+def open_html_str(html_str: str, do_print_too=True):
     """open a string in a browser"""
     import tempfile
     import webbrowser
+
+    if do_print_too:
+        print(html_str)
 
     with tempfile.NamedTemporaryFile('w', delete=False, suffix='.html') as f:
         url = 'file://' + f.name
