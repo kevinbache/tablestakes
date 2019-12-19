@@ -1,7 +1,8 @@
 import enum
 from typing import *
 
-from tablestakes.fresh import utils, html_css
+from tablestakes.fresh import utils
+from tablestakes.fresh import html_css as hc
 
 
 CONTAINER_HTML_CLASS = 'kv_container'
@@ -17,7 +18,7 @@ def get_all_classes_container_selector(other_class_name: Optional[str] = None):
     if other_class_name is not None:
         classes.append(other_class_name)
     classes.append(CONTAINER_HTML_CLASS)
-    return html_css.HtmlClassesAll(classes)
+    return hc.HtmlClassesAll(classes)
 
 
 def get_all_classes_key_selector(kv_name: Optional[str] = None):
@@ -25,7 +26,7 @@ def get_all_classes_key_selector(kv_name: Optional[str] = None):
     if kv_name is not None:
         classes.append(kv_name)
     classes.append(KEY_HTML_CLASS)
-    return html_css.HtmlClassesAll(classes)
+    return hc.HtmlClassesAll(classes)
 
 
 def get_all_classes_value_selector(kv_name: Optional[str] = None):
@@ -33,15 +34,15 @@ def get_all_classes_value_selector(kv_name: Optional[str] = None):
     if kv_name is not None:
         classes.append(kv_name)
     classes.append(VALUE_HTML_CLASS)
-    return html_css.HtmlClassesAll(classes)
+    return hc.HtmlClassesAll(classes)
 
 
-class KVHtml(html_css.Div):
+class KvHtml(hc.Div):
     def __init__(
             self,
-            k_tag: html_css.HtmlTag,
-            v_tag: html_css.HtmlTag,
-            container_classes: html_css.HtmlClassesType,
+            k_tag: hc.HtmlTag,
+            v_tag: hc.HtmlTag,
+            container_classes: hc.HtmlClassesType,
             container_attributes: Optional[utils.StrDict] = None,
     ):
         super().__init__([k_tag, v_tag], container_classes, container_attributes)
@@ -51,14 +52,14 @@ class KVHtml(html_css.Div):
     @classmethod
     def from_strs(
             cls,
-            k_contents: html_css.DirtyHtmlChunk,
-            v_contents: html_css.DirtyHtmlChunk,
+            k_contents: hc.DirtyHtmlChunk,
+            v_contents: hc.DirtyHtmlChunk,
             kv_name: Optional[str] = None,
-    ) -> 'KVHtml':
+    ) -> 'KvHtml':
         return cls(
             container_classes=get_all_classes_container_selector(kv_name),
-            k_tag=html_css.Div(k_contents, classes=get_all_classes_key_selector(kv_name)),
-            v_tag=html_css.Div(v_contents, classes=get_all_classes_value_selector(kv_name)),
+            k_tag=hc.Div(k_contents, classes=get_all_classes_key_selector(kv_name)),
+            v_tag=hc.Div(v_contents, classes=get_all_classes_value_selector(kv_name)),
         )
 
     def get_container_class_list(self):
@@ -108,31 +109,31 @@ class KLoc(enum.Enum):
     def get_css(
             self,
             kv_name: Optional[str] = None,
-            containing_class: Optional[Union[html_css.HtmlClass, str]] = None,
-    ) -> html_css.Css:
-        kv_css = html_css.Css()
+            containing_class: Optional[Union[hc.HtmlClass, str]] = None,
+    ) -> hc.Css:
+        kv_css = hc.Css()
 
         # TODO: clean this selector creation business up
         if kv_name is not None and containing_class is not None:
             raise ValueError(f'Only one of kv_name and containing_class may be set')
         elif containing_class is not None:
-            if isinstance(containing_class, html_css.HtmlClass):
+            if isinstance(containing_class, hc.HtmlClass):
                 class_name = containing_class.name
             elif isinstance(containing_class, str):
                 class_name = containing_class
             else:
                 raise ValueError(f'containing_class should be either an HtmlClass or str.  '
                                  f'Got {type(containing_class)}')
-            container_selector = html_css.HtmlClassesNested([class_name, CONTAINER_HTML_CLASS])
-            key_selector = html_css.HtmlClassesNested([class_name, KEY_HTML_CLASS])
-            value_selector = html_css.HtmlClassesNested([class_name, VALUE_HTML_CLASS])
+            container_selector = hc.HtmlClassesNested([class_name, CONTAINER_HTML_CLASS])
+            key_selector = hc.HtmlClassesNested([class_name, KEY_HTML_CLASS])
+            value_selector = hc.HtmlClassesNested([class_name, VALUE_HTML_CLASS])
         else:
             # still fine if kv_name is None
             container_selector = get_all_classes_container_selector(kv_name)
             key_selector = get_all_classes_key_selector(kv_name)
             value_selector = get_all_classes_value_selector(kv_name)
 
-        kv_css.add_style(html_css.CssChunk(
+        kv_css.add_style(hc.CssChunk(
             container_selector,
             {
                 'display': 'grid',
@@ -141,7 +142,7 @@ class KLoc(enum.Enum):
             },
         ))
 
-        kv_css.add_style(html_css.CssChunk(
+        kv_css.add_style(hc.CssChunk(
             key_selector,
             {
                 'grid-column-start': self.key_col,
@@ -149,7 +150,7 @@ class KLoc(enum.Enum):
             },
         ))
 
-        kv_css.add_style(html_css.CssChunk(
+        kv_css.add_style(hc.CssChunk(
             value_selector,
             {
                 'grid-column-start': self.value_col,

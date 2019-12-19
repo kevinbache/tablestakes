@@ -198,7 +198,7 @@ class KvCssCreator(Creator):
         return self.kv_loc.get_css(kv_name).add_style(extra_css)
 
 
-class KeyValueCreator(Creator):
+class KvCreator(Creator):
     """Just a holder for a kv_name and associated creators"""
     def __init__(
             self,
@@ -215,12 +215,12 @@ class KeyValueCreator(Creator):
         self._html = None
         self._css = None
 
-    def __call__(self, *args, **kwargs) -> Tuple[kv.KVHtml, hc.Css]:
+    def __call__(self, *args, **kwargs) -> Tuple[kv.KvHtml, hc.Css]:
         return self.get_html(), self.get_css()
 
-    def get_html(self) -> kv.KVHtml:
+    def get_html(self) -> kv.KvHtml:
         if self._html is None:
-            self._html = kv.KVHtml.from_strs(
+            self._html = kv.KvHtml.from_strs(
                 k_contents=self.key_contents_gen(),
                 v_contents=self.value_contents_gen(),
                 kv_name=self.name,
@@ -264,32 +264,32 @@ if __name__ == '__main__':
 
     my_date_creator = DateCreator()
     kv_creators = [
-        KeyValueCreator(
+        KvCreator(
             name='to_address',
             key_contents_creator=ChoiceCreator(['Receiving', 'Receiving Address', 'Sent To', 'To']),
             value_contents_creator=AddressCreator(),
         ),
-        KeyValueCreator(
+        KvCreator(
             name='sale_address',
             key_contents_creator=ChoiceCreator(['Sale Address', 'Sold To']),
             value_contents_creator=AddressCreator(),
         ),
-        KeyValueCreator(
+        KvCreator(
             name='from_address',
             key_contents_creator=ChoiceCreator(['Shipping', 'Shipping Address', 'From', 'Address From']),
             value_contents_creator=AddressCreator(),
         ),
-        KeyValueCreator(
+        KvCreator(
             name='date_sent',
             key_contents_creator=ChoiceCreator(['Sent', 'Date Sent', 'Statement Date']),
             value_contents_creator=my_date_creator,
         ),
-        KeyValueCreator(
+        KvCreator(
             name='date_received',
             key_contents_creator=ChoiceCreator(['Received', 'Date Received']),
             value_contents_creator=my_date_creator,
         ),
-        KeyValueCreator(
+        KvCreator(
             name='invoice_number',
             key_contents_creator=ChoiceCreator(['Invoice', 'Invoice number', 'Account']),
             value_contents_creator=IntCreator(),

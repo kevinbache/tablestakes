@@ -335,15 +335,14 @@ class StyledHtmlTag:
     def add_style(self, css: Union[Css, CssChunk]):
         self.css.add_style(css)
 
-    # todo: this vs kv_styles.KvGroup.add_kv()
     def add_both(self, html_chunk: DirtyHtmlChunk, css: Union[Css, CssChunk]):
         self.add_contents(html_chunk)
         self.add_style(css)
 
-    def get_html(self):
+    def get_html(self) -> HtmlTag:
         return self.html_tag
 
-    def get_css(self):
+    def get_css(self) -> Css:
         return self.css
 
 
