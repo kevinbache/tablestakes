@@ -70,6 +70,12 @@ class KVHtml(html_css.Div):
     def get_value_class_list(self):
         return self._v_tag.get_class_list()
 
+    def get_key_tag(self):
+        return self._k_tag
+
+    def get_value_tag(self):
+        return self._v_tag
+
 
 class KLoc(enum.Enum):
     # names are where the key is relative to the value

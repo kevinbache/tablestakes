@@ -273,9 +273,39 @@ class Html(HtmlTag):
         super().__init__('html', contents, classes, attributes)
 
 
+class Table(HtmlTag):
+    def __init__(
+            self,
+            contents: DirtyHtmlChunk,
+            classes: HtmlClassesType = None,
+            attributes: Optional[utils.StrDict] = None,
+    ):
+        super().__init__('table', contents, classes, attributes)
+
+
+class Tr(HtmlTag):
+    def __init__(
+            self,
+            contents: DirtyHtmlChunk,
+            classes: HtmlClassesType = None,
+            attributes: Optional[utils.StrDict] = None,
+    ):
+        super().__init__('tr', contents, classes, attributes)
+
+
+class Td(HtmlTag):
+    def __init__(
+            self,
+            contents: DirtyHtmlChunk,
+            classes: HtmlClassesType = None,
+            attributes: Optional[utils.StrDict] = None,
+    ):
+        super().__init__('td', contents, classes, attributes)
+
 ###################
 # End HTML Things #
 ###################
+
 
 ######################
 # Start Combo Things #
@@ -305,6 +335,7 @@ class StyledHtmlTag:
     def add_style(self, css: Union[Css, CssChunk]):
         self.css.add_style(css)
 
+    # todo: this vs kv_styles.KvGroup.add_kv()
     def add_both(self, html_chunk: DirtyHtmlChunk, css: Union[Css, CssChunk]):
         self.add_contents(html_chunk)
         self.add_style(css)

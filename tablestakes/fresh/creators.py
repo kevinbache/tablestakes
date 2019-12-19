@@ -1,5 +1,5 @@
 import abc
-from typing import Callable, Union, Iterable, Optional, Any
+from typing import Callable, Union, Iterable, Optional, Any, Tuple
 
 import faker
 import numpy as np
@@ -215,7 +215,7 @@ class KeyValueCreator(Creator):
         self._html = None
         self._css = None
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs) -> Tuple[kv.KVHtml, hc.Css]:
         return self.get_html(), self.get_css()
 
     def get_html(self) -> kv.KVHtml:
@@ -227,7 +227,7 @@ class KeyValueCreator(Creator):
             )
         return self._html
 
-    def get_css(self):
+    def get_css(self) -> hc.Css:
         if self.style_generator is None:
             return hc.Css()
 
