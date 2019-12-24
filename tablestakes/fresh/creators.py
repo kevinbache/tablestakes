@@ -138,9 +138,10 @@ class BoldTagWrapper(TagWrapperCreator):
 
 
 class AbstractFakerCreator(Creator, abc.ABC):
-    def __init__(self, seed: int = 42):
+    def __init__(self, seed: Optional[int] = None):
         self.faker = faker.Faker()
-        self.faker.seed(seed)
+        if seed is not None:
+            self.faker.seed(seed)
 
 
 class AddressCreator(AbstractFakerCreator):
@@ -160,7 +161,7 @@ class DateCreator(AbstractFakerCreator):
         '%A, %B %d, %Y'  # Monday, December 17, 2019
     ]
 
-    def __init__(self, pattern: Optional[str] = '%m/%d/%Y', seed=42):
+    def __init__(self, pattern: Optional[str] = '%m/%d/%Y', seed=None):
         super().__init__(seed)
         if pattern is None:
             pattern = np.random.choice(self.patterns)
@@ -171,7 +172,7 @@ class DateCreator(AbstractFakerCreator):
 
 
 class IntCreator(AbstractFakerCreator):
-    def __init__(self, min=0, max=int(1e10), zero_pad_to_width: Optional[int]=None, seed=42):
+    def __init__(self, min=0, max=int(1e10), zero_pad_to_width: Optional[int]=None, seed=None):
         super().__init__(seed)
         self.min = min
         self.max = max

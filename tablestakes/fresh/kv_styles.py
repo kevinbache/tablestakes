@@ -9,6 +9,7 @@ from tablestakes.fresh import html_css as hc
 
 
 class SelectorType(enum.Enum):
+    """Represents regions within a KV Group"""
     GROUP_CONTAINER = 1
     TRS_IN_GROUP = 2
     TDS_IN_GROUP = 3
@@ -83,30 +84,35 @@ class KvGroup(hc.StyledHtmlTag, abc.ABC):
             }),
         )
 
-    def set_css_property(self, property: str, value: str, selector_type=SelectorType.KV_KEY):
+    def set_css_property(self, property: str, value: Optional[str], selector_type=SelectorType.KV_KEY):
+        if value is None:
+            return
         self.css.add_style(
             hc.CssChunk(self.get_selector(selector_type), {
                 property: value,
             })
         )
 
-    def set_font_family(self, value: str = '"Times New Roman", Times, serif', selector_type=SelectorType.KV_KEY):
+    def set_font_family(self, value: Optional[str] = '"Times New Roman", Times, serif', selector_type=SelectorType.KV_KEY):
         self.set_css_property('font-family', value, selector_type)
 
-    def set_font_style(self, value: str = 'italics', selector_type=SelectorType.KV_KEY):
+    def set_font_style(self, value: Optional[str] = 'italics', selector_type=SelectorType.KV_KEY):
         self.set_css_property('font-style', value, selector_type)
 
-    def set_font_weight(self, value: str = 'bold', selector_type=SelectorType.KV_KEY):
+    def set_font_weight(self, value: Optional[str] = 'bold', selector_type=SelectorType.KV_KEY):
         self.set_css_property('font-weight', value, selector_type)
 
-    def set_text_transform(self, value: str = 'uppercase', selector_type: SelectorType = SelectorType.KV_KEY):
+    def set_text_transform(self, value: Optional[str] = 'uppercase', selector_type: SelectorType = SelectorType.KV_KEY):
         self.set_css_property('text-transform', value, selector_type)
 
-    def set_bg_color(self, value: str = '#333333', selector_type: SelectorType = SelectorType.KEY_GROUP):
+    def set_bg_color(self, value: Optional[str] = '#333333', selector_type: SelectorType = SelectorType.KEY_GROUP):
         self.set_css_property('background-color', value, selector_type)
 
-    def set_color(self, value: str = '#ffffff', selector_type: SelectorType = SelectorType.KEY_GROUP):
+    def set_color(self, value: Optional[str] = '#ffffff', selector_type: SelectorType = SelectorType.KEY_GROUP):
         self.set_css_property('color', value, selector_type)
+
+    def set_padding(self, value: Optional[str] = '1px', selector_type: SelectorType = SelectorType.TDS_IN_GROUP):
+        self.set_css_property('padding', value, selector_type)
 
 
 class LColonKvGroup(KvGroup):
@@ -190,16 +196,9 @@ class ATableKvGroup(KvGroup):
         self.html_chunks.append(html_chunk)
         self.add_style(css)
 
-    def set_padding(self, amount='1px'):
-        self.css.add_style(
-            hc.CssChunk(self.get_selector(SelectorType.TDS_IN_GROUP), {
-                'padding': amount,
-            }),
-        )
-
 
 if __name__ == '__main__':
-    np.random.seed(42)
+    # np.random.seed(42)
 
     my_date_creator = creators.DateCreator()
     kv_creators = [
@@ -247,6 +246,8 @@ if __name__ == '__main__':
     group.set_padding('4px')
     group.set_bg_color()
     group.set_color()
+    group.set_font_family('monospace', SelectorType.GROUP_CONTAINER)
+    group.set_text_transform()
 
     for kvc in kv_creators:
         group.add_both(*kvc())
