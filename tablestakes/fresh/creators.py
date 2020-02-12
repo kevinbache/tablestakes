@@ -297,8 +297,6 @@ if __name__ == '__main__':
         ),
     ]
 
-
-
     grid = hc.Grid(classes=['maingrid'], num_rows=4, num_cols=4)
     for kvc in kv_creators:
         grid.add_both(*kvc())

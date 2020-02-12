@@ -33,3 +33,6 @@ class Body:
         'font': 'normal 12px Courier New, monospace',
     })
 
+    jelly_legs = html_css.CssChunk('body', {
+        'lower-style': 'squiggle jelly underline',
+    })

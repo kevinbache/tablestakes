@@ -1,4 +1,5 @@
 import abc
+import enum
 from typing import List, Union, Optional
 
 import yattag
@@ -169,6 +170,13 @@ def _html_chunk_to_str(chunk: HtmlChunk, join_str='\n'):
     return join_str.join([str(t) for t in chunk])
 
 
+class SelectableHtml(abc.ABC):
+    @abc.abstractmethod
+    def get_selector(self, sector_type: enum.Enum):
+        pass
+
+
+# TODO: convert to SelectableHtml
 class HtmlTag:
     def __init__(
             self,

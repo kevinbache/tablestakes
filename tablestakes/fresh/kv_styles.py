@@ -2,8 +2,6 @@ import abc
 import enum
 from typing import *
 
-import numpy as np
-
 from tablestakes.fresh import kv, utils, chunks, creators
 from tablestakes.fresh import html_css as hc
 
@@ -14,21 +12,25 @@ class SelectorType(enum.Enum):
     TRS_IN_GROUP = 2
     TDS_IN_GROUP = 3
 
+    # DIVs holding Ks and Vs, present even in tables
     KV_CONTAINER = 4
     KV_KEY = 5
     KV_VALUE = 6
 
-    KEY_GROUP = 7
-    VALUE_GROUP = 8
+    # can be a TR for ATable or a TD for LTable
+    TABLE_KEY_HOLDER = 7
+    TABLE_VALUE_HOLDER = 8
 
 
-KEY_GROUP_HTML_CLASS = 'key_group'
-VALUE_GROUP_HTML_CLASS = 'value_group'
+# TODO: why are these separate?  Others are in KV
+TABLE_KEY_HOLDER_HTML_CLASS = 'table_key_holder'
+TABLE_VALUE_HOLDER_HTML_CLASS = 'table_value_holder'
 
 
 class KvAlign(enum.Enum):
     LL = ('left', 'left')
     LR = ('left', 'right')
+    RL = ('right', 'left')
     CC = ('center', 'center')
     CL = ('center', 'left')
 
@@ -44,6 +46,7 @@ class KvGroup(hc.StyledHtmlTag, abc.ABC):
         self.kvs = []
 
     def get_selector(self, selector_type: SelectorType) -> hc.CssSelector:
+        # These go here rather than in SelectorType because of self.klass
         if selector_type == SelectorType.GROUP_CONTAINER:
             return hc.HtmlClass(self.klass)
         elif selector_type == SelectorType.KV_CONTAINER:
@@ -52,6 +55,14 @@ class KvGroup(hc.StyledHtmlTag, abc.ABC):
             return hc.HtmlClassesNested([self.klass, kv.KEY_HTML_CLASS])
         elif selector_type == SelectorType.KV_VALUE:
             return hc.HtmlClassesNested([self.klass, kv.VALUE_HTML_CLASS])
+        elif selector_type == SelectorType.TABLE_KEY_HOLDER:
+            return hc.HtmlClassesNested([self.klass, TABLE_KEY_HOLDER_HTML_CLASS])
+        elif selector_type == SelectorType.TABLE_VALUE_HOLDER:
+            return hc.HtmlClassesNested([self.klass, TABLE_VALUE_HOLDER_HTML_CLASS])
+        elif selector_type == SelectorType.TRS_IN_GROUP:
+            return hc.CssSelector(f'.{self.klass} tr')
+        elif selector_type == SelectorType.TDS_IN_GROUP:
+            return hc.CssSelector(f'.{self.klass} td')
         else:
             raise ValueError(f'Got unexpected container SelectorType: {selector_type}')
 
@@ -105,10 +116,10 @@ class KvGroup(hc.StyledHtmlTag, abc.ABC):
     def set_text_transform(self, value: Optional[str] = 'uppercase', selector_type: SelectorType = SelectorType.KV_KEY):
         self.set_css_property('text-transform', value, selector_type)
 
-    def set_bg_color(self, value: Optional[str] = '#333333', selector_type: SelectorType = SelectorType.KEY_GROUP):
+    def set_bg_color(self, value: Optional[str] = '#333333', selector_type: SelectorType = SelectorType.TABLE_KEY_HOLDER):
         self.set_css_property('background-color', value, selector_type)
 
-    def set_color(self, value: Optional[str] = '#ffffff', selector_type: SelectorType = SelectorType.KEY_GROUP):
+    def set_color(self, value: Optional[str] = '#ffffff', selector_type: SelectorType = SelectorType.TABLE_KEY_HOLDER):
         self.set_css_property('color', value, selector_type)
 
     def set_padding(self, value: Optional[str] = '1px', selector_type: SelectorType = SelectorType.TDS_IN_GROUP):
@@ -141,7 +152,7 @@ class LColonKvGroup(KvGroup):
         ]))
 
 
-class ATableKvGroup(KvGroup):
+class TableKvGroup(KvGroup, abc.ABC):
     def __init__(self, klass: Union[hc.HtmlClass, str]):
         super().__init__(klass)
         self.html_chunks = []
@@ -158,43 +169,52 @@ class ATableKvGroup(KvGroup):
             }),
         ]))
 
-    def get_selector(self, selector_type: SelectorType) -> hc.CssSelector:
-        if selector_type == SelectorType.KEY_GROUP:
-            return hc.HtmlClassesNested([self.klass, KEY_GROUP_HTML_CLASS])
-        elif selector_type == SelectorType.TRS_IN_GROUP:
-            return hc.CssSelector(f'.{self.klass} tr')
-        elif selector_type == SelectorType.TDS_IN_GROUP:
-            return hc.CssSelector(f'.{self.klass} td')
-        elif selector_type == SelectorType.VALUE_GROUP:
-            return hc.HtmlClassesNested([self.klass, VALUE_GROUP_HTML_CLASS])
-        elif selector_type == SelectorType.VALUE_GROUP:
-            return hc.HtmlClassesNested([self.klass, VALUE_GROUP_HTML_CLASS])
-        else:
-            return super().get_selector(selector_type)
-
+    @abc.abstractmethod
     def get_html(self):
-        return str(hc.Table(
-            contents=[
-                hc.Tr(
-                    contents=[hc.Td(kv.get_key_tag()) for kv in self.html_chunks],
-                    classes=[KEY_GROUP_HTML_CLASS],
-                ),
-                hc.Tr(
-                    contents=[hc.Td(kv.get_value_tag()) for kv in self.html_chunks],
-                    classes=[VALUE_GROUP_HTML_CLASS],
-                ),
-            ],
-            classes=[self.klass],
-        ))
+        pass
 
     def add_contents(self, html_chunk: hc.DirtyHtmlChunk):
-        raise ValueError(f"This method isn't value for this class "
+        raise ValueError(f"This method isn't valid for this class "
                          f"(because it makes a table rather than just dumping all "
                          f"the kvs in a <div> tag)")
 
     def add_both(self, html_chunk: kv.KvHtml, css: hc.Css):
         self.html_chunks.append(html_chunk)
         self.add_style(css)
+
+
+class ATableKvGroup(TableKvGroup):
+    def get_html(self):
+        return str(hc.Table(
+            contents=[
+                hc.Tr(
+                    contents=[hc.Td(kv.get_key_tag()) for kv in self.html_chunks],
+                    classes=[TABLE_KEY_HOLDER_HTML_CLASS],
+                ),
+                hc.Tr(
+                    contents=[hc.Td(kv.get_value_tag()) for kv in self.html_chunks],
+                    classes=[TABLE_VALUE_HOLDER_HTML_CLASS],
+                ),
+            ],
+            classes=[self.klass],
+        ))
+
+
+class LTableKvGroup(TableKvGroup):
+    def get_html(self):
+        return str(hc.Table(
+            contents=[
+                hc.Tr(
+                    contents=[
+                        hc.Td(contents=[kv_chunk.get_key_tag()], classes=[TABLE_KEY_HOLDER_HTML_CLASS]),
+                        hc.Td(contents=[kv_chunk.get_value_tag()], classes=[TABLE_VALUE_HOLDER_HTML_CLASS]),
+                    ],
+                    classes=[kv.CONTAINER_HTML_CLASS],
+                ) for kv_chunk in self.html_chunks
+            ],
+            classes=[self.klass],
+        ))
+
 
 
 if __name__ == '__main__':
@@ -238,8 +258,12 @@ if __name__ == '__main__':
     # group.set_font_weight()
     # group.do_add_colon_to_keys()
     # group.set_kv_horz_alignment(KvAlign.LR)
+    # # group.set_bg_color(selector_type=SelectorType.KV_KEY)
+    # # group.set_color(selector_type=SelectorType.KV_KEY)
+    # group.set_kv_horz_alignment(KvAlign.RL)
 
     group = ATableKvGroup('maingroup')
+    # group = LTableKvGroup('maingroup')
     group.set_font_weight()
     group.do_add_colon_to_keys()
     group.set_kv_horz_alignment(KvAlign.CL)
