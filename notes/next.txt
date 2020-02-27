@@ -1,0 +1,3 @@
+table TDs get second class: key/value container
+super div if kvhtml too?
+    look  at normLBHTML

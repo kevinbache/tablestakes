@@ -2,29 +2,9 @@ import abc
 import enum
 from typing import *
 
-from tablestakes.fresh import kv, utils, chunks, creators
+from tablestakes.fresh import kv, creators
 from tablestakes.fresh import html_css as hc
-
-
-class SelectorType(enum.Enum):
-    """Represents regions within a KV Group"""
-    GROUP_CONTAINER = 1
-    TRS_IN_GROUP = 2
-    TDS_IN_GROUP = 3
-
-    # DIVs holding Ks and Vs, present even in tables
-    KV_CONTAINER = 4
-    KV_KEY = 5
-    KV_VALUE = 6
-
-    # can be a TR for ATable or a TD for LTable
-    TABLE_KEY_HOLDER = 7
-    TABLE_VALUE_HOLDER = 8
-
-
-# TODO: why are these separate?  Others are in KV
-TABLE_KEY_HOLDER_HTML_CLASS = 'table_key_holder'
-TABLE_VALUE_HOLDER_HTML_CLASS = 'table_value_holder'
+from tablestakes.fresh.html_css import SelectorType
 
 
 class KvAlign(enum.Enum):
@@ -33,6 +13,9 @@ class KvAlign(enum.Enum):
     RL = ('right', 'left')
     CC = ('center', 'center')
     CL = ('center', 'left')
+    TB = ('flex-start', 'flex-end')
+    BB = ('flex-end', 'flex-end')
+    TT = ('flex-start', 'flex-start')
 
     def __init__(self, key_alignment: str, value_alignment: str):
         self.key_alignment = key_alignment
@@ -46,56 +29,71 @@ class KvGroup(hc.StyledHtmlTag, abc.ABC):
         self.kvs = []
 
     def get_selector(self, selector_type: SelectorType) -> hc.CssSelector:
-        # These go here rather than in SelectorType because of self.klass
-        if selector_type == SelectorType.GROUP_CONTAINER:
+        if selector_type == SelectorType.GROUP:
             return hc.HtmlClass(self.klass)
-        elif selector_type == SelectorType.KV_CONTAINER:
-            return hc.HtmlClassesNested([self.klass, kv.CONTAINER_HTML_CLASS])
-        elif selector_type == SelectorType.KV_KEY:
-            return hc.HtmlClassesNested([self.klass, kv.KEY_HTML_CLASS])
-        elif selector_type == SelectorType.KV_VALUE:
-            return hc.HtmlClassesNested([self.klass, kv.VALUE_HTML_CLASS])
-        elif selector_type == SelectorType.TABLE_KEY_HOLDER:
-            return hc.HtmlClassesNested([self.klass, TABLE_KEY_HOLDER_HTML_CLASS])
-        elif selector_type == SelectorType.TABLE_VALUE_HOLDER:
-            return hc.HtmlClassesNested([self.klass, TABLE_VALUE_HOLDER_HTML_CLASS])
         elif selector_type == SelectorType.TRS_IN_GROUP:
             return hc.CssSelector(f'.{self.klass} tr')
         elif selector_type == SelectorType.TDS_IN_GROUP:
             return hc.CssSelector(f'.{self.klass} td')
+        elif selector_type in (
+                SelectorType.KV_CONTAINER,
+                SelectorType.KEY,
+                SelectorType.VALUE,
+                SelectorType.KEY_OUTER,
+                SelectorType.VALUE_OUTER,
+                SelectorType.TABLE_KEY_HOLDER,
+                SelectorType.TABLE_VALUE_HOLDER
+        ):
+            return hc.HtmlClassesNested([self.klass, selector_type.html_class_name])
         else:
             raise ValueError(f'Got unexpected container SelectorType: {selector_type}')
 
     def set_kv_horz_alignment(self, alignment: KvAlign):
         self.css.add_style(hc.Css([
-            hc.CssChunk(self.get_selector(SelectorType.KV_KEY), {
+            hc.CssChunk(self.get_selector(SelectorType.KEY), {
                 'text-align': alignment.key_alignment,
             }),
-            hc.CssChunk(self.get_selector(SelectorType.KV_VALUE), {
+            hc.CssChunk(self.get_selector(SelectorType.VALUE), {
                 'text-align': alignment.value_alignment,
             }),
         ]))
 
     def set_kv_vert_alignment(self, alignment: KvAlign):
+        # raise ValueError("Doesn't work.")
+
         self.css.add_style(hc.Css([
-            hc.CssChunk(self.get_selector(SelectorType.KV_KEY), {
+            hc.CssChunk(self.get_selector(SelectorType.KEY_OUTER), {
                 'display': 'flex',
-                'align-items': alignment.key_alignment,
+                'flex-direction': 'column',
+                'justify-content': alignment.key_alignment,
+                'height': '100%',
             }),
-            hc.CssChunk(self.get_selector(SelectorType.KV_VALUE), {
+            hc.CssChunk(self.get_selector(SelectorType.VALUE_OUTER), {
                 'display': 'flex',
-                'align-items': alignment.value_alignment,
+                'flex-direction': 'column',
+                'justify-content': alignment.value_alignment,
+                'height': '100%',
             }),
+            # # TODO: this is dirty.  shoudln't have to change table styles here
+            # hc.CssChunk('table', {
+            #     'height': '1px',
+            # }),
+            # hc.CssChunk('tr', {
+            #     'height': '100%',
+            # }),
+            # hc.CssChunk('td', {
+            #     'height': '100%',
+            # }),
         ]))
 
     def do_add_colon_to_keys(self):
         self.css.add_style(
-            hc.CssChunk(f'{self.get_selector(SelectorType.KV_KEY).to_selector_str()}:after', {
+            hc.CssChunk(f'{self.get_selector(SelectorType.KEY).to_selector_str()}:after', {
                 'content': "':'",
             }),
         )
 
-    def set_css_property(self, property: str, value: Optional[str], selector_type=SelectorType.KV_KEY):
+    def set_css_property(self, property: str, value: Optional[str], selector_type=SelectorType.KEY):
         if value is None:
             return
         self.css.add_style(
@@ -104,16 +102,16 @@ class KvGroup(hc.StyledHtmlTag, abc.ABC):
             })
         )
 
-    def set_font_family(self, value: Optional[str] = '"Times New Roman", Times, serif', selector_type=SelectorType.KV_KEY):
+    def set_font_family(self, value: Optional[str] = '"Times New Roman", Times, serif', selector_type=SelectorType.KEY):
         self.set_css_property('font-family', value, selector_type)
 
-    def set_font_style(self, value: Optional[str] = 'italics', selector_type=SelectorType.KV_KEY):
+    def set_font_style(self, value: Optional[str] = 'italics', selector_type=SelectorType.KEY):
         self.set_css_property('font-style', value, selector_type)
 
-    def set_font_weight(self, value: Optional[str] = 'bold', selector_type=SelectorType.KV_KEY):
+    def set_font_weight(self, value: Optional[str] = 'bold', selector_type=SelectorType.KEY):
         self.set_css_property('font-weight', value, selector_type)
 
-    def set_text_transform(self, value: Optional[str] = 'uppercase', selector_type: SelectorType = SelectorType.KV_KEY):
+    def set_text_transform(self, value: Optional[str] = 'uppercase', selector_type: SelectorType = SelectorType.KEY):
         self.set_css_property('text-transform', value, selector_type)
 
     def set_bg_color(self, value: Optional[str] = '#333333', selector_type: SelectorType = SelectorType.TABLE_KEY_HOLDER):
@@ -134,19 +132,19 @@ class LColonKvGroup(KvGroup):
 
         self.css.add_style(hc.Css([
             # group container styles
-            hc.CssChunk(self.get_selector(SelectorType.GROUP_CONTAINER), {
+            hc.CssChunk(self.get_selector(SelectorType.GROUP), {
                 'display': 'grid',
                 'grid-template-columns': 'auto',
                 'grid-gap': '5px 10px',  # vert, horz
             }),
 
             # kv key styles
-            hc.CssChunk(self.get_selector(SelectorType.KV_KEY), {
+            hc.CssChunk(self.get_selector(SelectorType.KEY), {
                 'text-align': 'left',
             }),
 
             # kv value styles
-            hc.CssChunk(self.get_selector(SelectorType.KV_VALUE), {
+            hc.CssChunk(self.get_selector(SelectorType.VALUE), {
                 'text-align': 'right',
             }),
         ]))
@@ -157,17 +155,24 @@ class TableKvGroup(KvGroup, abc.ABC):
         super().__init__(klass)
         self.html_chunks = []
 
-        self.css.add_style(hc.Css([
-            hc.CssChunk(self.get_selector(SelectorType.GROUP_CONTAINER), {
+        css = hc.Css([
+            hc.CssChunk(self.get_selector(SelectorType.GROUP), {
                 'border-collapse': 'collapse',
+                'height': '1px',
             }),
-
+            # TODO: somehow self.get_selector(SelectorType.TDS_IN_GROUP) is returning '.atable_group'
             hc.CssChunk(self.get_selector(SelectorType.TDS_IN_GROUP), {
                 'border-style': 'solid',
                 'border-width': '1px',
                 'padding': '1px',
+                'height': '100%',
             }),
-        ]))
+            hc.CssChunk(self.get_selector(SelectorType.TRS_IN_GROUP), {
+                'height': '100%',
+            }),
+        ])
+        self.add_style(css)
+        print(self.get_css())
 
     @abc.abstractmethod
     def get_html(self):
@@ -182,6 +187,18 @@ class TableKvGroup(KvGroup, abc.ABC):
         self.html_chunks.append(html_chunk)
         self.add_style(css)
 
+    def set_border_style(self, value: Optional[str] = 'solid', selector_type=SelectorType.TDS_IN_GROUP):
+        self.set_css_property('border-style', value, selector_type)
+
+    def set_border_width(self, value: Optional[str] = '1px', selector_type=SelectorType.TDS_IN_GROUP):
+        self.set_css_property('border-style', value, selector_type)
+
+    def set_invisible_border(self):
+        self.set_border_style('none', selector_type=SelectorType.TDS_IN_GROUP)
+        self.set_border_style('none', selector_type=SelectorType.TRS_IN_GROUP)
+        self.set_border_width('0px', selector_type=SelectorType.TDS_IN_GROUP)
+        self.set_border_width('0px', selector_type=SelectorType.TRS_IN_GROUP)
+
 
 class ATableKvGroup(TableKvGroup):
     def get_html(self):
@@ -189,11 +206,11 @@ class ATableKvGroup(TableKvGroup):
             contents=[
                 hc.Tr(
                     contents=[hc.Td(kv.get_key_tag()) for kv in self.html_chunks],
-                    classes=[TABLE_KEY_HOLDER_HTML_CLASS],
+                    classes=[SelectorType.TABLE_KEY_HOLDER.html_class_name],
                 ),
                 hc.Tr(
                     contents=[hc.Td(kv.get_value_tag()) for kv in self.html_chunks],
-                    classes=[TABLE_VALUE_HOLDER_HTML_CLASS],
+                    classes=[SelectorType.TABLE_VALUE_HOLDER.html_class_name],
                 ),
             ],
             classes=[self.klass],
@@ -206,19 +223,25 @@ class LTableKvGroup(TableKvGroup):
             contents=[
                 hc.Tr(
                     contents=[
-                        hc.Td(contents=[kv_chunk.get_key_tag()], classes=[TABLE_KEY_HOLDER_HTML_CLASS]),
-                        hc.Td(contents=[kv_chunk.get_value_tag()], classes=[TABLE_VALUE_HOLDER_HTML_CLASS]),
+                        hc.Td(
+                            contents=[kv_chunk.get_key_tag()],
+                            classes=[SelectorType.TABLE_KEY_HOLDER.html_class_name]
+                        ),
+                        hc.Td(
+                            contents=[kv_chunk.get_value_tag()],
+                            classes=[SelectorType.TABLE_VALUE_HOLDER.html_class_name]
+                        ),
                     ],
-                    classes=[kv.CONTAINER_HTML_CLASS],
+                    classes=[SelectorType.KV_CONTAINER.html_class_name],
                 ) for kv_chunk in self.html_chunks
             ],
             classes=[self.klass],
         ))
 
 
-
 if __name__ == '__main__':
-    # np.random.seed(42)
+    import numpy as np
+    np.random.seed(42)
 
     my_date_creator = creators.DateCreator()
     kv_creators = [
@@ -254,7 +277,7 @@ if __name__ == '__main__':
         ),
     ]
 
-    # group = LColonKvGroup('maingroup')
+    # group = LColonKvGroup('lcolon_group')
     # group.set_font_weight()
     # group.do_add_colon_to_keys()
     # group.set_kv_horz_alignment(KvAlign.LR)
@@ -262,15 +285,26 @@ if __name__ == '__main__':
     # # group.set_color(selector_type=SelectorType.KV_KEY)
     # group.set_kv_horz_alignment(KvAlign.RL)
 
-    group = ATableKvGroup('maingroup')
-    # group = LTableKvGroup('maingroup')
+    # group = ATableKvGroup('atable_group')
+    # group.set_invisible_border()
+    # group.set_font_weight()
+    # group.do_add_colon_to_keys()
+    # group.set_kv_horz_alignment(KvAlign.CL)
+    # group.set_kv_vert_alignment(KvAlign.TT)
+    # group.set_padding('4px')
+    # group.set_bg_color()
+    # group.set_color()
+    # group.set_font_family('monospace', SelectorType.GROUP)
+    # group.set_text_transform()
+
+    group = LTableKvGroup('ltable_group')
+    group.set_invisible_border()
     group.set_font_weight()
     group.do_add_colon_to_keys()
-    group.set_kv_horz_alignment(KvAlign.CL)
+    group.set_kv_horz_alignment(KvAlign.LL)
+    group.set_kv_vert_alignment(KvAlign.TT)
     group.set_padding('4px')
-    group.set_bg_color()
-    group.set_color()
-    group.set_font_family('monospace', SelectorType.GROUP_CONTAINER)
+    group.set_font_family('sans serif', SelectorType.GROUP)
     group.set_text_transform()
 
     for kvc in kv_creators:

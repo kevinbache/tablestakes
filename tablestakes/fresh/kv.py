@@ -3,21 +3,20 @@ from typing import *
 
 from tablestakes.fresh import utils
 from tablestakes.fresh import html_css as hc
-
-
-CONTAINER_HTML_CLASS = 'kv_container'
-KEY_HTML_CLASS = 'kv_key'
-VALUE_HTML_CLASS = 'kv_value'
-
+from tablestakes.fresh.html_css import SelectorType
 
 ProbDict = Dict[Any, float]
 
 
+##############################################################################
+
+
+# TODO: compress these five functions
 def get_all_classes_container_selector(other_class_name: Optional[str] = None):
     classes = []
     if other_class_name is not None:
         classes.append(other_class_name)
-    classes.append(CONTAINER_HTML_CLASS)
+    classes.append(SelectorType.KV_CONTAINER.html_class_name)
     return hc.HtmlClassesAll(classes)
 
 
@@ -25,7 +24,7 @@ def get_all_classes_key_selector(kv_name: Optional[str] = None):
     classes = []
     if kv_name is not None:
         classes.append(kv_name)
-    classes.append(KEY_HTML_CLASS)
+    classes.append(SelectorType.KEY.html_class_name)
     return hc.HtmlClassesAll(classes)
 
 
@@ -33,8 +32,27 @@ def get_all_classes_value_selector(kv_name: Optional[str] = None):
     classes = []
     if kv_name is not None:
         classes.append(kv_name)
-    classes.append(VALUE_HTML_CLASS)
+    classes.append(SelectorType.VALUE.html_class_name)
     return hc.HtmlClassesAll(classes)
+
+
+def get_all_classes_key_outer_selector(kv_name: Optional[str] = None):
+    classes = []
+    if kv_name is not None:
+        classes.append(kv_name)
+    classes.append(SelectorType.KEY_OUTER.html_class_name)
+    return hc.HtmlClassesAll(classes)
+
+
+def get_all_classes_value_outer_selector(kv_name: Optional[str] = None):
+    classes = []
+    if kv_name is not None:
+        classes.append(kv_name)
+    classes.append(SelectorType.VALUE_OUTER.html_class_name)
+    return hc.HtmlClassesAll(classes)
+
+
+##############################################################################
 
 
 class KvHtml(hc.Div):
@@ -58,8 +76,20 @@ class KvHtml(hc.Div):
     ) -> 'KvHtml':
         return cls(
             container_classes=get_all_classes_container_selector(kv_name),
-            k_tag=hc.Div(k_contents, classes=get_all_classes_key_selector(kv_name)),
-            v_tag=hc.Div(v_contents, classes=get_all_classes_value_selector(kv_name)),
+            k_tag=hc.Div(
+                contents=hc.Div(
+                    contents=k_contents,
+                    classes=get_all_classes_key_selector(kv_name)
+                ),
+                classes=get_all_classes_key_outer_selector(kv_name),
+            ),
+            v_tag=hc.Div(
+                contents=hc.Div(
+                    contents=v_contents,
+                    classes=get_all_classes_value_selector(kv_name)
+                ),
+                classes=get_all_classes_value_outer_selector(kv_name)
+            ),
         )
 
     def get_container_class_list(self):
@@ -124,11 +154,11 @@ class KLoc(enum.Enum):
             else:
                 raise ValueError(f'containing_class should be either an HtmlClass or str.  '
                                  f'Got {type(containing_class)}')
-            container_selector = hc.HtmlClassesNested([class_name, CONTAINER_HTML_CLASS])
-            key_selector = hc.HtmlClassesNested([class_name, KEY_HTML_CLASS])
-            value_selector = hc.HtmlClassesNested([class_name, VALUE_HTML_CLASS])
+            container_selector = hc.HtmlClassesNested([class_name, SelectorType.KV_CONTAINER.html_class_name])
+            key_selector = hc.HtmlClassesNested([class_name, SelectorType.KEY.html_class_name])
+            value_selector = hc.HtmlClassesNested([class_name, SelectorType.VALUE.html_class_name])
         else:
-            # still fine if kv_name is None
+            # containing_class is None.  kv_name is set or is None
             container_selector = get_all_classes_container_selector(kv_name)
             key_selector = get_all_classes_key_selector(kv_name)
             value_selector = get_all_classes_value_selector(kv_name)
@@ -159,5 +189,3 @@ class KLoc(enum.Enum):
         ))
 
         return kv_css
-
-

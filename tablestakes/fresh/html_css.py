@@ -17,7 +17,7 @@ class CssSelector:
         self.name = name
 
     def __repr__(self):
-        return self.name
+        return self.to_selector_str()
 
     def __eq__(self, other):
         return self.to_selector_str() == other.to_selector_str()
@@ -34,9 +34,6 @@ class AbstractHtmlClasses(CssSelector, abc.ABC):
         del self.name
 
         self.classes = classes
-
-    def __repr__(self):
-        return self.classes
 
     @abc.abstractmethod
     def get_join_str(self): pass
@@ -104,12 +101,10 @@ class Css:
 
         if chunks:
             for chunk in chunks:
-                self._selector_to_chunk[chunk.selector.to_selector_str()] = chunk
+                self._add_chunk(chunk)
 
     def _add_chunk(self, chunk: CssChunk):
         new_selector_str = chunk.selector.to_selector_str()
-        print(chunk)
-        print()
         if new_selector_str in self._selector_to_chunk:
             self._selector_to_chunk[new_selector_str].add_style(chunk)
         else:
@@ -239,6 +234,16 @@ class Div(HtmlTag):
             attributes: Optional[utils.StrDict] = None,
     ):
         super().__init__('div', contents, classes, attributes)
+
+
+class Span(HtmlTag):
+    def __init__(
+            self,
+            contents: DirtyHtmlChunk,
+            classes: HtmlClassesType = None,
+            attributes: Optional[utils.StrDict] = None,
+    ):
+        super().__init__('span', contents, classes, attributes)
 
 
 class Body(HtmlTag):
@@ -444,3 +449,24 @@ def open_html_str(html_str: str, do_print_too=True):
         f.write(html_str)
     webbrowser.open(url)
 
+
+class SelectorType(enum.Enum):
+    """Represents regions within a KV Group"""
+    GROUP = (1, None, )
+    TRS_IN_GROUP = (2, None, )
+    TDS_IN_GROUP = (3, None, )
+
+    # DIVs holding Ks and Vs, present even in tables
+    KV_CONTAINER = (4, 'kv_container', )
+    KEY = (5, 'kv_key',)
+    VALUE = (6, 'kv_value',)
+    KEY_OUTER = (7, 'kv_key_container',)
+    VALUE_OUTER = (8, 'kv_value_container',)
+
+    # can be a TR for ATable or a TD for LTable
+    TABLE_KEY_HOLDER = (9, 'table_key_holder', )
+    TABLE_VALUE_HOLDER = (10, 'table_value_holder', )
+
+    def __init__(self, id: int, html_class_name: str):
+        self.id = id
+        self.html_class_name = html_class_name

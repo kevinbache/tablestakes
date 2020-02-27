@@ -1,8 +1,9 @@
-from tablestakes.fresh import html_css, kv
+from tablestakes.fresh import html_css
+from tablestakes.fresh.html_css import SelectorType
 
 
 class Keys:
-    key_class = kv.KEY_HTML_CLASS
+    key_class = SelectorType.KEY.html_class_name
 
     bold = html_css.CssChunk(
         f'.{key_class}', {
