@@ -1,4 +1,7 @@
-from typing import Iterable
+"""Document representation with conversion from Google OCR format."""
+import abc
+import itertools
+from typing import Iterable, List
 
 from tablestakes.fresh import utils
 
@@ -51,10 +54,24 @@ class Word(Bounded):
         )
 
 
-class Paragraph(Bounded):
-    def __init__(self, words: Iterable[Word], bbox: BBox):
+class HasWordsMixin(abc.ABC):
+    @abc.abstractmethod
+    def get_words(self) -> List[Word]:
+        pass
+
+    @staticmethod
+    def _flatten_words(elements: List["HasWordsMixin"]):
+        return list(itertools.chain.from_iterable([e.get_words() for e in elements]))
+
+
+class Paragraph(Bounded, HasWordsMixin):
+    def __init__(self, words: List[Word], bbox: BBox):
         super().__init__(bbox)
         self.words = words
+
+    def __repr__(self):
+        words = ' '.join([w.text for w in self.words])
+        return f'Paragraph("{words}", {self.bbox.simple_repr()})'
 
     @classmethod
     def from_dict(cls, d: dict):
@@ -63,16 +80,19 @@ class Paragraph(Bounded):
             bbox=BBox.from_dict(d['boundingBox']),
         )
 
-    def __repr__(self):
-        words = ' '.join([w.text for w in self.words])
-        return f'Paragraph("{words}", {self.bbox.simple_repr()})'
+    def get_words(self) -> List[Word]:
+        return self.words
 
 
-class Block(Bounded):
-    def __init__(self, paragraphs: Iterable[Paragraph], bbox: BBox, block_type: str):
+class Block(Bounded, HasWordsMixin):
+    def __init__(self, paragraphs: List[Paragraph], bbox: BBox, block_type: str):
         super().__init__(bbox),
         self.paragraphs = paragraphs
         self.block_type = block_type
+
+    def __repr__(self):
+        paragraphs = '\n  '.join([str(p) for p in self.paragraphs])
+        return f'Block(\n  {paragraphs} \n  {self.bbox.simple_repr()}\n)'
 
     @classmethod
     def from_dict(cls, d: dict):
@@ -82,16 +102,14 @@ class Block(Bounded):
             block_type=d['blockType'],
         )
 
-    def __repr__(self):
-        paragraphs = '\n  '.join([str(p) for p in self.paragraphs])
-        return f'Block(\n  {paragraphs} \n  {self.bbox.simple_repr()}\n)'
+    def get_words(self) -> List[Word]:
+        return self._flatten_words(self.paragraphs)
 
 
-class Page(Bounded):
-    def __init__(self, blocks: Iterable[Block], bbox: BBox):
+class Page(Bounded, HasWordsMixin):
+    def __init__(self, blocks: List[Block], bbox: BBox):
         super().__init__(bbox),
         self.blocks = blocks
-        # self.block_type = block_type
 
     def __repr__(self):
         blocks = '\n  '.join([str(b).replace('\n', '\n  ') for b in self.blocks])
@@ -104,9 +122,12 @@ class Page(Bounded):
             bbox=BBox(xmin=0, xmax=d['width'], ymin=0, ymax=d['height']),
         )
 
+    def get_words(self) -> List[Word]:
+        return self._flatten_words(self.blocks)
 
-class Document:
-    def __init__(self, pages: Iterable[Page]):
+
+class Document(HasWordsMixin):
+    def __init__(self, pages: List[Page]):
         self.pages = pages
 
     def __repr__(self):
@@ -119,32 +140,31 @@ class Document:
             pages=[Page.from_dict(p) for p in d['fullTextAnnotation']['pages']],
         )
 
+    def get_words(self) -> List[Word]:
+        return self._flatten_words(self.pages)
+
 
 if __name__ == '__main__':
     d = utils.read_json('sample_invoice_ocrd.json')
 
     print("================ Paragraph ================")
     pd = d['fullTextAnnotation']['pages'][0]['blocks'][0]['paragraphs'][0]
-    # utils.print_dict(pd)
     p = Paragraph.from_dict(pd)
     print(p)
 
     print("================ Block ================")
     bd = d['fullTextAnnotation']['pages'][0]['blocks'][0]
-    # utils.print_dict(bd)
     b = Block.from_dict(bd)
     print(b)
     print()
 
     print("================ Page ================")
     paged = d['fullTextAnnotation']['pages'][0]
-    # utils.print_dict(paged)
     page = Page.from_dict(paged)
     print(page)
     print()
 
     print("================ Document ================")
-    # utils.print_dict(dd)
     doc = Document.from_dict(d)
     print(doc)
     print()
