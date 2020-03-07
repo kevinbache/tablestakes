@@ -74,16 +74,6 @@ class KvGroup(hc.StyledHtmlTag, abc.ABC):
                 'justify-content': alignment.value_alignment,
                 'height': '100%',
             }),
-            # # TODO: this is dirty.  shoudln't have to change table styles here
-            # hc.CssChunk('table', {
-            #     'height': '1px',
-            # }),
-            # hc.CssChunk('tr', {
-            #     'height': '100%',
-            # }),
-            # hc.CssChunk('td', {
-            #     'height': '100%',
-            # }),
         ]))
 
     def do_add_colon_to_keys(self):
@@ -160,7 +150,6 @@ class TableKvGroup(KvGroup, abc.ABC):
                 'border-collapse': 'collapse',
                 'height': '1px',
             }),
-            # TODO: somehow self.get_selector(SelectorType.TDS_IN_GROUP) is returning '.atable_group'
             hc.CssChunk(self.get_selector(SelectorType.TDS_IN_GROUP), {
                 'border-style': 'solid',
                 'border-width': '1px',

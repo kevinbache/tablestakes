@@ -11,7 +11,7 @@ from tablestakes.fresh import utils
 # CSS Selectors #
 #################
 class CssSelector:
-    """Raw CssSelector.  Can be a complex string."""
+    """A raw CssSelector.  Can be a complex string."""
 
     def __init__(self, name: str):
         self.name = name
@@ -25,10 +25,12 @@ class CssSelector:
     def __hash__(self):
         return hash(self.to_selector_str())
 
-    def to_selector_str(self): return self.name
+    def to_selector_str(self):
+        return self.name
 
 
 class AbstractHtmlClasses(CssSelector, abc.ABC):
+    """Abstract CssSelector for one or more classes, nested or all."""
     def __init__(self, classes: List[str]):
         super().__init__('')
         del self.name
@@ -45,19 +47,23 @@ class AbstractHtmlClasses(CssSelector, abc.ABC):
 
 
 class HtmlClassesAll(AbstractHtmlClasses):
+    """Select all elements with all of these classes"""
     def get_join_str(self): return ''
 
 
 class HtmlClass(HtmlClassesAll):
+    """Select all elements with this class"""
     def __init__(self, name: str):
         super().__init__([name])
 
 
 class HtmlClassesNested(AbstractHtmlClasses):
+    """Select an element with class nested inside element with class (possibly more than 2 layers deep)"""
     def get_join_str(self): return ' '
 
 
 class HtmlId(CssSelector):
+    """Select the element with the given id."""
     def to_selector_str(self): return f'#{self.name}'
 
 
@@ -142,6 +148,7 @@ HtmlChunk = List[Union[str, 'HtmlTag']]
 # an HtmlChunk which can also be a raw str or tag rather than a list of them.
 DirtyHtmlChunk = Union[HtmlChunk, str, 'HtmlTag']
 
+
 def check_dirty_html_chunk_type(chunk: DirtyHtmlChunk):
     if isinstance(chunk, list):
         for e in chunk:
@@ -165,13 +172,13 @@ def _html_chunk_to_str(chunk: HtmlChunk, join_str='\n'):
     return join_str.join([str(t) for t in chunk])
 
 
-class SelectableHtml(abc.ABC):
-    @abc.abstractmethod
-    def get_selector(self, sector_type: enum.Enum):
-        pass
+# class SelectableHtml(abc.ABC):
+#     @abc.abstractmethod
+#     def get_selector(self, sector_type: enum.Enum):
+#         pass
 
 
-# TODO: convert to SelectableHtml
+# TODO: convert to SelectableHtml?
 class HtmlTag:
     def __init__(
             self,
@@ -468,5 +475,6 @@ class SelectorType(enum.Enum):
     TABLE_VALUE_HOLDER = (10, 'table_value_holder', )
 
     def __init__(self, id: int, html_class_name: str):
+        # need ids so equality tests don't fail with the three None classes
         self.id = id
         self.html_class_name = html_class_name

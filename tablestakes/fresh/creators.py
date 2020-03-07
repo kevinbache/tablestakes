@@ -50,7 +50,7 @@ class CssProbCreator(ChoiceCreator):
             css = hc.Css([css])
         choices = {
             css:            prob,
-            hc.Css(): 1 - prob,
+            hc.Css():   1 - prob,
         }
         super().__init__(choices)
 
