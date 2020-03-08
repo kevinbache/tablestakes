@@ -1,7 +1,7 @@
 """Document representation with conversion from Google OCR format."""
 import abc
 import itertools
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 from tablestakes.fresh import utils
 
@@ -34,9 +34,36 @@ class Bounded:
         self.bbox = bbox
 
 
+DEBUG_MODE = True
+def print_extra_properties(symbol_dict: dict, word_text: str):
+    """debug function for looking at extra properties"""
+    if 'property' in symbol_dict:
+        import copy
+        p = copy.copy(symbol_dict['property'])
+        if 'detectedLanguages' in p:
+            del p['detectedLanguages']
+        if p:
+            print(f'in word with text {word_text}, symbol {symbol_dict["text"]} got extra properties')
+            utils.print_dict(p)
+
+
+"""
+in word with text Sasco, symbol o got extra properties
+  detectedBreak: {'type': 'SPACE'}
+in word with text 2400188ar, symbol r got extra properties
+  detectedBreak: {'type': 'EOL_SURE_SPACE'}
+in word with text 8.93, symbol 3 got extra properties
+  detectedBreak: {'type': 'EOL_SURE_SPACE'}
+in word with text 8.93, symbol 3 got extra properties
+  detectedBreak: {'type': 'SPACE'}
+"""
+
+
 class Word(Bounded):
     def __init__(self, text: str, bbox: BBox):
         super().__init__(bbox)
+        if text == "D16352004":
+            print("found it")
         self.text = text
 
     def __repr__(self):
@@ -44,12 +71,17 @@ class Word(Bounded):
 
     @staticmethod
     def _get_word_text(w: dict):
-        return ''.join([s['text'] for s in w['symbols']])
+        text = ''.join([s['text'] for s in w['symbols']])
+        if DEBUG_MODE:
+            for s in w['symbols']:
+                print_extra_properties(s, text)
+        return text
 
     @classmethod
     def from_dict(cls, w: dict):
+        text = cls._get_word_text(w)
         return cls(
-            text=cls._get_word_text(w),
+            text=text,
             bbox=BBox.from_dict(w['boundingBox']),
         )
 
@@ -73,10 +105,31 @@ class Paragraph(Bounded, HasWordsMixin):
         words = ' '.join([w.text for w in self.words])
         return f'Paragraph("{words}", {self.bbox.simple_repr()})'
 
+    @staticmethod
+    def _maybe_create_break_word(w: dict) -> Optional[Word]:
+        s = w['symbols'][-1]
+        if 'property' in s:
+            p = s['property']
+            if 'detectedBreak' in p:
+                db = p['detectedBreak']
+                if db['type'] == 'EOL_SURE_SPACE':
+                    bbox = BBox.from_dict(w['boundingBox'])
+                    bbox.xmin = bbox.xmax
+                    word = Word(text='\n', bbox=bbox)
+                    return word
+        return None
+
     @classmethod
     def from_dict(cls, d: dict):
+        words = []
+        for w in d['words']:
+            word = Word.from_dict(w)
+            words.append(word)
+            break_word = cls._maybe_create_break_word(w)
+            if break_word:
+                words.append(break_word)
         return cls(
-            words=[Word.from_dict(w) for w in d['words']],
+            words=words,
             bbox=BBox.from_dict(d['boundingBox']),
         )
 
@@ -147,16 +200,16 @@ class Document(HasWordsMixin):
 if __name__ == '__main__':
     d = utils.read_json('sample_invoice_ocrd.json')
 
-    print("================ Paragraph ================")
-    pd = d['fullTextAnnotation']['pages'][0]['blocks'][0]['paragraphs'][0]
-    p = Paragraph.from_dict(pd)
-    print(p)
-
-    print("================ Block ================")
-    bd = d['fullTextAnnotation']['pages'][0]['blocks'][0]
-    b = Block.from_dict(bd)
-    print(b)
-    print()
+    # print("================ Paragraph ================")
+    # pd = d['fullTextAnnotation']['pages'][0]['blocks'][0]['paragraphs'][0]
+    # p = Paragraph.from_dict(pd)
+    # print(p)
+    #
+    # print("================ Block ================")
+    # bd = d['fullTextAnnotation']['pages'][0]['blocks'][0]
+    # b = Block.from_dict(bd)
+    # print(b)
+    # print()
 
     print("================ Page ================")
     paged = d['fullTextAnnotation']['pages'][0]
@@ -164,7 +217,7 @@ if __name__ == '__main__':
     print(page)
     print()
 
-    print("================ Document ================")
-    doc = Document.from_dict(d)
-    print(doc)
-    print()
+    # print("================ Document ================")
+    # doc = Document.from_dict(d)
+    # print(doc)
+    # print()
