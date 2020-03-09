@@ -2,6 +2,7 @@ import abc
 import enum
 from typing import List, Union, Optional
 
+import weasyprint
 import yattag
 
 from tablestakes.fresh import utils
@@ -396,6 +397,25 @@ class Grid(StyledHtmlTag):
         super().__init__(html_tag=html, css=css)
 
 
+class PageSize(enum.Enum):
+    A4 = 'A4',
+    LETTER = 'Letter',
+
+    def __init__(self, size_str: str):
+        self.size_str = size_str
+
+
+class BaseCss(enum.Enum):
+    FIREFOX = 'default_firefox_css.css'
+    CHROME = 'default_chrome_css.css'
+
+    def __init__(self, filename: str):
+        self.filename = filename
+
+    def __str__(self):
+        return utils.read_txt(self.filename)
+
+
 # TODO: subclass StyledHtmlTag?  StyledHtmlContents?
 class Document:
     def __init__(self, contents: Optional[DirtyHtmlChunk] = None, css: Optional[Css] = None):
@@ -425,6 +445,29 @@ class Document:
         ])
 
         return str(html)
+
+    PAGE_CSS_TEMPLATE = '@page {{ size: {size}; margin: {margin} }}'
+
+    # def save_pdf(self, output_fullfule: str, page_size=PageSize.LETTER, margin='1in', default_css=BaseCss.FIREFOX):
+    #     html = weasyprint.HTML(string=str(self))
+    #     css_str = self.PAGE_CSS_TEMPLATE.format(size=page_size.size_str, margin=margin)
+    #     html.write_pdf(
+    #         target=output_fullfule,
+    #         stylesheets=[
+    #             weasyprint.CSS(string='body {background-color: coral;}'),
+    #             weasyprint.CSS(string=str(default_css)),
+    #             weasyprint.CSS(string=css_str),
+    #         ],
+    #     )
+
+    def save_pdf(self, output_fullfile: str, page_size=PageSize.LETTER, margin='1in'):
+        import pdfkit
+        options = {
+            'page-size': page_size.size_str,
+        }
+        for side in ('top', 'bottom', 'left', 'right'):
+            options[f'margin-{side}'] = margin
+        pdfkit.from_string(str(self), output_fullfile, options=options)
 
 
 '''

@@ -42,7 +42,9 @@ setup(
         'scipy',
         'pandas',
         'keras',
-        'google-cloud-storage', 'yattag'
+        'google-cloud-storage',
+        'yattag',
+        'faker',
     ],
 
     classifiers=[

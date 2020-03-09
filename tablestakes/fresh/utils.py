@@ -31,3 +31,8 @@ def print_dict(d: Dict, indent_width=2, extra_key_width=0, do_norm_key_width=Tru
 def read_json(filename: str):
     with open(filename, mode='r') as f:
         return json.load(f)
+
+
+def read_txt(filename: str):
+    with open(filename, mode='r') as f:
+        return f.read()

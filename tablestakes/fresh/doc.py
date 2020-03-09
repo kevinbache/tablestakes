@@ -204,7 +204,7 @@ class Document(HasWordsMixin):
 
 
 if __name__ == '__main__':
-    d = utils.read_json('sample_invoice_ocrd.json')
+    d = utils.read_json('../../data/ocr/sample_invoice_ocrd.json')
 
     # print("================ Paragraph ================")
     # pd = d['fullTextAnnotation']['pages'][0]['blocks'][0]['paragraphs'][0]
