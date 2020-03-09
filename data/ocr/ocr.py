@@ -1,7 +1,8 @@
 """Document representation with conversion from Google OCR format."""
 import abc
+import enum
 import itertools
-from typing import Iterable, List, Optional
+from typing import List, Optional
 
 from tablestakes.fresh import utils
 
@@ -34,7 +35,7 @@ class Bounded:
         self.bbox = bbox
 
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 def print_extra_properties(symbol_dict: dict, word_text: str):
     """debug function for looking at extra properties"""
     if 'property' in symbol_dict:
@@ -60,11 +61,16 @@ in word with text 8.93, symbol 3 got extra properties
 
 
 class Word(Bounded):
-    def __init__(self, text: str, bbox: BBox):
+    class WordType(enum.Enum):
+        TEXT = 1
+        LINEBREAK = 2
+
+    def __init__(self, text: str, bbox: BBox, word_type=WordType.TEXT):
         super().__init__(bbox)
-        if text == "D16352004":
-            print("found it")
+        # if text == "D16352004":
+        #     print("found it")
         self.text = text
+        self.word_type = word_type
 
     def __repr__(self):
         return f'Word("{self.text}", {self.bbox.simple_repr()})'
@@ -102,7 +108,7 @@ class Paragraph(Bounded, HasWordsMixin):
         self.words = words
 
     def __repr__(self):
-        words = ' '.join([w.text for w in self.words])
+        words = ' '.join([w.text for w in self.words if w.word_type == Word.WordType.TEXT])
         return f'Paragraph("{words}", {self.bbox.simple_repr()})'
 
     @staticmethod
@@ -115,7 +121,7 @@ class Paragraph(Bounded, HasWordsMixin):
                 if db['type'] == 'EOL_SURE_SPACE':
                     bbox = BBox.from_dict(w['boundingBox'])
                     bbox.xmin = bbox.xmax
-                    word = Word(text='\n', bbox=bbox)
+                    word = Word(text='\n', bbox=bbox, word_type=Word.WordType.LINEBREAK)
                     return word
         return None
 
@@ -126,7 +132,7 @@ class Paragraph(Bounded, HasWordsMixin):
             word = Word.from_dict(w)
             words.append(word)
             break_word = cls._maybe_create_break_word(w)
-            if break_word:
+            if break_word is not None:
                 words.append(break_word)
         return cls(
             words=words,
