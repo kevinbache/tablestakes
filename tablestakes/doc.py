@@ -68,10 +68,11 @@ class Word(Bounded):
         TEXT = 1
         LINEBREAK = 2
 
-    def __init__(self, text: str, bbox: BBox, word_type=WordType.TEXT):
+    def __init__(self, text: str, bbox: BBox, word_type=WordType.TEXT, confidence=-1):
         super().__init__(bbox)
         self.text = text
         self.word_type = word_type
+        self.confidence = -1
 
     def __repr__(self):
         return f'Word("{self.text}", {self.bbox.simple_repr()})'
