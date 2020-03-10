@@ -1,0 +1,56 @@
+training loop needs to:
+    create html + css document
+    convert to pdf
+
+for inferece
+    OcrProvider:
+        ingest pdf
+        convert to images
+        ocr images
+        convert ocr format to Doc obj
+
+    save doc obj
+
+    preproc:
+        add per-word tags
+            regex matches
+                address
+                phone number
+                number
+            character type counter
+                uppercase alpha
+                lowercase alpha
+                numbers
+                special
+
+    create y values
+        what do my y values look like?
+            depends on the model.
+            might be "this is a key, this is a value.  they go together"
+                how do you phrase that?  key id, value id?  depends on how the objective function is implemented i guess
+            might be "this is the value for field 7"
+            those get created from the html.  but they need to have ocr in order to know word ids.
+                still doesn't
+            really my true y values are strings, where they are located is secondary, but would be nice to have
+
+    display:
+        ocr detections
+            html doc with doc image as bg and ocr laid on top.
+                ocr text alpha is set to 0%.  blue border pixel and 20% alpha fill for boxes.
+        interface is web form on left.
+            three versions:
+                kv:
+                    keys and values are joined together into a single box.
+                        click on one, and you can edit it,
+                            first by dragging (reset field value on drag start)
+                            then you can edit text if necessary
+                        you can also click the plus button to create a new double box
+                field dict:
+                    there's a web form on the left with field names
+                    you start in field 1, then you move
+                combined version:
+                    detect k/vs, you can match a new key to each field def
+                    on a new doc, detected keys are matched to their majority vote field definition by default.
+                    you can drag them to another instead if you want.
+
+

@@ -19,7 +19,7 @@
 
 if __name__ == '__main__':
     fullfile = 'sample_weasy_output.pdf'
-    resolution = 300
+    resolution = 500
 
     # with(WandImage(filename=fullfile, resolution=resolution)) as conn:
     #     for index, image in enumerate(conn.sequence):
@@ -50,7 +50,7 @@ if __name__ == '__main__':
     import pytesseract
     import time
 
-    images = convert_from_path(fullfile, dpi=299.999)
+    images = convert_from_path(fullfile, dpi=resolution)
     image = images[0]
 
 
