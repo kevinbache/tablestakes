@@ -2,9 +2,8 @@ import abc
 import enum
 from typing import *
 
-from tablestakes.fresh import kv, creators
-from tablestakes.fresh import html_css as hc
-from tablestakes.fresh.html_css import SelectorType
+from tablestakes import html_css as hc, creators, kv
+from tablestakes.html_css import SelectorType
 
 
 class KvAlign(enum.Enum):
@@ -283,7 +282,7 @@ if __name__ == '__main__':
     group.set_padding('4px')
     group.set_bg_color()
     group.set_color()
-    group.set_font_family('monospace', SelectorType.GROUP)
+    group.set_font_family('Verdana, Arial, Helvetica, sans-serif;', SelectorType.GROUP)
     group.set_text_transform()
 
     # group = LTableKvGroup('ltable_group')

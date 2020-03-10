@@ -1,10 +1,12 @@
 """Document representation with conversion from Google OCR format."""
+import copy
+
 import abc
 import enum
 import itertools
 from typing import List, Optional
 
-from tablestakes.fresh import utils
+from tablestakes import utils
 
 
 class BBox:
@@ -36,10 +38,11 @@ class Bounded:
 
 
 DEBUG_MODE = False
+
+
 def print_extra_properties(symbol_dict: dict, word_text: str):
     """debug function for looking at extra properties"""
     if 'property' in symbol_dict:
-        import copy
         p = copy.copy(symbol_dict['property'])
         if 'detectedLanguages' in p:
             del p['detectedLanguages']
@@ -67,29 +70,11 @@ class Word(Bounded):
 
     def __init__(self, text: str, bbox: BBox, word_type=WordType.TEXT):
         super().__init__(bbox)
-        # if text == "D16352004":
-        #     print("found it")
         self.text = text
         self.word_type = word_type
 
     def __repr__(self):
         return f'Word("{self.text}", {self.bbox.simple_repr()})'
-
-    @staticmethod
-    def _get_word_text(w: dict):
-        text = ''.join([s['text'] for s in w['symbols']])
-        if DEBUG_MODE:
-            for s in w['symbols']:
-                print_extra_properties(s, text)
-        return text
-
-    @classmethod
-    def from_dict(cls, w: dict):
-        text = cls._get_word_text(w)
-        return cls(
-            text=text,
-            bbox=BBox.from_dict(w['boundingBox']),
-        )
 
 
 class HasWordsMixin(abc.ABC):
@@ -111,6 +96,72 @@ class Paragraph(Bounded, HasWordsMixin):
         words = ' '.join([w.text for w in self.words if w.word_type == Word.WordType.TEXT])
         return f'Paragraph("{words}", {self.bbox.simple_repr()})'
 
+    def get_words(self) -> List[Word]:
+        return self.words
+
+
+class Block(Bounded, HasWordsMixin):
+    def __init__(self, paragraphs: List[Paragraph], bbox: BBox, block_type: str):
+        super().__init__(bbox),
+        self.paragraphs = paragraphs
+        self.block_type = block_type
+
+    def __repr__(self):
+        paragraphs = '\n  '.join([str(p) for p in self.paragraphs])
+        return f'Block(\n  {paragraphs} \n  {self.bbox.simple_repr()}\n)'
+
+    def get_words(self) -> List[Word]:
+        return self._flatten_words(self.paragraphs)
+
+
+class Page(Bounded, HasWordsMixin):
+    def __init__(self, blocks: List[Block], bbox: BBox):
+        super().__init__(bbox),
+        self.blocks = blocks
+
+    def __repr__(self):
+        blocks = '\n  '.join([str(b).replace('\n', '\n  ') for b in self.blocks])
+        return f'Page(\n  {blocks} \n  {self.bbox.simple_repr()}\n)'
+
+    def get_words(self) -> List[Word]:
+        return self._flatten_words(self.blocks)
+
+
+class Document(HasWordsMixin):
+    def __init__(self, pages: List[Page]):
+        self.pages = pages
+
+    def __repr__(self):
+        pages = '\n  '.join([str(p).replace('\n', '\n  ') for p in self.pages])
+        return f'Document(\n  {pages}\n)'
+
+    def get_words(self) -> List[Word]:
+        return self._flatten_words(self.pages)
+
+
+class GoogleOcrDocumentFactory:
+    """Factory for creating Document structure from GoogleOcr json blob loaded as a dict.
+
+    The input dictionary should have a key called "fullTextAnnotation".
+
+    See https://cloud.google.com/vision/docs/ocr for more info.
+    """
+    @staticmethod
+    def _get_word_text(word_dict: dict):
+        text = ''.join([s['text'] for s in word_dict['symbols']])
+        if DEBUG_MODE:
+            for s in word_dict['symbols']:
+                print_extra_properties(s, text)
+        return text
+
+    @classmethod
+    def _word_dict_2_word(cls, w: dict):
+        text = cls._get_word_text(w)
+        return Word(
+            text=text,
+            bbox=BBox.from_dict(w['boundingBox']),
+        )
+
     @staticmethod
     def _maybe_create_break_word(w: dict) -> Optional[Word]:
         s = w['symbols'][-1]
@@ -126,104 +177,62 @@ class Paragraph(Bounded, HasWordsMixin):
         return None
 
     @classmethod
-    def from_dict(cls, d: dict):
+    def _paragraph_dict_2_paragraph(cls, d: dict):
         words = []
         for w in d['words']:
-            word = Word.from_dict(w)
+            word = cls._word_dict_2_word(w)
             words.append(word)
             break_word = cls._maybe_create_break_word(w)
             if break_word is not None:
                 words.append(break_word)
-        return cls(
+        return Paragraph(
             words=words,
             bbox=BBox.from_dict(d['boundingBox']),
         )
 
-    def get_words(self) -> List[Word]:
-        return self.words
-
-
-class Block(Bounded, HasWordsMixin):
-    def __init__(self, paragraphs: List[Paragraph], bbox: BBox, block_type: str):
-        super().__init__(bbox),
-        self.paragraphs = paragraphs
-        self.block_type = block_type
-
-    def __repr__(self):
-        paragraphs = '\n  '.join([str(p) for p in self.paragraphs])
-        return f'Block(\n  {paragraphs} \n  {self.bbox.simple_repr()}\n)'
-
     @classmethod
-    def from_dict(cls, d: dict):
-        return cls(
-            paragraphs=[Paragraph.from_dict(p) for p in d['paragraphs']],
+    def _block_dict_2_block(cls, d: dict):
+        return Block(
+            paragraphs=[cls._paragraph_dict_2_paragraph(p) for p in d['paragraphs']],
             bbox=BBox.from_dict(d['boundingBox']),
             block_type=d['blockType'],
         )
 
-    def get_words(self) -> List[Word]:
-        return self._flatten_words(self.paragraphs)
-
-
-class Page(Bounded, HasWordsMixin):
-    def __init__(self, blocks: List[Block], bbox: BBox):
-        super().__init__(bbox),
-        self.blocks = blocks
-
-    def __repr__(self):
-        blocks = '\n  '.join([str(b).replace('\n', '\n  ') for b in self.blocks])
-        return f'Page(\n  {blocks} \n  {self.bbox.simple_repr()}\n)'
-
     @classmethod
-    def from_dict(cls, d: dict):
-        return cls(
-            blocks=[Block.from_dict(b) for b in d['blocks']],
+    def _page_dict_2_page(cls, d: dict):
+        return Page(
+            blocks=[cls._block_dict_2_block(b) for b in d['blocks']],
             bbox=BBox(xmin=0, xmax=d['width'], ymin=0, ymax=d['height']),
         )
 
-    def get_words(self) -> List[Word]:
-        return self._flatten_words(self.blocks)
-
-
-class Document(HasWordsMixin):
-    def __init__(self, pages: List[Page]):
-        self.pages = pages
-
-    def __repr__(self):
-        pages = '\n  '.join([str(p).replace('\n', '\n  ') for p in self.pages])
-        return f'Document(\n  {pages}\n)'
-
     @classmethod
-    def from_dict(cls, d: dict):
-        return cls(
-            pages=[Page.from_dict(p) for p in d['fullTextAnnotation']['pages']],
+    def document_dict_2_document(cls, d: dict):
+        return Document(
+            pages=[cls._page_dict_2_page(p) for p in d['fullTextAnnotation']['pages']],
         )
-
-    def get_words(self) -> List[Word]:
-        return self._flatten_words(self.pages)
 
 
 if __name__ == '__main__':
-    d = utils.read_json('../../data/ocr/sample_invoice_ocrd.json')
+    d = utils.read_json('../data/ocr/sample_invoice_google_ocr_output.json')
 
     # print("================ Paragraph ================")
     # pd = d['fullTextAnnotation']['pages'][0]['blocks'][0]['paragraphs'][0]
-    # p = Paragraph.from_dict(pd)
+    # p = GoogleOcrDocumentFactory._paragraph_dict_2_paragraph(pd)
     # print(p)
     #
     # print("================ Block ================")
     # bd = d['fullTextAnnotation']['pages'][0]['blocks'][0]
-    # b = Block.from_dict(bd)
+    # b = GoogleOcrDocumentFactory._block_dict_2_block(bd)
     # print(b)
     # print()
 
-    print("================ Page ================")
-    paged = d['fullTextAnnotation']['pages'][0]
-    page = Page.from_dict(paged)
-    print(page)
-    print()
+    # print("================ Page ================")
+    # paged = d['fullTextAnnotation']['pages'][0]
+    # page = GoogleOcrDocumentFactory._page_dict_2_page(paged)
+    # print(page)
+    # print()
 
     # print("================ Document ================")
-    # doc = Document.from_dict(d)
+    # doc = GoogleOcrDocumentFactory.document_dict_2_document(d)
     # print(doc)
     # print()

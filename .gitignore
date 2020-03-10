@@ -1,6 +1,7 @@
 *.py[cod]
 probably_trash
 .DS_Store
+output
 
 # C extensions
 *.so

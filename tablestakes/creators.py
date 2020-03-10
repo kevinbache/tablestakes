@@ -4,8 +4,7 @@ from typing import Callable, Union, Iterable, Optional, Any, Tuple
 import faker
 import numpy as np
 
-from tablestakes.fresh import kv, utils, chunks
-from tablestakes.fresh import html_css as hc
+from tablestakes import chunks, html_css as hc, kv, utils
 
 
 class Creator(abc.ABC):
@@ -310,12 +309,12 @@ if __name__ == '__main__':
 
     global_css_creator = ParallelCreators(
         creators=[
-            CssProbCreator(chunks.Keys.bold, prob=2./3),
+            CssProbCreator(chunks.Keys.bold, prob=2. / 3),
             CssProbCreator(chunks.Keys.add_colon, prob=0.5),
             ChoiceCreator({
                 chunks.Body.font_sans_serif: 1. / 3,
-                chunks.Body.font_serif:      1. / 3,
-                chunks.Body.font_mono:       1. / 3,
+                chunks.Body.font_serif: 1. / 3,
+                chunks.Body.font_mono: 1. / 3,
             }),
         ],
         combiner=CssCombiner(),

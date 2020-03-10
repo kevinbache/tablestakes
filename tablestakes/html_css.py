@@ -1,11 +1,12 @@
 import abc
 import enum
+
 from typing import List, Union, Optional
 
-import weasyprint
+import pdfkit
 import yattag
 
-from tablestakes.fresh import utils
+from tablestakes import utils
 
 
 #################
@@ -446,28 +447,17 @@ class Document:
 
         return str(html)
 
-    PAGE_CSS_TEMPLATE = '@page {{ size: {size}; margin: {margin} }}'
-
-    # def save_pdf(self, output_fullfule: str, page_size=PageSize.LETTER, margin='1in', default_css=BaseCss.FIREFOX):
-    #     html = weasyprint.HTML(string=str(self))
-    #     css_str = self.PAGE_CSS_TEMPLATE.format(size=page_size.size_str, margin=margin)
-    #     html.write_pdf(
-    #         target=output_fullfule,
-    #         stylesheets=[
-    #             weasyprint.CSS(string='body {background-color: coral;}'),
-    #             weasyprint.CSS(string=str(default_css)),
-    #             weasyprint.CSS(string=css_str),
-    #         ],
-    #     )
-
-    def save_pdf(self, output_fullfile: str, page_size=PageSize.LETTER, margin='1in'):
-        import pdfkit
+    def save_pdf(self, output_fullfile: str, page_size=PageSize.LETTER, margin='1in') -> Optional[str]:
         options = {
             'page-size': page_size.size_str,
         }
         for side in ('top', 'bottom', 'left', 'right'):
             options[f'margin-{side}'] = margin
-        pdfkit.from_string(str(self), output_fullfile, options=options)
+        return pdfkit.from_string(
+            input=str(self),
+            output_path=output_fullfile,
+            options=options,
+        )
 
 
 '''
