@@ -1,5 +1,5 @@
-"""tablestakes - Brown, paper, tied up with string."""
+"""tablestakes - I mean, why not?"""
 
 __version__ = '0.0.1'
-__author__ = 'My Name <kevin.bache@gmail.com>'
+__author__ = 'Kevin Bache <kevin.bache@gmail.com>'
 __all__ = []
