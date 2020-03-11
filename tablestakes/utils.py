@@ -48,8 +48,9 @@ class Timer:
 
     def __enter__(self):
         self.t = time.time()
+        name_str = '' if not self.name else f' {self.name}'
         time_str = time.strftime(self.TIME_FORMAT, time.localtime(self.t))
-        print(f"Starting timer {self.name} at time {time_str}.", end=" ")
+        print(f"Starting timer{name_str} at time {time_str}.", end=" ")
 
     def __exit__(self, *args):
         print(f"Took {time.time() - self.t:2.3g}")

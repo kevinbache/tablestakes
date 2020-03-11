@@ -16,7 +16,17 @@ for inferece
             regex matches
                 address
                 phone number
+                    area code - could i get lat/lon for center of mass?
                 number
+                    annotate with number
+                date
+                    annotate with year, month, day
+                    days since epoch
+                zip code
+                    zip code lat / lon
+                states lat / lon
+                does it look like a us name
+                is it in a gazetteer
             character type counter
                 uppercase alpha
                 lowercase alpha
