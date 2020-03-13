@@ -40,19 +40,24 @@ def read_txt(filename: str):
         return f.read()
 
 
+def save_txt(filename: str, txt: str):
+    with open(filename, mode='w') as f:
+        return f.write(txt)
+
+
 class Timer:
     TIME_FORMAT = '%H:%M:%S'
 
     def __init__(self, name: str):
         self.name = name
+        self.name_str = '' if not self.name else f' "{self.name}"'
 
     def __enter__(self):
         self.t = time.time()
-        name_str = '' if not self.name else f' {self.name}'
         time_str = time.strftime(self.TIME_FORMAT, time.localtime(self.t))
-        print(f"Starting timer{name_str} at time {time_str}.", end=" ")
+        print(f'Starting timer{self.name_str} at time {time_str}.', end=" ")
 
     def __exit__(self, *args):
-        print(f"Took {time.time() - self.t:2.3g}")
+        print(f'Timer{self.name_str} took {time.time() - self.t:2.3g} secs.')
 
 

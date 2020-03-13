@@ -18,11 +18,11 @@ class OcrProvider(abc.ABC):
     def load_pdf_to_images(cls, pdf_filename: str, dpi: int):
         return pdf2image.convert_from_path(pdf_filename, dpi=dpi)
 
-    def ocr(self, pdf_filename: str, dpi=400, save_raw_ocr_output_location: Optional[str] = None) -> doc.Document:
-        for page_ind, image in enumerate(self.load_pdf_to_images(pdf_filename, dpi)):
+    def ocr(self, input_pdf: str, dpi=400, save_raw_ocr_output_location: Optional[str] = None) -> doc.Document:
+        for page_ind, page_image in enumerate(self.load_pdf_to_images(input_pdf, dpi)):
             ocr_page_outputs = []
             with utils.Timer(f"Page {page_ind}"):
-                ocr_page_outputs.append(self._ocr_page_image(image))
+                ocr_page_outputs.append(self._ocr_page_image(page_image))
             ocrd_pages_combined = self._combine_ocr_output(ocr_page_outputs)
             self._save_ocr_output(ocrd_pages_combined, save_raw_ocr_output_location)
             return self._ocr_output_2_doc(ocrd_pages_combined)
@@ -52,12 +52,12 @@ class TesseractOcrProvider(OcrProvider):
         )
 
     def _combine_ocr_output(self, ocr_page_outputs: List[pd.DataFrame]):
-        for page_idx, df in ocr_page_outputs:
+        for page_idx, df in enumerate(ocr_page_outputs):
             df['page_num'] = page_idx
         return pd.concat(ocr_page_outputs, axis=0)
 
     def _save_ocr_output(self, ocr_output: pd.DataFrame, save_raw_ocr_output_location: Optional[str] = None):
-        ocr_output.save(save_raw_ocr_output_location)
+        ocr_output.to_pickle(save_raw_ocr_output_location)
 
     def _ocr_output_2_doc(self, ocr_output: pd.DataFrame) -> doc.Document:
         return TesseractDocumentFactory.tesseract_df_2_document(ocr_output)

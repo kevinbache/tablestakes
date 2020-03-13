@@ -441,7 +441,7 @@ class Document:
 
     def __str__(self):
         html = Html([
-            Head(Style(f'\n{str(self.css)}\n')),
+            Head(['<meta charset="utf-8"/>', Style(f'\n{str(self.css)}\n')]),
             Body(_html_chunk_to_str(self.contents)),
         ])
 
@@ -458,6 +458,10 @@ class Document:
             output_path=output_fullfile,
             options=options,
         )
+
+    def save_html(self, output_fullfile: str):
+        utils.save_txt(output_fullfile, str(self))
+
 
 
 '''

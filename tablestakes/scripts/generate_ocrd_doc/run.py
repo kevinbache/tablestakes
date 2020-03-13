@@ -1,4 +1,6 @@
-from tablestakes import kv_styles, creators, utils, html_css as hc
+import re
+
+from tablestakes import kv_styles, creators, utils, html_css as hc, ocr
 from tablestakes.html_css import SelectorType
 
 
@@ -76,7 +78,54 @@ if __name__ == '__main__':
 
         doc = hc.Document()
         doc.add_styled_html(group)
-        hc.open_html_str(str(doc), do_print_too=True)
 
-        doc.save_pdf('generated.pdf')
-        print('done')
+    html_filename = 'doc.html'
+    with utils.Timer('save html'):
+        doc.save_html(html_filename)
+
+    c = doc.contents[0]
+    from lxml import etree
+
+    word_id = 0
+    doc = etree.fromstring(c, parser=etree.HTMLParser())
+    re_white = re.compile(r'(\s+)')
+    for tag in doc.iter():
+        print(tag)
+        if tag.text and tag.text.strip():
+            words = re.split(re_white, tag.text.strip())
+            annotated_words = []
+            for word in words:
+                if word.strip():
+                    annotated_words.append(f'<w id=word{word_id}>{word}</w>')
+                    word_id += 1
+                else:
+                    annotated_words.append(word)
+                    continue
+            tag.text = ''.join(annotated_words)
+    new_contents = etree.tostring(doc, pretty_print=True)
+    print(new_contents)
+
+
+# https://stackoverflow.com/questions/44215381/wrap-text-within-element-lxml
+# deal with el.text, then el.child.tail for each child
+
+    ###########
+    # KEEP ME #
+    ###########
+    # pdf_filename = 'doc.pdf'
+    # dpi = 400
+    # margins = '1in'
+    # with utils.Timer('save pdf'):
+    #     doc.save_pdf(pdf_filename)
+    #     print('done')
+    #
+    # ocr_raw_filename = 'doc_ocr_df.pkl'
+    # with utils.Timer('TesseractOcrProvider.ocr'):
+    #     ocr_doc = ocr.TesseractOcrProvider().ocr(
+    #         input_pdf=pdf_filename,
+    #         dpi=dpi,
+    #         save_raw_ocr_output_location=ocr_raw_filename,
+    #     )
+    ###########
+    # KEEP ME #
+    ###########

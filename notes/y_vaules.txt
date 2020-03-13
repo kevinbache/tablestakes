@@ -1,0 +1,24 @@
+how to create y values?
+the problem is the ocr loop.
+when i drop down to pdf / images, i lose all word id data
+should i replace each word with an equallyish sized unique number?
+    that'd work well for monospace fonts at least
+    get word length, replace with numbers of equal length
+    throw into a set to ensure uniqueness
+
+but how should i do it in general?
+the best way would be to fake the ocr output in the first place
+it'd save a couple of seconds in generating each doc
+it'd also be future proof if i could really do it.
+best would be to create the web page pdf
+    and for each word, find its location on the rendered doc
+how?
+    use something like selenium
+    if the window can be set to the exact right pixel size
+
+
+could surround each word with a tiny box with a wordid label
+render at super high res, like 800dpi or something to support tiny wordid font
+then do ocr and snag the wordid labels to get their location.  downsize by a factor of ~2 to the target size
+then regenerate at normal dpi -- 400 or something -- without the wordid labels
+

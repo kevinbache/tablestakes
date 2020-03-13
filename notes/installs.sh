@@ -41,3 +41,6 @@ pip install pytesseract
 
 conda install -c conda-forge poppler
 pip install pdf2image
+
+# selenium, firefox edition
+conda install -c conda-forge geckodriver

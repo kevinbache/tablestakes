@@ -15,8 +15,10 @@ for inferece
         add per-word tags
             regex matches
                 address
+                    geo if possible - https://opencagedata.com/api free / day
                 phone number
                     area code - could i get lat/lon for center of mass?
+                    https://github.com/ravisorg/Area-Code-Geolocation-Database
                 number
                     annotate with number
                 date

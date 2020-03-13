@@ -105,6 +105,8 @@ class Block(Bounded, HasWordsMixin):
     def __init__(self, paragraphs: List[Paragraph], bbox: BBox, block_type: str):
         super().__init__(bbox),
         self.paragraphs = paragraphs
+        if block_type != 'TEXT':
+            raise ValueError(f"you've never seen a non-TEXT block-type before, but you just got: {block_type}")
         self.block_type = block_type
 
     def __repr__(self):
