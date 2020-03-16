@@ -104,3 +104,7 @@
 1583928290749	Marionette	WARN	TLS certificate errors will be ignored for this session
 1583928291385	Marionette	INFO	Stopped listening on port 61176
 1583928295563	Marionette	INFO	Stopped listening on port 61119
+JavaScript error: , line 0: uncaught exception: Object
+console.error: PushService: 
+  Failed to drop expired registrations on idle
+  UnknownError

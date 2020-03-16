@@ -1,0 +1,93 @@
+overlay on top of craigslist apartment finder to make it more usable
+	draw a query location
+	click like / don't like apartment
+	reorder a list on the right as you do
+	we read the postings you browse
+	look at the pictures
+	figure out which ones you like
+	it's a browser plugin.
+	it's netscape. but you need a fast local gpu.
+	drive the next generation of hardware
+	it's a lean linux manufacturer
+	who can rewrite the keyboard and mouse
+	how do you really want to use this thing?	
+	we're generating this deluge of content.  there are all these ways that people are putting out things you can pay attention to. 
+	you need customizable, plug in consumer interfaces
+
+
+	craigslist, if you give me access to your user's browsing history, i'll give you that reordering list.  i won't charge you anything. i've just got apolcalypse blues and i'm bored of watching netflix.
+
+	facebook, you give me access to your feed and i'll build you the ultimate diary builder.  tell us the story of your life.
+
+	but first up, 
+
+	https://boulder.craigslist.org/apa/d/boulder-room-avail-in-multilevel-2br/7059802636.html
+
+	how can i most efficiently find the place i'm looking for?
+
+
+	could i write a browser plugin which would run models againts content and keep around the vectors or be able to regenerate them in real time?
+
+	each page has words and images and videos, each of which gets an embedding vector.
+	then you aggregate those along the DOM tree. each page gets a summary vector.  so now you've got summary vectors on each page, each of which can be aggregated across various cross sections which are made more or less apparent in the ui.  recommend summary vectors to you by news source.  or via BigBillsTransformer, or LeftAggregator.  You can follow anyone's recommender vectors which are created by what they do and don't thumbsup.
+
+
+	Our rec engine can highlight sections of an article for you.  
+
+	Add vectors for NER (big/sparse), Entity Types (medium/sparse), 
+
+	Make a recommendation for which recommender to handle each object type.
+
+	Overall Output score 	
+
+	It's for news recommendation but it should also help me handle my apartment search.
+	Or product search.  
+		https://www.youtube.com/watch?v=8idr1WZ1A7Q
+		it should be able to read the website and recommend this
+
+
+	the ML operating system: make available vectors.  easily train models on top of those vectors.
+
+	vectorizor
+
+	surfacing ideas
+
+	models and translator layers between them.
+	solves cold start because you can translate from other people
+
+
+	-----
+
+	url cache - url -> model id + model vector
+	url + subelement
+	need universal way of uniquely describing each element including words 
+	dangle vectors on every object
+	translate between them.  
+		'oh, i have small model (ie. a matrix multiply) that knows how to interpret vectors from WellKnownModelA' for my current task
+		browser plugin + web crawl to recommend *anything*
+	also need to cache the actual content so that your crawl of the content can be matched against whatever's actually there.  cheap enough for html.  what do you do for videos?  images?  just store a hash?  
+	queries:
+		show me all models that have crawled this page. 
+			by content type:
+				text / html
+				images
+				videos
+			sub by task:
+				text / html
+					sentiment
+					product search
+					k/v
+				images
+					classification
+						generic
+						specific
+						maybe find+extend a canonical hierarchy of classes
+					segmentation
+					OCR
+				videos
+					same as images?
+					include voice transcription
+		highlight this page for some particular intent?
+		this is too diffuse.  what's the use case?
+
+

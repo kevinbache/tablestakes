@@ -3,6 +3,10 @@ import time
 from typing import *
 from collections.abc import Iterable
 import json
+import os
+import xml.dom.minidom
+
+from lxml import etree
 
 StrDict = Dict[str, Union[str, int, float]]
 
@@ -43,6 +47,31 @@ def read_txt(filename: str):
 def save_txt(filename: str, txt: str):
     with open(filename, mode='w') as f:
         return f.write(txt)
+
+
+def hprint(s: str, sep_char='=', do_include_pre_break_line=True):
+    """Print header"""
+    l = len(s)
+    h = sep_char * (l + 4)
+    if do_include_pre_break_line:
+        print()
+    print(h)
+    print(f'  {s}  ')
+    print(h)
+
+
+# ref: https://stackoverflow.com/questions/1662351/problem-with-newlines-when-i-use-toprettyxml/39984422#39984422
+def root_2_pretty_str(root: etree._Element):
+    """Get a pretty string for the given tree."""
+    xml_string = xml.dom.minidom.parseString(etree.tostring(root)).toprettyxml()
+    xml_string = os.linesep.join([s for s in xml_string.splitlines() if s.strip()])  # remove the weird newline issue
+    return xml_string
+
+
+def print_tree(root: etree._Element):
+    """Print a pretty string for the given tree."""
+    print(root_2_pretty_str(root))
+
 
 
 class Timer:
