@@ -1,12 +1,29 @@
+import numpy as np
 import pandas as pd
 
 from tablestakes import kv_styles, creators, utils, html_css as hc, ocr, word_wrap
 from tablestakes.html_css import SelectorType
 from tablestakes.scripts.generate_ocrd_doc import sel_ocr_word_match
 
+# class NodeModifier:
+#     def __init__(self, find_str: str, fn: Callable):
+#         self.find_str = find_str
+#         self.fn = fn
+#
+#     def modify(self, root: etree._Element):
+#         # TODO
+#         return root
+#
+#     def modify_str(self, contents: str):
+#         root = etree.fromstring(text=contents, parser=etree.HTMLParser())
+#         root = self.modify(root)
+#         return etree.tostring(root, encoding='unicode')
+
 
 if __name__ == '__main__':
-    import numpy as np
+    ######################################################
+    # randomly create html representing a print document #
+    ######################################################
     np.random.seed(42)
 
     with utils.Timer('hc creation'):
@@ -80,21 +97,6 @@ if __name__ == '__main__':
         doc = hc.Document()
         doc.add_styled_html(group)
 
-
-    # class NodeModifier:
-    #     def __init__(self, find_str: str, fn: Callable):
-    #         self.find_str = find_str
-    #         self.fn = fn
-    #
-    #     def modify(self, root: etree._Element):
-    #         # TODO
-    #         return root
-    #
-    #     def modify_str(self, contents: str):
-    #         root = etree.fromstring(text=contents, parser=etree.HTMLParser())
-    #         root = self.modify(root)
-    #         return etree.tostring(root, encoding='unicode')
-
     base_filename = 'doc_unwrapped'
     with utils.Timer('save unwrapped'):
         doc.save_html(f'{base_filename}.html')
@@ -106,23 +108,23 @@ if __name__ == '__main__':
         doc.contents = [wrapper.wrap_words_in_str(doc.contents[0])]
 
     base_filename = 'doc_wrapped'
+    html_filename = f'{base_filename}.html'
     pdf_filename = f'{base_filename}.pdf'
     with utils.Timer('save wrapped'):
-        doc.save_html(f'{base_filename}.html')
-        doc.save_pdf(pdf_filename)
+        doc.save_html(html_filename)
+        doc.save_pdf(pdf_filename, page_size=hc.PageSize.LETTER, margin='1in')
         # doc.open_in_browser()
 
+    ##############################################
+    # use selenium to get locations of all words #
+    ##############################################
     dpi = 500
     window_width_px = dpi * 8.5
     window_height_px = dpi * 11.00
 
-    html_file = "file:///Users/kevin/projects/tablestakes/tablestakes/scripts/generate_ocrd_doc/doc_wrapped.html"
-    ##############################################
-    # use selenium to get locations of all words #
-    ##############################################
     word_id_2_word = wrapper.get_used_id_to_word()
     sel_df = sel_ocr_word_match.get_word_pixel_locations(
-        html_file,
+        html_file=html_filename,
         word_id_to_word=word_id_2_word,
         window_width_px=window_width_px,
         window_height_px=window_height_px,
