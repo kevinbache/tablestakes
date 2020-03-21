@@ -3,6 +3,8 @@ probably_trash
 .DS_Store
 output
 
+**/node_modules
+
 # C extensions
 *.so
 

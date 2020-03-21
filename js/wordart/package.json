@@ -1,0 +1,30 @@
+{
+  "name": "wordart",
+  "version": "1.0.0",
+  "description": "paint you some words",
+  "main": "index.js",
+  "scripts": {
+//    "deploy": "npm run build && npm run git-commit && npm run git-push",
+    "build": "webpack",
+    "start": "webpack-dev-server"
+  },
+  "repository": {
+    "type": "git",
+    "url": "github.com/learningnut/wordart"
+  },
+  "author": "kevin bache",
+  "license": "MIT",
+  "dependencies": {
+    "react": "^16.13.1",
+    "react-dom": "^16.13.1"
+  },
+  "devDependencies": {
+    "babel-core": "^6.26.3",
+    "babel-loader": "^8.1.0",
+    "babel-preset-react": "^6.24.1",
+    "html-webpack-plugin": "^3.2.0",
+    "webpack": "^4.42.0",
+    "webpack-cli": "^3.3.11",
+    "webpack-dev-server": "^3.10.3"
+  }
+}
