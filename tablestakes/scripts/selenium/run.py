@@ -6,8 +6,9 @@ from tablestakes import utils
 
 options = Options()
 # options.headless = True
-window_width_px = 300 * 8.5
-window_height_px = 300 * 11.00
+dpi = 400
+window_width_px = dpi * 8.5
+window_height_px = dpi * 11.00
 
 with utils.Timer('driver='):
     driver = webdriver.Firefox(options=options)
@@ -15,9 +16,13 @@ with utils.Timer('driver='):
     driver.set_window_size(window_width_px, window_height_px)
 with utils.Timer('driver.get'):
     # driver.get("http://google.com/")
-    driver.get("file://")
+    driver.get("file:///Users/kevin/projects/tablestakes/tablestakes/scripts/generate_ocrd_doc/doc_wrapped.html")
 with utils.Timer('execute script'):
-    out = driver.execute_script("return true")
+    script = """
+    var w = document.getElementById("word_000000");
+    return w.getBoundingClientRect();
+    """
+    out = driver.execute_script(script)
     print(f'execute out: {out}')
 with utils.Timer('driver.quit'):
     driver.quit()
@@ -33,8 +38,8 @@ function findPos(obj) {
         } while (obj = obj.offsetParent);
     }
 }
-var obj = document.getElementById("demo");
-return findPos(obj);
+var w = document.getElementById("demo");
+w.getBoundingClientRect();
 """
 
 """

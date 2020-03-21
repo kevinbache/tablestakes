@@ -44,3 +44,15 @@ pip install pdf2image
 
 # selenium, firefox edition
 conda install -c conda-forge geckodriver
+
+# rtree data structure
+conda install -c conda-forge rtree
+
+# node / npm / react
+brew install node
+
+
+npm install --save react
+npm install --save react-dom
+npm install --save-dev babel-core babel-loader babel-preset-react
+npm install --save-dev webpack webpack-dev-server html-webpack-plugin

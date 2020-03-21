@@ -6,11 +6,13 @@ import enum
 import itertools
 from typing import List, Optional
 
+import numpy as np
+
 from tablestakes import utils
 
 
 class BBox:
-    def __init__(self, xmin: int, xmax: int, ymin: int, ymax: int):
+    def __init__(self, xmin: float, xmax: float, ymin: float, ymax: float):
         self.xmin = xmin
         self.xmax = xmax
         self.ymin = ymin
@@ -20,7 +22,7 @@ class BBox:
         return f'BBox({self.simple_repr()})'
 
     def simple_repr(self):
-        return f'x=[{self.xmin}, {self.xmax}], y=[{self.ymin}, {self.ymax}]'
+        return f'x=[{self.xmin:0.0f}, {self.xmax:0.0f}], y=[{self.ymin:0.0f}, {self.ymax:0.0f}]'
 
     @classmethod
     def from_dict(cls, d: dict):
@@ -30,6 +32,14 @@ class BBox:
         ymin = verts[0]['y']
         ymax = verts[3]['y']
         return cls(xmin, xmax, ymin, ymax)
+
+    def to_array(self):
+        return np.array([self.xmin, self.xmax, self.ymin, self.ymax])
+
+    @classmethod
+    def from_array(cls, a: np.array):
+        assert a.shape == (4,)
+        return cls(*a)
 
 
 class Bounded:

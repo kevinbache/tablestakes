@@ -6,6 +6,7 @@ import json
 import os
 import xml.dom.minidom
 
+import numpy as np
 from lxml import etree
 
 StrDict = Dict[str, Union[str, int, float]]
@@ -73,7 +74,6 @@ def print_tree(root: etree._Element):
     print(root_2_pretty_str(root))
 
 
-
 class Timer:
     TIME_FORMAT = '%H:%M:%S'
 
@@ -90,3 +90,33 @@ class Timer:
         print(f'Timer{self.name_str} took {time.time() - self.t:2.3g} secs.')
 
 
+def levenshtein(a: str, b: str):
+    na = len(a)
+    nb = len(b)
+
+    d = np.zeros((na+1, nb+1))
+
+    d[0, :] = np.arange(nb + 1)
+    d[:, 0] = np.arange(na + 1)
+
+    for bi in range(1, nb+1):
+        for ai in range(1, na+1):
+            sub_cost = 0 if a[ai - 1] == b[bi - 1] else 1
+
+            d[ai, bi] = np.min([
+                d[ai - 1, bi] + 1,
+                d[ai, bi - 1] + 1,
+                d[ai - 1, bi - 1] + sub_cost,
+            ])
+
+    return d[na, nb]
+
+
+if __name__ == '__main__':
+    assert levenshtein('', '') == 0
+    assert levenshtein('asdf', '') == 4
+    assert levenshtein('', 'asdf') == 4
+    assert levenshtein('asdf', 'asdf') == 0
+    assert levenshtein('asxf', 'asdf') == 1
+    assert levenshtein('asf', 'asdf') == 1
+    assert levenshtein('asdf', 'asf') == 1

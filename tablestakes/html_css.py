@@ -1,3 +1,7 @@
+import re
+import tempfile
+import webbrowser
+
 import abc
 import enum
 
@@ -178,6 +182,14 @@ def _html_chunk_to_str(chunk: HtmlChunk, join_str='\n'):
 #     @abc.abstractmethod
 #     def get_selector(self, sector_type: enum.Enum):
 #         pass
+#     def get_class_based_selector():
+#         pass
+#     def get_id_based_selector():
+#         pass
+
+
+def does_contain_an_html_tag(s: str) -> bool:
+    return re.search(r'(<.*>)', s) is not None
 
 
 # TODO: convert to SelectableHtml?
@@ -334,6 +346,7 @@ class Td(HtmlTag):
 ######################
 # TODO: subclass HtmlTag?
 class StyledHtmlTag:
+    # todo: this should really be something like: HtmlTag, CssChunk (selector is taken from tag)
     def __init__(self, html_tag: HtmlTag, css: Css):
         self.html_tag = html_tag
         self.css = css
@@ -446,6 +459,13 @@ class Document:
         ])
 
         return str(html)
+
+    def open_in_browser(self):
+        with tempfile.NamedTemporaryFile('w', delete=False, suffix='.html') as f:
+            url = 'file://' + f.name
+            f.write(str(self))
+            webbrowser.open(url)
+            f.close()
 
     def save_pdf(self, output_fullfile: str, page_size=PageSize.LETTER, margin='1in') -> Optional[str]:
         options = {

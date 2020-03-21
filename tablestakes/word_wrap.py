@@ -9,10 +9,14 @@ class WordWrapper:
     re_whitespace = re.compile(r'(\s+)')
     WORD_TAG = 'w'
 
+    def __init__(self):
+        self._used_word_ids = {}
+
+
     @classmethod
-    def text_2_word_nodes(cls, text_to_wrap: str):
+    def str_2_word_nodes(cls, str_to_wrap: str):
         # re.spitting on whitespaces keeps the whitespace regions as entries in the resulting list
-        word_strs = re.split(cls.re_whitespace, text_to_wrap.strip())
+        word_strs = re.split(cls.re_whitespace, str_to_wrap.strip())
 
         word_nodes = []
         for word_ind, word_str in enumerate(word_strs):
@@ -20,7 +24,7 @@ class WordWrapper:
                 # this word_str is whitespace.  it's going to be the tail of the previous node
                 if not len(word_nodes):
                     raise ValueError(f"What you doing starting this string with whitespace? Didn't you call strip()?"
-                                     f"words: {word_strs}, e: {etree.tostring(node)}")
+                                     f"words: {word_strs}.")
                 word_nodes[-1].tail = word_str
             else:
                 # don't worry about word_ids, we'll set those in a future iteration through the tree
@@ -47,7 +51,7 @@ class WordWrapper:
             insert_node = node
             insert_start = 0
 
-        word_nodes = cls.text_2_word_nodes(text)
+        word_nodes = cls.str_2_word_nodes(text)
 
         # set the newly created word nodes as children of the parent node.
         # for text they go below the current node, at the beginning.
@@ -57,21 +61,32 @@ class WordWrapper:
 
         return
 
-    @classmethod
-    def wrap_words(cls, root: etree._Element, starting_wordid=0):
+    def wrap_words_in_str(self, root: str, starting_word_id=0):
+        # TODO: this will autowrap to <html><body>CONTENTS</html></body> but you might not want the <html><body>
+        root = etree.fromstring(text=root, parser=etree.HTMLParser())
+        self.wrap_words_on_tree_inplace(root, starting_word_id)
+        return etree.tostring(root, encoding='unicode')
+
+    def wrap_words_on_tree_inplace(self, root: etree._Element, starting_word_id=0):
         # do it as a BFS.  that way you've already got the parent nodes in your queue and you won't ever double visit
         to_visit = [root]
         while to_visit:
             node = to_visit.pop(0)
             to_visit.extend(list(node))
-            cls.handle_text(node)
-            cls.handle_text(node, do_handle_tail_instead=True)
+            self.handle_text(node)
+            self.handle_text(node, do_handle_tail_instead=True)
 
-        docwide_word_id = starting_wordid
+        docwide_word_id = starting_word_id
+
         for node in root.iter():
-            if node.tag == cls.WORD_TAG:
-                node.attrib['word_id'] = f'{docwide_word_id:0>6d}'
+            if node.tag == self.WORD_TAG:
+                word_id = f'word_{docwide_word_id:0>6d}'
+                node.attrib['id'] = word_id
+                self._used_word_ids[word_id] = node
                 docwide_word_id += 1
+
+    def get_used_id_to_word(self):
+        return self._used_word_ids
 
 
 if __name__ == '__main__':
@@ -97,7 +112,7 @@ if __name__ == '__main__':
     utils.hprint('before:')
     print(utils.root_2_pretty_str(root))
 
-    WordWrapper.wrap_words(root)
+    WordWrapper.wrap_words_in_str(root)
     utils.hprint('after:')
     print(utils.root_2_pretty_str(root))
 

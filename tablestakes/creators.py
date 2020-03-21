@@ -10,14 +10,23 @@ from tablestakes import chunks, html_css as hc, kv, utils
 class Creator(abc.ABC):
     """Randomly generates values when called."""
 
-    @abc.abstractmethod
     def __call__(self, *args, **kwargs):
+        return self._post_process(self._call_inner(*args, **kwargs))
+
+    @abc.abstractmethod
+    def _call_inner(self, *args, **kwargs):
         pass
+
+    def _post_process(self, output):
+        return output
 
 
 class CssCreator(Creator):
-    @abc.abstractmethod
     def __call__(self, *args, **kwargs) -> hc.Css:
+        return self._call_inner(*args, **kwargs)
+
+    @abc.abstractmethod
+    def _call_inner(self, *args, **kwargs) -> hc.Css:
         pass
 
 
@@ -33,7 +42,7 @@ class ChoiceCreator(Creator):
         self.choices = choices
         self.probs = probs
 
-    def __call__(self, *args, **kwargs):
+    def _call_inner(self, *args, **kwargs):
         try:
             c = np.random.choice(self.choices, p=self.probs)
         except:
@@ -58,13 +67,13 @@ class ConstantCreator(Creator):
     def __init__(self, constant: Any):
         self.constant = constant
 
-    def __call__(self, *args, **kwargs):
+    def _call_inner(self, *args, **kwargs):
         return self.constant
 
 
 class Combiner(abc.ABC):
     @abc.abstractmethod
-    def __call__(self, values: Iterable, *args, **kwargs):
+    def call_inner(self, values: Iterable, *args, **kwargs):
         pass
 
 
@@ -72,12 +81,12 @@ class StrCombiner(Combiner):
     def __init__(self, join_str: str = ''):
         self.join_str = join_str
 
-    def __call__(self, values: Iterable, *args, **kwargs):
+    def call_inner(self, values: Iterable, *args, **kwargs):
         return self.join_str.join([str(v) for v in values])
 
 
 class CssCombiner(Combiner):
-    def __call__(self, values: Iterable[hc.Css], *args, **kwargs):
+    def call_inner(self, values: Iterable[hc.Css], *args, **kwargs):
         css = hc.Css()
         for c in values:
             css.add_style(c)
@@ -94,7 +103,7 @@ class ParallelCreators(Creator):
         self.creators = creators
         self.combiner = combiner
 
-    def __call__(self, *args, **kwargs):
+    def _call_inner(self, *args, **kwargs):
         return self.combiner([c() for c in self.creators])
 
 
@@ -119,7 +128,7 @@ class TagWrapperCreator(Creator):
         self.attributes = attributes
         self.probability_of_running = probability_of_running
 
-    def __call__(self, contents: hc.DirtyHtmlChunk, *args, **kwargs):
+    def _call_inner(self, contents: hc.DirtyHtmlChunk, *args, **kwargs):
         if np.random.uniform() < self.probability_of_running:
             return str(hc.HtmlTag(
                 tag_name=self.tag_name,
@@ -144,7 +153,7 @@ class AbstractFakerCreator(Creator, abc.ABC):
 
 
 class AddressCreator(AbstractFakerCreator):
-    def __call__(self, *args, **kwargs):
+    def _call_inner(self, *args, **kwargs):
         address = self.faker.address().replace("\n", "<br>\n")
         return f'{self.faker.company()}<br>\n{address}'
 
@@ -166,7 +175,7 @@ class DateCreator(AbstractFakerCreator):
             pattern = np.random.choice(self.patterns)
         self.pattern = pattern
 
-    def __call__(self, *args, **kwargs):
+    def _call_inner(self, *args, **kwargs):
         return self.faker.date(pattern=self.pattern)
 
 
@@ -177,7 +186,7 @@ class IntCreator(AbstractFakerCreator):
         self.max = max
         self.zero_pad_to_width = zero_pad_to_width
 
-    def __call__(self, *args, **kwargs):
+    def _call_inner(self, *args, **kwargs):
         num = np.random.randint(self.min, self.max)
         if self.zero_pad_to_width is None:
             return f'{num:d}'
@@ -191,7 +200,7 @@ class KvCssCreator(Creator):
         self.kv_loc = kv_loc
         self.extra_css_creator = extra_css_creator
 
-    def __call__(self, kv_name: Optional[str] = None, *args, **kwargs) -> hc.Css:
+    def _call_inner(self, kv_name: Optional[str] = None, *args, **kwargs) -> hc.Css:
         extra_css = hc.Css()
         if self.extra_css_creator is not None:
             extra_css += self.extra_css_creator()
@@ -215,7 +224,7 @@ class KvCreator(Creator):
         self._html = None
         self._css = None
 
-    def __call__(self, *args, **kwargs) -> Tuple[kv.KvHtml, hc.Css]:
+    def _call_inner(self, *args, **kwargs) -> Tuple[kv.KvHtml, hc.Css]:
         return self.get_html(), self.get_css()
 
     def get_html(self) -> kv.KvHtml:

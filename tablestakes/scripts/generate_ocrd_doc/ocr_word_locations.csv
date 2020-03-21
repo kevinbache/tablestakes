@@ -1,0 +1,71 @@
+,text,bbox,word_type
+0,"
+","BBox(x=[553, 553], y=[534, 584])",WordType.LINEBREAK
+1,SENT,"BBox(x=[553, 743], y=[534, 584])",WordType.TEXT
+2,TO,"BBox(x=[767, 865], y=[534, 584])",WordType.TEXT
+3,"
+","BBox(x=[553, 553], y=[805, 855])",WordType.LINEBREAK
+4,SOLD,"BBox(x=[553, 748], y=[805, 855])",WordType.TEXT
+5,TO,"BBox(x=[771, 869], y=[805, 855])",WordType.TEXT
+6,"
+","BBox(x=[553, 553], y=[1076, 1126])",WordType.LINEBREAK
+7,SHIPPING,"BBox(x=[553, 929], y=[1076, 1126])",WordType.TEXT
+8,"
+","BBox(x=[553, 553], y=[1346, 1621])",WordType.LINEBREAK
+9,STATEMENT,"BBox(x=[553, 994], y=[1346, 1396])",WordType.TEXT
+10,DATE,"BBox(x=[1022, 1022], y=[1347, 1395])",WordType.TEXT
+11,"
+","BBox(x=[1022, 1022], y=[1347, 1395])",WordType.LINEBREAK
+12,RECEIVED,"BBox(x=[556, 556], y=[1459, 1509])",WordType.TEXT
+13,"
+","BBox(x=[556, 556], y=[1459, 1509])",WordType.LINEBREAK
+14,INVOICE,"BBox(x=[554, 876], y=[1571, 1621])",WordType.TEXT
+15,"
+","BBox(x=[1250, 1250], y=[532, 754])",WordType.LINEBREAK
+16,Thomas-Wilcox,"BBox(x=[1250, 1250], y=[532, 584])",WordType.TEXT
+17,"
+","BBox(x=[1250, 1250], y=[532, 584])",WordType.LINEBREAK
+18,6635,"BBox(x=[1254, 1415], y=[613, 663])",WordType.TEXT
+19,Dixon,"BBox(x=[1451, 1631], y=[613, 663])",WordType.TEXT
+20,Bridge,"BBox(x=[1668, 1668], y=[611, 676])",WordType.TEXT
+21,"
+","BBox(x=[1668, 1668], y=[611, 676])",WordType.LINEBREAK
+22,"Zoeport,","BBox(x=[1254, 1530], y=[693, 754])",WordType.TEXT
+23,WV,"BBox(x=[1565, 1672], y=[693, 741])",WordType.TEXT
+24,24084,"BBox(x=[1705, 1908], y=[691, 742])",WordType.TEXT
+25,"
+","BBox(x=[1254, 1254], y=[803, 1024])",WordType.LINEBREAK
+26,Freeman-Smith,"BBox(x=[1256, 1256], y=[803, 855])",WordType.TEXT
+27,"
+","BBox(x=[1256, 1256], y=[803, 855])",WordType.LINEBREAK
+28,0668,"BBox(x=[1254, 1415], y=[883, 934])",WordType.TEXT
+29,Carr,"BBox(x=[1449, 1589], y=[884, 934])",WordType.TEXT
+30,Court,"BBox(x=[1616, 1795], y=[884, 934])",WordType.TEXT
+31,Suite,"BBox(x=[1824, 1989], y=[884, 934])",WordType.TEXT
+32,265,"BBox(x=[2021, 2021], y=[884, 934])",WordType.TEXT
+33,"
+","BBox(x=[2021, 2021], y=[884, 934])",WordType.LINEBREAK
+34,"Matthewview,","BBox(x=[1256, 1705], y=[961, 1024])",WordType.TEXT
+35,SD,"BBox(x=[1741, 1830], y=[963, 1013])",WordType.TEXT
+36,22494,"BBox(x=[1863, 2066], y=[963, 1013])",WordType.TEXT
+37,"
+","BBox(x=[1256, 1256], y=[1074, 1284])",WordType.LINEBREAK
+38,Mcconnell-Smith,"BBox(x=[1256, 1256], y=[1074, 1126])",WordType.TEXT
+39,"
+","BBox(x=[1256, 1256], y=[1074, 1126])",WordType.LINEBREAK
+40,USCGC,"BBox(x=[1256, 1486], y=[1155, 1205])",WordType.TEXT
+41,Mitchell,"BBox(x=[1518, 1518], y=[1153, 1205])",WordType.TEXT
+42,"
+","BBox(x=[1518, 1518], y=[1153, 1205])",WordType.LINEBREAK
+43,FPO,"BBox(x=[1256, 1377], y=[1234, 1284])",WordType.TEXT
+44,AA,"BBox(x=[1405, 1494], y=[1235, 1283])",WordType.TEXT
+45,75926,"BBox(x=[1525, 1729], y=[1234, 1284])",WordType.TEXT
+46,"
+","BBox(x=[1254, 1254], y=[1344, 1621])",WordType.LINEBREAK
+47,03/29/2007,"BBox(x=[1254, 1254], y=[1344, 1405])",WordType.TEXT
+48,"
+","BBox(x=[1254, 1254], y=[1344, 1405])",WordType.LINEBREAK
+49,09/16/1980,"BBox(x=[1254, 1254], y=[1457, 1518])",WordType.TEXT
+50,"
+","BBox(x=[1254, 1254], y=[1457, 1518])",WordType.LINEBREAK
+51,670094950,"BBox(x=[1254, 1627], y=[1571, 1621])",WordType.TEXT

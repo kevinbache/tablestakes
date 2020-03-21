@@ -74,11 +74,12 @@ class KvGroup(hc.StyledHtmlTag, abc.ABC):
         ]))
 
     def do_add_colon_to_keys(self):
-        self.css.add_style(
-            hc.CssChunk(f'{self.get_selector(SelectorType.KEY).to_selector_str()}:after', {
-                'content': "':'",
-            }),
-        )
+        raise ValueError("Doesn't work")
+        # self.css.add_style(
+        #     hc.CssChunk(f'{self.get_selector(SelectorType.KEY).to_selector_str()}:after', {
+        #         'content': "':'",
+        #     }),
+        # )
 
     def set_css_property(self, property: str, value: Optional[str], selector_type=SelectorType.KEY):
         if value is None:

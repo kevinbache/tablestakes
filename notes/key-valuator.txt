@@ -1,0 +1,20 @@
+be able to take this shitty pdf form:
+==================================
+file:///Users/kevin/Downloads/APPLICATION%20TO%20LEASE%20A%20%20PROPERTY...936%20Rain%20Lilly%20Ln,%20Boulder.pdf
+==================================
+APPLICATION TO LEASE A PROPERTY
+Note: In the event of a student wishing to apply, parent or guardian must complete the application
+
+PROPERTY DETAILS:
+Property Address: 936 Rain Lilly Ln, Boulder, CO 80304, USA
+Period Required: 1 YEAR (Short Lease Also Available)
+Rental Payable: $1330 Occupation Date: ___________________________________
+No. of Occupants: __1____________________________________
+No. of Adults: _____1__________________________________
+No. of Children: ___0___________
+==================================
+
+and convert it to a google form
+which understands something about the types and uses those to give sensible widgets
+
+==================================

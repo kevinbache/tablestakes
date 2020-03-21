@@ -85,9 +85,9 @@ class KvHtml(hc.Div):
             v_tag=hc.Div(
                 contents=hc.Div(
                     contents=v_contents,
-                    classes=get_all_classes_value_selector(kv_name)
+                    classes=get_all_classes_value_selector(kv_name),
                 ),
-                classes=get_all_classes_value_outer_selector(kv_name)
+                classes=get_all_classes_value_outer_selector(kv_name),
             ),
         )
 

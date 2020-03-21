@@ -19,9 +19,10 @@ class OcrProvider(abc.ABC):
         return pdf2image.convert_from_path(pdf_filename, dpi=dpi)
 
     def ocr(self, input_pdf: str, dpi=400, save_raw_ocr_output_location: Optional[str] = None) -> doc.Document:
-        for page_ind, page_image in enumerate(self.load_pdf_to_images(input_pdf, dpi)):
+        page_images = self.load_pdf_to_images(input_pdf, dpi)
+        for page_ind, page_image in enumerate(page_images):
             ocr_page_outputs = []
-            with utils.Timer(f"Page {page_ind}"):
+            with utils.Timer(f"OCRing page {page_ind} of {len(page_images)}"):
                 ocr_page_outputs.append(self._ocr_page_image(page_image))
             ocrd_pages_combined = self._combine_ocr_output(ocr_page_outputs)
             self._save_ocr_output(ocrd_pages_combined, save_raw_ocr_output_location)

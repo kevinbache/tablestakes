@@ -1,0 +1,7 @@
+be able to generate useful html which can be rendered as a document which
+fools a discriminator
+is the discriminator looking at the html?  at the html->pdf->image?
+
+what kinds of commands could it have?  i guess it's just generating tags.
+what does the generator for an html document look like?  it's a tree generator.
+the next token it spits out can be a tag.  the tag generator generates the tag, the attrib=value pairs, and the contents
