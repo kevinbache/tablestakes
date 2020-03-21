@@ -56,3 +56,4 @@ npm install --save react
 npm install --save react-dom
 npm install --save-dev babel-core babel-loader babel-preset-react
 npm install --save-dev webpack webpack-dev-server html-webpack-plugin
+

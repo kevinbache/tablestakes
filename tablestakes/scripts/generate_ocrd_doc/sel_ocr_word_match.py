@@ -98,3 +98,4 @@ def get_word_pixel_locations(
         driver.quit()
 
     return pd.DataFrame(word_locations)
+
