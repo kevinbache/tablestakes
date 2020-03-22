@@ -2,7 +2,7 @@ import re
 
 from lxml import etree
 
-from python.tablestakes import utils
+from tablestakes import utils
 
 
 class WordWrapper:

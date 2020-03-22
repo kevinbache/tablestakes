@@ -1,7 +1,7 @@
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 
-from python.tablestakes import utils
+from tablestakes import utils
 
 
 options = Options()

@@ -1,7 +1,7 @@
 import enum
 from typing import *
 
-from python.tablestakes.tryouts import tags
+from tablestakes.tryouts import tags
 
 """
 param: normal row height multiplier 

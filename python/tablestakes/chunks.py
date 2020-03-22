@@ -1,5 +1,5 @@
-from python.tablestakes import html_css
-from python.tablestakes.html_css import SelectorType
+from tablestakes import html_css
+from tablestakes.html_css import SelectorType
 
 
 class Keys:

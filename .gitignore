@@ -1,6 +1,6 @@
 *.py[cod]
-python/probably_trash
 .DS_Store
+python/probably_trash
 python/output
 
 **/node_modules

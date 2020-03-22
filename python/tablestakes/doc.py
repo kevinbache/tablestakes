@@ -8,7 +8,7 @@ from typing import List, Optional
 
 import numpy as np
 
-from python.tablestakes import utils
+from tablestakes import utils
 
 
 class BBox:
@@ -232,7 +232,7 @@ if __name__ == '__main__':
     # pd = d['fullTextAnnotation']['pages'][0]['blocks'][0]['paragraphs'][0]
     # p = GoogleOcrDocumentFactory._paragraph_dict_2_paragraph(pd)
     # print(p)
-    #
+
     # print("================ Block ================")
     # bd = d['fullTextAnnotation']['pages'][0]['blocks'][0]
     # b = GoogleOcrDocumentFactory._block_dict_2_block(bd)
