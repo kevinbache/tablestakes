@@ -1,9 +1,10 @@
 import numpy as np
 import pandas as pd
 
-from tablestakes import kv_styles, creators, utils, html_css as hc, ocr, word_wrap
-from tablestakes.html_css import SelectorType
-from tablestakes.scripts.generate_ocrd_doc import sel_ocr_word_match
+from python.tablestakes import kv_styles, creators, utils, ocr, word_wrap
+from python.tablestakes import html_css as hc
+from python.tablestakes.html_css import SelectorType
+from python.tablestakes.scripts.generate_ocrd_doc import sel_ocr_word_match
 
 # class NodeModifier:
 #     def __init__(self, find_str: str, fn: Callable):
@@ -187,11 +188,10 @@ if __name__ == '__main__':
     print(f'x_line: {x_line}')
     print(f'y_line: {y_line}')
 
-
     ############################################################################
     # since the words are already matched by text, figure out the statistical  #
     # version of the transformation and apply that.                            #
-    # seems to be about 1/5 in off MAE                                         #
+    # seems to be about 1/5 of an inch off MAE                                 #
     # need to visualize to diagnose                                            #
     #   html                                                                   #
     #   background image for page                                              #

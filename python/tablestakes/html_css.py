@@ -10,7 +10,7 @@ from typing import List, Union, Optional
 import pdfkit
 import yattag
 
-from tablestakes import utils
+from python.tablestakes import utils
 
 
 #################

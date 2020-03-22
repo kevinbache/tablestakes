@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from selenium import webdriver
 
-from tablestakes import doc as ts_doc
+from python.tablestakes import doc as ts_doc
 
 
 # TODO: these conversion functions are ugly

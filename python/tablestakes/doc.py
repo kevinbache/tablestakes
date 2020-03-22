@@ -8,7 +8,7 @@ from typing import List, Optional
 
 import numpy as np
 
-from tablestakes import utils
+from python.tablestakes import utils
 
 
 class BBox:

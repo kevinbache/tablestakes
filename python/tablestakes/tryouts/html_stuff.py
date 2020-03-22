@@ -8,8 +8,8 @@ import pandas as pd
 from pandas_faker import PandasFaker
 
 from chillpill import params
-from tablestakes import utils
-from tablestakes.tryouts import my_css
+from python.tablestakes import utils
+from python.tablestakes.tryouts import my_css
 
 seed = 1234
 fake = faker.Faker()

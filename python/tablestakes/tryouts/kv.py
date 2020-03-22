@@ -1,10 +1,7 @@
 import enum
-from pathlib import Path
 from typing import *
 
-import yattag
-
-from tablestakes.tryouts import tags
+from python.tablestakes.tryouts import tags
 
 """
 param: normal row height multiplier 

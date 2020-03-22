@@ -1,8 +1,9 @@
 import enum
 from typing import *
 
-from tablestakes import html_css as hc, utils
-from tablestakes.html_css import SelectorType
+from python.tablestakes import utils
+from python.tablestakes import html_css as hc
+from python.tablestakes.html_css import SelectorType
 
 ProbDict = Dict[Any, float]
 

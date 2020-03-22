@@ -7,7 +7,7 @@ import pandas as pd
 import pdf2image
 import pytesseract
 
-from tablestakes import doc, utils
+from python.tablestakes import doc, utils
 
 
 class OcrProvider(abc.ABC):

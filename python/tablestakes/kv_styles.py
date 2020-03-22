@@ -2,8 +2,9 @@ import abc
 import enum
 from typing import *
 
-from tablestakes import kv, html_css as hc
-from tablestakes.html_css import SelectorType
+from python.tablestakes import kv
+from python.tablestakes import html_css as hc
+from python.tablestakes.html_css import SelectorType
 
 
 class KvAlign(enum.Enum):

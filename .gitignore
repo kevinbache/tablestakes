@@ -1,7 +1,7 @@
 *.py[cod]
-probably_trash
+python/probably_trash
 .DS_Store
-output
+python/output
 
 **/node_modules
 
@@ -20,7 +20,7 @@ var
 sdist
 develop-eggs
 .installed.cfg
-lib
+python/lib
 lib64
 __pycache__
 

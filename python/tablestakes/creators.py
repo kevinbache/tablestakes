@@ -4,7 +4,8 @@ from typing import Callable, Union, Iterable, Optional, Any, Tuple
 import faker
 import numpy as np
 
-from tablestakes import chunks, html_css as hc, kv, utils
+from python.tablestakes import chunks, kv, utils
+from python.tablestakes import html_css as hc
 
 
 class Creator(abc.ABC):
