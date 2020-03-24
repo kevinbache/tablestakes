@@ -82,16 +82,16 @@ class Page extends React.Component {
   datum_2_box(datum, index) {
     // TODO: inflation_factor and yOffset
     const inflation_factor = 1.0;
-    const extraWidth = 5;
-    const extraHeight = 5;
-    const yOffset = 3;
-    const xOffset = 5;
+    const extraWidth = 6;
+    const extraHeight = 6;
+    const yOffset = 4;
+    const xOffset = 4;
     const box_style = {
       left: datum.xmin + xOffset,
       top: datum.ymin + yOffset,
       width: (datum.xmax - datum.xmin) * inflation_factor + extraWidth,
       height: (datum.ymax - datum.ymin) * inflation_factor + extraHeight,
-      backgroundColor: 'rgba(20, 20, 240, 0.2)',
+      backgroundColor: 'rgba(60, 60, 240, 0.2)',
       border: "1px solid blue",
       position: 'absolute',
     };
@@ -125,11 +125,8 @@ class Page extends React.Component {
   }
 }
 
-// class Boxes extends React.Component {
-//
-// }
-
 ReactDOM.render(
   <Page />,
   document.getElementById('root')
 );
+
