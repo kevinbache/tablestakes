@@ -99,7 +99,7 @@ class Page extends React.Component {
       <div
         style={box_style}
         key={index}
-        datawordtext={datum.text}
+        wordtext={datum.text}
       >
       </div>
     );
@@ -117,9 +117,11 @@ class Page extends React.Component {
       border: "0px solid blue",
     };
 
-    return <div className="page-holder" style={bg_div_style}>
-      { this.state.ocr_data.map((datum, index) => this.datum_2_box(datum, index)) }
-    </div>;
+    return (
+      <div className="page-holder" style={bg_div_style}>
+        { this.state.ocr_data.map((datum, index) => this.datum_2_box(datum, index)) }
+      </div>
+    );
   }
 }
 
