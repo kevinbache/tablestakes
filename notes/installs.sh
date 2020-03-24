@@ -16,10 +16,8 @@ pip install faker
 
 #git@github.com:tirthajyoti/pydbgen.git
 
-
 brew install wkhtmltopdf
 pip install pdfkit
-
 
 # tesseract
 # haven't installed opencv
@@ -33,11 +31,9 @@ pip install pytesseract
 #brew tap tlk/imagemagick-x11
 #brew install tlk/imagemagick-x11/imagemagick
 
-
 ## ref: https://github.com/pymupdf/PyMuPDF
 #brew install mupdf-tools
 #pip install PyMuPDF
-
 
 conda install -c conda-forge poppler
 pip install pdf2image
@@ -56,4 +52,3 @@ npm install --save react
 npm install --save react-dom
 npm install --save-dev babel-core babel-loader babel-preset-react
 npm install --save-dev webpack webpack-dev-server html-webpack-plugin
-

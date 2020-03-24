@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -5,20 +7,6 @@ from tablestakes import kv_styles, creators, utils, ocr, word_wrap
 from tablestakes import html_css as hc
 from tablestakes.html_css import SelectorType
 from tablestakes.scripts.generate_ocrd_doc import sel_ocr_word_match
-
-# class NodeModifier:
-#     def __init__(self, find_str: str, fn: Callable):
-#         self.find_str = find_str
-#         self.fn = fn
-#
-#     def modify(self, root: etree._Element):
-#         # TODO
-#         return root
-#
-#     def modify_str(self, contents: str):
-#         root = etree.fromstring(text=contents, parser=etree.HTMLParser())
-#         root = self.modify(root)
-#         return etree.tostring(root, encoding='unicode')
 
 
 if __name__ == '__main__':
@@ -125,13 +113,23 @@ if __name__ == '__main__':
 
     word_id_2_word = wrapper.get_used_id_to_word()
     sel_df = sel_ocr_word_match.get_word_pixel_locations(
-        html_file=html_filename,
+        html_file=f'file:///Users/kevin/projects/tablestakes/python/tablestakes/scripts/generate_ocrd_doc/{html_filename}',
         word_id_to_word=word_id_2_word,
         window_width_px=window_width_px,
         window_height_px=window_height_px,
     )
     sel_df.to_csv('selenium_word_locations.csv')
     print(sel_df)
+
+    ####################
+    # save page images #
+    ####################
+    page_images_dir = Path('.') / 'page_images'
+    utils.mkdir_if_not_exist(page_images_dir)
+    page_images = ocr.OcrProvider.load_pdf_to_images(pdf_filename, dpi)
+    for page_ind, page_image in enumerate(page_images):
+        page_file = page_images_dir / utils.prepend_before_extension(pdf_filename, f'_page_{page_ind}', new_ext='.png')
+        page_image.save(page_file)
 
     ####################################
     # ocr the previously saved pdf doc #

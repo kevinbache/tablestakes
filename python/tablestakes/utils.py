@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import time
 
 from typing import *
@@ -110,6 +112,24 @@ def levenshtein(a: str, b: str):
             ])
 
     return d[na, nb]
+
+
+def mkdir_if_not_exist(d: str):
+    p = Path(d)
+    if p.exists():
+        if p.is_dir():
+            return
+        else:
+            raise ValueError(f'{d} exists but is not a directory.')
+    else:
+        p.mkdir(parents=True)
+        return
+
+
+def prepend_before_extension(f: str, to_append: str, new_ext: Optional[str]=None):
+    p = Path(f)
+    ext = new_ext if new_ext is not None else p.suffix
+    return p.parent / f'{p.stem}{to_append}{ext}'
 
 
 if __name__ == '__main__':

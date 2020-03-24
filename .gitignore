@@ -4,6 +4,7 @@ python/probably_trash
 python/output
 
 **/node_modules
+**/form-api
 
 # C extensions
 *.so

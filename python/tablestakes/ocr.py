@@ -18,7 +18,12 @@ class OcrProvider(abc.ABC):
     def load_pdf_to_images(cls, pdf_filename: str, dpi: int):
         return pdf2image.convert_from_path(pdf_filename, dpi=dpi)
 
-    def ocr(self, input_pdf: str, dpi=400, save_raw_ocr_output_location: Optional[str] = None) -> doc.Document:
+    def ocr(
+            self,
+            input_pdf: str,
+            dpi=400,
+            save_raw_ocr_output_location: Optional[str] = None,
+    ) -> doc.Document:
         page_images = self.load_pdf_to_images(input_pdf, dpi)
         for page_ind, page_image in enumerate(page_images):
             ocr_page_outputs = []

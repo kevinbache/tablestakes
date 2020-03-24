@@ -16,11 +16,11 @@ def read(filename):
 setup(
     name="tablestakes",
     version='0.0.1',
-    url="git@github.com:kevinbache/tablestakes",
+    url="git@github.com:wonkygiraffe/tablestakes",
     license='MIT',
 
     author="My Name",
-    author_email="kevin.bache@gmail.com",
+    author_email="wonkygiraffe@outlook.com",
 
     description="Brown, paper, tied up with string.",
     long_description=read("README.md"),
