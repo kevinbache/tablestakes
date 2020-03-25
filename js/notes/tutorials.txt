@@ -1,3 +1,7 @@
 https://www.codecademy.com/articles/react-setup-i
 
 https://codeburst.io/asynchronous-file-upload-with-node-and-react-ea2ed47306dd
+
+https://css-tricks.com/scaled-proportional-blocks-with-css-and-javascript/
+
+https://stackoverflow.com/questions/38836553/how-to-use-jquery-ui-with-react-js

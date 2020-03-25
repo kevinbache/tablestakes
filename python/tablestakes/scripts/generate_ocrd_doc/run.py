@@ -110,6 +110,8 @@ if __name__ == '__main__':
     dpi = 500
     window_width_px = dpi * 8.5
     window_height_px = dpi * 11.00
+    output_dir = Path('.') / 'docs' / 'doc_01'
+    utils.mkdir_if_not_exist(output_dir)
 
     word_id_2_word = wrapper.get_used_id_to_word()
     sel_df = sel_ocr_word_match.get_word_pixel_locations(
@@ -118,34 +120,36 @@ if __name__ == '__main__':
         window_width_px=window_width_px,
         window_height_px=window_height_px,
     )
-    sel_df.to_csv('selenium_word_locations.csv')
+    sel_df.to_csv(output_dir / 'sel_words.csv')
     print(sel_df)
 
     ####################
     # save page images #
     ####################
-    page_images_dir = Path('.') / 'page_images'
-    utils.mkdir_if_not_exist(page_images_dir)
     page_images = ocr.OcrProvider.load_pdf_to_images(pdf_filename, dpi)
     for page_ind, page_image in enumerate(page_images):
-        page_file = page_images_dir / utils.prepend_before_extension(pdf_filename, f'_page_{page_ind}', new_ext='.png')
+        page_file = output_dir / utils.prepend_before_extension(pdf_filename, f'_page_{page_ind}', new_ext='.png')
         page_image.save(page_file)
 
     ####################################
     # ocr the previously saved pdf doc #
     ####################################
     ocr_raw_filename = 'doc_ocr_df.pkl'
+    ocr_provider = ocr.TesseractOcrProvider()
     with utils.Timer('TesseractOcrProvider.ocr'):
-        ocr_doc = ocr.TesseractOcrProvider().ocr(
+        ocr_doc = ocr_provider.ocr(
             input_pdf=pdf_filename,
             dpi=dpi,
             save_raw_ocr_output_location=ocr_raw_filename,
         )
-    print(ocr_doc)
+    words = ocr_doc.get_words()
+    # print([w for w in words if not w.bbox.xmax - w.bbox.xmin])
+    # print(ocr_doc)
 
     #########################################
     # create a df of the ocr word locations #
     #########################################
+
     ocrd_words = []
     for word in ocr_doc.get_words():
         ocrd_word = {
@@ -156,7 +160,7 @@ if __name__ == '__main__':
         ocrd_words.append(ocrd_word)
 
     ocr_df = pd.DataFrame(ocrd_words)
-    ocr_df.to_csv('ocr_word_locations.csv')
+    ocr_df.to_csv(output_dir / 'ocr_words.csv')
 
     ############################################################################
     # match up one word by text between selenium and ocr versions of the words #
@@ -201,6 +205,7 @@ if __name__ == '__main__':
     sbox_array = np.array(list(sel_df['sel_bbox'].apply(lambda bbox: bbox.to_array())))
     obox_array = np.array(list(sel_df['ocr_bbox'].apply(lambda bbox: bbox.to_array())))
 
+    to_write = ['[self.xmin, self.xmax, self.ymin, self.ymax]']
     for target_ind in range(4):
         x = sbox_array[:, target_ind:target_ind+1]
         # x = sbox_array
@@ -209,4 +214,13 @@ if __name__ == '__main__':
         y_hat = model.predict(x)
         mae = np.mean(np.abs(y_hat - y))
         print(target_ind, model.intercept_, model.coef_, mae)
+
+        conversion_model_str = ' '.join([str(e) for e in [target_ind, model.intercept_, model.coef_, mae]])
+        to_write.append(conversion_model_str)
+
+    to_write.append(f'x_line: {x_line}')
+    to_write.append(f'y_line: {y_line}')
+
+    utils.save_txt(output_dir / 'conversion_factors.txt', '\n'.join(to_write))
+
 

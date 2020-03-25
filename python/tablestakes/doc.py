@@ -82,7 +82,7 @@ class Word(Bounded):
         super().__init__(bbox)
         self.text = text
         self.word_type = word_type
-        self.confidence = -1
+        self.confidence = confidence
 
     def __repr__(self):
         return f'Word("{self.text}", {self.bbox.simple_repr()})'

@@ -1,3 +1,4 @@
+import copy
 from typing import Any, List, Optional
 
 from PIL import Image
@@ -30,6 +31,8 @@ class OcrProvider(abc.ABC):
             with utils.Timer(f"OCRing page {page_ind} of {len(page_images)}"):
                 ocr_page_outputs.append(self._ocr_page_image(page_image))
             ocrd_pages_combined = self._combine_ocr_output(ocr_page_outputs)
+            # TODO: remove this line when done debugging
+            self.ocr_page_outputs = ocr_page_outputs
             self._save_ocr_output(ocrd_pages_combined, save_raw_ocr_output_location)
             return self._ocr_output_2_doc(ocrd_pages_combined)
 
@@ -90,7 +93,7 @@ class TesseractDocumentFactory:
             block_index = row['block_num'] - 1
             par_index = row['par_num'] - 1
 
-            prev_bbox = bbox
+            prev_bbox = copy.copy(bbox)
             bbox = cls._row_to_bbox(row)
             if row['level'] == 1:
                 document.pages.append(
