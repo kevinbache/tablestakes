@@ -120,8 +120,6 @@ class Page extends React.Component {
   }
 
   render() {
-    // const width = 8.5 * 500;
-    // const height = 11 * 500;
     const image_size = [8.5, 11];
 
     const [width, height] = image_size.map(x => x * this.dpi * this.scale) ;
