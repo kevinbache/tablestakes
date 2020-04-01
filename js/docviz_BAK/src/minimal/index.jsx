@@ -2,9 +2,9 @@ import React, {useState} from 'react';
 import ReactDOM from "react-dom";
 import Papa from 'papaparse';
 
-import selDataFile from '../data/doc_01/sel_words.csv';
-import ocrDataFile from '../data/doc_01/ocr_words.csv';
-import imageFile from '../data/doc_01/doc_wrapped_page_0.png';
+import selDataFile from '../../../docviz/src/data/doc_01/sel_words.csv';
+import ocrDataFile from '../../../docviz/src/data/doc_01/ocr_words.csv';
+import imageFile from '../../../docviz/src/data/doc_01/doc_wrapped_page_0.png';
 
 function bbox_to_ranges(bbox) {
   // bbox should be a string like "BBox(x=[1947, 2149], y=[1234, 1284])"
