@@ -1,9 +1,6 @@
 import React, {useContext, useState} from 'react';
 import Papa from "papaparse";
 import {BoxesContext} from "../context/BoxesContext";
-
-// https://github.com/kitze/react-hanger
-import * as d3 from "d3";
 import {readFileAsText} from "../utils";
 
 
