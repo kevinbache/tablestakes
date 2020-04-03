@@ -78,10 +78,10 @@ class TesseractDocumentFactory:
     @staticmethod
     def _row_to_bbox(row: pd.Series):
         return doc.BBox(
-            xmin=row['left'],
-            xmax=row['left'] + row['width'],
-            ymin=row['top'],
-            ymax=row['top'] + row['height'],
+            left=row['left'],
+            right=row['left'] + row['width'],
+            top=row['top'],
+            bottom=row['top'] + row['height'],
         )
 
     @classmethod
@@ -109,7 +109,7 @@ class TesseractDocumentFactory:
                 )
             elif row['level'] == 4:
                 # tesseract lines become "\n" words
-                prev_bbox.xmax = prev_bbox.xmin
+                prev_bbox.right = prev_bbox.left
                 document.pages[page_index].blocks[block_index].paragraphs[par_index].words.append(
                     doc.Word(text='\n', bbox=prev_bbox, word_type=doc.Word.WordType.LINEBREAK, confidence=row['conf'])
                 )

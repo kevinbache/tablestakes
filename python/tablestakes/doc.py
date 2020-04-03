@@ -12,17 +12,17 @@ from tablestakes import utils
 
 
 class BBox:
-    def __init__(self, xmin: float, xmax: float, ymin: float, ymax: float):
-        self.xmin = xmin
-        self.xmax = xmax
-        self.ymin = ymin
-        self.ymax = ymax
+    def __init__(self, left: float, right: float, top: float, bottom: float):
+        self.left = left
+        self.right = right
+        self.top = top
+        self.bottom = bottom
 
     def __repr__(self):
         return f'BBox({self.simple_repr()})'
 
     def simple_repr(self):
-        return f'x=[{self.xmin:0.0f}, {self.xmax:0.0f}], y=[{self.ymin:0.0f}, {self.ymax:0.0f}]'
+        return f'x=[{self.left:0.0f}, {self.right:0.0f}], y=[{self.top:0.0f}, {self.bottom:0.0f}]'
 
     @classmethod
     def from_dict(cls, d: dict):
@@ -34,7 +34,7 @@ class BBox:
         return cls(xmin, xmax, ymin, ymax)
 
     def to_array(self):
-        return np.array([self.xmin, self.xmax, self.ymin, self.ymax])
+        return np.array([self.left, self.right, self.top, self.bottom])
 
     @classmethod
     def from_array(cls, a: np.array):
@@ -184,7 +184,7 @@ class GoogleOcrDocumentFactory:
                 db = p['detectedBreak']
                 if db['type'] == 'EOL_SURE_SPACE':
                     bbox = BBox.from_dict(w['boundingBox'])
-                    bbox.xmin = bbox.xmax
+                    bbox.left = bbox.right
                     word = Word(text='\n', bbox=bbox, word_type=Word.WordType.LINEBREAK)
                     return word
         return None
@@ -215,7 +215,7 @@ class GoogleOcrDocumentFactory:
     def _page_dict_2_page(cls, d: dict):
         return Page(
             blocks=[cls._block_dict_2_block(b) for b in d['blocks']],
-            bbox=BBox(xmin=0, xmax=d['width'], ymin=0, ymax=d['height']),
+            bbox=BBox(left=0, right=d['width'], top=0, bottom=d['height']),
         )
 
     @classmethod

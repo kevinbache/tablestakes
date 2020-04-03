@@ -14,10 +14,10 @@ from tablestakes import doc as ts_doc
 def selenium_row_to_bbox(srow: pd.Series):
     print(f"selenium_row_to_bbox srow: {srow}")
     return ts_doc.BBox(
-        xmin=float(srow['left']),
-        xmax=float(srow['right']),
-        ymin=float(srow['top']),
-        ymax=float(srow['bottom']),
+        left=float(srow['left']),
+        right=float(srow['right']),
+        top=float(srow['top']),
+        bottom=float(srow['bottom']),
     )
 
 
@@ -43,13 +43,13 @@ def get_line(ocr_points: np.array, selenium_points: np.array):
 
 def get_lines(ocr_bbox: ts_doc.BBox, selenium_bbox: ts_doc.BBox):
     x_line = get_line(
-        np.array([ocr_bbox.xmin, ocr_bbox.xmax]),
-        np.array([selenium_bbox.xmin, selenium_bbox.xmax]),
+        np.array([ocr_bbox.left, ocr_bbox.right]),
+        np.array([selenium_bbox.left, selenium_bbox.right]),
     )
 
     y_line = get_line(
-        np.array([ocr_bbox.ymin, ocr_bbox.ymax]),
-        np.array([selenium_bbox.ymin, selenium_bbox.ymax]),
+        np.array([ocr_bbox.top, ocr_bbox.bottom]),
+        np.array([selenium_bbox.top, selenium_bbox.bottom]),
     )
 
     return x_line, y_line
@@ -62,10 +62,10 @@ def _convert_point(line: np.array, point: float):
 
 def convert_bbox(x_line: np.array, y_line: np.array, sel_bbox: ts_doc.BBox):
     return ts_doc.BBox(
-        xmin=_convert_point(x_line, sel_bbox.xmin),
-        xmax=_convert_point(x_line, sel_bbox.xmax),
-        ymin=_convert_point(y_line, sel_bbox.ymin),
-        ymax=_convert_point(y_line, sel_bbox.ymax),
+        left=_convert_point(x_line, sel_bbox.left),
+        right=_convert_point(x_line, sel_bbox.right),
+        top=_convert_point(y_line, sel_bbox.top),
+        bottom=_convert_point(y_line, sel_bbox.bottom),
     )
 
 
@@ -89,6 +89,20 @@ def get_word_pixel_locations(
             var w = document.getElementById("{word_id}");
             var rect = w.getBoundingClientRect();
             return rect;
+            """
+
+            """
+            Example: 
+            word_location == {
+                'left': 12,
+                'right': 58.75,
+                'top': 12,
+                'bottom': 33,
+                'width': 46.75,
+                'height': 21,
+                'x': 12,
+                'y': 12,
+            }
             """
             word_location = driver.execute_script(script)
             word_location['word_id'] = word_id
