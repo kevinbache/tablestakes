@@ -1,4 +1,4 @@
-"""Document representation with conversion from Google OCR format."""
+"""Document, Page, Word etc. objects."""
 import copy
 
 import abc

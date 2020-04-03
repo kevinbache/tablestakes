@@ -1,0 +1,78 @@
+,text,bbox,word_type
+0,"
+","BBox(x=[1107, 1107], y=[1067, 1168])",WordType.LINEBREAK
+1,SENT,"BBox(x=[1107, 1486], y=[1067, 1168])",WordType.TEXT
+2,TO,"BBox(x=[1536, 1731], y=[1067, 1168])",WordType.TEXT
+3,"
+","BBox(x=[1107, 1107], y=[1609, 1710])",WordType.LINEBREAK
+4,SOLD,"BBox(x=[1107, 1496], y=[1609, 1710])",WordType.TEXT
+5,TO,"BBox(x=[1544, 1739], y=[1609, 1710])",WordType.TEXT
+6,"
+","BBox(x=[1107, 1107], y=[2151, 2252])",WordType.LINEBREAK
+7,SHIPPING,"BBox(x=[1107, 1858], y=[2151, 2252])",WordType.TEXT
+8,"
+","BBox(x=[1107, 1107], y=[2692, 3243])",WordType.LINEBREAK
+9,STATEMENT,"BBox(x=[1107, 1989], y=[2692, 2793])",WordType.TEXT
+10,DATE,"BBox(x=[2045, 2420], y=[2694, 2791])",WordType.TEXT
+11,"
+","BBox(x=[2045, 2045], y=[2694, 2791])",WordType.LINEBREAK
+12,RECEIVED,"BBox(x=[1112, 1852], y=[2917, 3018])",WordType.TEXT
+13,"
+","BBox(x=[1112, 1112], y=[2917, 3018])",WordType.LINEBREAK
+14,INVOICE,"BBox(x=[1108, 1752], y=[3142, 3243])",WordType.TEXT
+15,"
+","BBox(x=[2507, 2507], y=[1065, 1507])",WordType.LINEBREAK
+16,Kelley,"BBox(x=[2513, 2899], y=[1065, 1193])",WordType.TEXT
+17,Ltd,"BBox(x=[2963, 3147], y=[1065, 1168])",WordType.TEXT
+18,"
+","BBox(x=[2963, 2963], y=[1065, 1168])",WordType.LINEBREAK
+19,207,"BBox(x=[2510, 2745], y=[1226, 1327])",WordType.TEXT
+20,Garcia,"BBox(x=[2815, 3223], y=[1226, 1327])",WordType.TEXT
+21,Glen,"BBox(x=[3290, 3575], y=[1224, 1327])",WordType.TEXT
+22,Suite,"BBox(x=[3642, 3970], y=[1226, 1327])",WordType.TEXT
+23,650,"BBox(x=[4034, 4270], y=[1226, 1327])",WordType.TEXT
+24,"
+","BBox(x=[4034, 4034], y=[1226, 1327])",WordType.LINEBREAK
+25,"Oscartown,","BBox(x=[2507, 3244], y=[1384, 1507])",WordType.TEXT
+26,MA,"BBox(x=[3321, 3509], y=[1386, 1483])",WordType.TEXT
+27,71182,"BBox(x=[3568, 3973], y=[1384, 1485])",WordType.TEXT
+28,"
+","BBox(x=[2509, 2509], y=[1607, 2049])",WordType.LINEBREAK
+29,Salas,"BBox(x=[2509, 2851], y=[1607, 1710])",WordType.TEXT
+30,LLC,"BBox(x=[2921, 3144], y=[1609, 1710])",WordType.TEXT
+31,"
+","BBox(x=[2921, 2921], y=[1609, 1710])",WordType.LINEBREAK
+32,61737,"BBox(x=[2509, 2915], y=[1767, 1868])",WordType.TEXT
+33,Sarah,"BBox(x=[2984, 3356], y=[1765, 1868])",WordType.TEXT
+34,Flats,"BBox(x=[3429, 3726], y=[1765, 1868])",WordType.TEXT
+35,"
+","BBox(x=[3429, 3429], y=[1765, 1868])",WordType.LINEBREAK
+36,East,"BBox(x=[2513, 2783], y=[1928, 2027])",WordType.TEXT
+37,"Laurie,","BBox(x=[2846, 3281], y=[1927, 2049])",WordType.TEXT
+38,MI,"BBox(x=[3354, 3501], y=[1928, 2025])",WordType.TEXT
+39,32037,"BBox(x=[3569, 3973], y=[1926, 2027])",WordType.TEXT
+40,"
+","BBox(x=[2502, 2502], y=[2151, 2590])",WordType.LINEBREAK
+41,Simpson,"BBox(x=[2509, 3063], y=[2151, 2277])",WordType.TEXT
+42,Group,"BBox(x=[3132, 3526], y=[2151, 2277])",WordType.TEXT
+43,"
+","BBox(x=[3132, 3132], y=[2151, 2277])",WordType.LINEBREAK
+44,3373,"BBox(x=[2511, 2829], y=[2309, 2410])",WordType.TEXT
+45,Campos,"BBox(x=[2898, 3422], y=[2309, 2435])",WordType.TEXT
+46,Pike,"BBox(x=[3488, 3743], y=[2307, 2410])",WordType.TEXT
+47,Suite,"BBox(x=[3809, 4137], y=[2309, 2410])",WordType.TEXT
+48,337,"BBox(x=[4202, 4437], y=[2309, 2410])",WordType.TEXT
+49,"
+","BBox(x=[4202, 4202], y=[2309, 2410])",WordType.LINEBREAK
+50,"Andersonton,","BBox(x=[2502, 3384], y=[2465, 2590])",WordType.TEXT
+51,MT,"BBox(x=[3454, 3636], y=[2469, 2566])",WordType.TEXT
+52,68219,"BBox(x=[3692, 4098], y=[2467, 2568])",WordType.TEXT
+53,"
+","BBox(x=[2509, 2509], y=[2690, 3243])",WordType.LINEBREAK
+54,03/03/2006,"BBox(x=[2509, 3292], y=[2690, 2811])",WordType.TEXT
+55,"
+","BBox(x=[2509, 2509], y=[2690, 2811])",WordType.LINEBREAK
+56,10/02/1991,"BBox(x=[2518, 3285], y=[2915, 3036])",WordType.TEXT
+57,"
+","BBox(x=[2518, 2518], y=[2915, 3036])",WordType.LINEBREAK
+58,670094950,"BBox(x=[2509, 3254], y=[3142, 3243])",WordType.TEXT

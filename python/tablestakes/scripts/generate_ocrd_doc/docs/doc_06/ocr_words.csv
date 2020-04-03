@@ -1,0 +1,82 @@
+,text,bbox,word_type
+0,"
+","BBox(x=[1053, 1053], y=[1034, 1084])",WordType.LINEBREAK
+1,SENT,"BBox(x=[1053, 1243], y=[1034, 1084])",WordType.TEXT
+2,TO,"BBox(x=[1267, 1365], y=[1034, 1084])",WordType.TEXT
+3,"
+","BBox(x=[1053, 1053], y=[1305, 1355])",WordType.LINEBREAK
+4,SOLD,"BBox(x=[1053, 1248], y=[1305, 1355])",WordType.TEXT
+5,TO,"BBox(x=[1271, 1369], y=[1305, 1355])",WordType.TEXT
+6,"
+","BBox(x=[1053, 1053], y=[1576, 1626])",WordType.LINEBREAK
+7,SHIPPING,"BBox(x=[1053, 1429], y=[1576, 1626])",WordType.TEXT
+8,"
+","BBox(x=[1053, 1053], y=[1846, 2121])",WordType.LINEBREAK
+9,STATEMENT,"BBox(x=[1053, 1494], y=[1846, 1896])",WordType.TEXT
+10,DATE,"BBox(x=[1522, 1710], y=[1847, 1895])",WordType.TEXT
+11,"
+","BBox(x=[1522, 1522], y=[1847, 1895])",WordType.LINEBREAK
+12,RECEIVED,"BBox(x=[1056, 1426], y=[1959, 2009])",WordType.TEXT
+13,"
+","BBox(x=[1056, 1056], y=[1959, 2009])",WordType.LINEBREAK
+14,INVOICE,"BBox(x=[1054, 1376], y=[2071, 2121])",WordType.TEXT
+15,"
+","BBox(x=[1752, 1752], y=[1032, 1254])",WordType.LINEBREAK
+16,"Hall,","BBox(x=[1756, 1894], y=[1032, 1095])",WordType.TEXT
+17,Sparks,"BBox(x=[1929, 2152], y=[1032, 1096])",WordType.TEXT
+18,and,"BBox(x=[2182, 2297], y=[1032, 1084])",WordType.TEXT
+19,Stephens,"BBox(x=[2333, 2638], y=[1032, 1096])",WordType.TEXT
+20,"
+","BBox(x=[2333, 2333], y=[1032, 1096])",WordType.LINEBREAK
+21,4635,"BBox(x=[1752, 1915], y=[1113, 1163])",WordType.TEXT
+22,Michelle,"BBox(x=[1951, 2209], y=[1111, 1163])",WordType.TEXT
+23,Islands,"BBox(x=[2241, 2474], y=[1111, 1163])",WordType.TEXT
+24,Apt.,"BBox(x=[2501, 2629], y=[1114, 1175])",WordType.TEXT
+25,122,"BBox(x=[2671, 2785], y=[1113, 1162])",WordType.TEXT
+26,"
+","BBox(x=[2671, 2671], y=[1113, 1162])",WordType.LINEBREAK
+27,"Murphyfort,","BBox(x=[1756, 2136], y=[1190, 1254])",WordType.TEXT
+28,MI,"BBox(x=[2172, 2246], y=[1193, 1241])",WordType.TEXT
+29,21124,"BBox(x=[2280, 2483], y=[1192, 1241])",WordType.TEXT
+30,"
+","BBox(x=[1751, 1751], y=[1303, 1524])",WordType.LINEBREAK
+31,Cunningham,"BBox(x=[1754, 2166], y=[1303, 1368])",WordType.TEXT
+32,and,"BBox(x=[2198, 2314], y=[1303, 1355])",WordType.TEXT
+33,Sons,"BBox(x=[2349, 2506], y=[1305, 1355])",WordType.TEXT
+34,"
+","BBox(x=[2349, 2349], y=[1305, 1355])",WordType.LINEBREAK
+35,549,"BBox(x=[1756, 1872], y=[1384, 1434])",WordType.TEXT
+36,Hubbard,"BBox(x=[1910, 2183], y=[1382, 1434])",WordType.TEXT
+37,Points,"BBox(x=[2218, 2411], y=[1384, 1434])",WordType.TEXT
+38,"
+","BBox(x=[2218, 2218], y=[1384, 1434])",WordType.LINEBREAK
+39,"Aaronfort,","BBox(x=[1751, 2083], y=[1461, 1524])",WordType.TEXT
+40,WV,"BBox(x=[2115, 2222], y=[1464, 1512])",WordType.TEXT
+41,12271,"BBox(x=[2259, 2454], y=[1463, 1512])",WordType.TEXT
+42,"
+","BBox(x=[1754, 1754], y=[1574, 1795])",WordType.LINEBREAK
+43,"Chavez,","BBox(x=[1754, 2010], y=[1574, 1637])",WordType.TEXT
+44,Simmons,"BBox(x=[2045, 2349], y=[1576, 1626])",WordType.TEXT
+45,and,"BBox(x=[2382, 2497], y=[1574, 1626])",WordType.TEXT
+46,Barnes,"BBox(x=[2535, 2757], y=[1577, 1626])",WordType.TEXT
+47,"
+","BBox(x=[2535, 2535], y=[1577, 1626])",WordType.LINEBREAK
+48,58812,"BBox(x=[1756, 1957], y=[1654, 1705])",WordType.TEXT
+49,Marisa,"BBox(x=[1993, 2199], y=[1655, 1705])",WordType.TEXT
+50,Stream,"BBox(x=[2233, 2468], y=[1655, 1705])",WordType.TEXT
+51,Apt.,"BBox(x=[2501, 2629], y=[1656, 1717])",WordType.TEXT
+52,714,"BBox(x=[2667, 2786], y=[1655, 1704])",WordType.TEXT
+53,"
+","BBox(x=[2667, 2667], y=[1655, 1704])",WordType.LINEBREAK
+54,"Kevinmouth,","BBox(x=[1757, 2169], y=[1732, 1795])",WordType.TEXT
+55,AZ,"BBox(x=[2201, 2287], y=[1735, 1783])",WordType.TEXT
+56,09658,"BBox(x=[2320, 2524], y=[1733, 1784])",WordType.TEXT
+57,"
+","BBox(x=[1754, 1754], y=[1844, 2121])",WordType.LINEBREAK
+58,12/10/2010,"BBox(x=[1759, 2145], y=[1844, 1905])",WordType.TEXT
+59,"
+","BBox(x=[1759, 1759], y=[1844, 1905])",WordType.LINEBREAK
+60,07/12/2006,"BBox(x=[1754, 2146], y=[1957, 2018])",WordType.TEXT
+61,"
+","BBox(x=[1754, 1754], y=[1957, 2018])",WordType.LINEBREAK
+62,670094950,"BBox(x=[1754, 2127], y=[2071, 2121])",WordType.TEXT

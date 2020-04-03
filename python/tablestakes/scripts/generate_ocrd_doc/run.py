@@ -14,6 +14,7 @@ if __name__ == '__main__':
     # randomly create html representing a print document #
     ######################################################
     np.random.seed(42)
+    margin = '2in'
 
     with utils.Timer('hc creation'):
         my_date_creator = creators.DateCreator()
@@ -101,13 +102,13 @@ if __name__ == '__main__':
     pdf_filename = f'{base_filename}.pdf'
     with utils.Timer('save wrapped'):
         doc.save_html(html_filename)
-        doc.save_pdf(pdf_filename, page_size=hc.PageSize.LETTER, margin='1in')
+        doc.save_pdf(pdf_filename, page_size=hc.PageSize.LETTER, margin=margin)
         # doc.open_in_browser()
 
     ##############################################
     # use selenium to get locations of all words #
     ##############################################
-    dpi = 500
+    dpi = 1000
     window_width_px = dpi * 8.5
     window_height_px = dpi * 11.00
     output_dir = Path('.') / 'docs' / 'doc_01'
@@ -179,16 +180,18 @@ if __name__ == '__main__':
     sel_df['ocr_bbox'] = ocr_df.loc[sel_df.closest_ocr_word_id].bbox.reset_index(drop=True)
     sel_df['ocr_text'] = ocr_df.loc[sel_df.closest_ocr_word_id].text.reset_index(drop=True)
     sel_df['sel_bbox'] = sel_df.apply(lambda row: sel_ocr_word_match.selenium_row_to_bbox(row), axis=1)
-    sel_df['sel_bbox_converted'] = \
+    sel_df['sel_bbox_line_converted'] = \
         sel_df.sel_bbox.apply(lambda sel_bbox: sel_ocr_word_match.convert_bbox(x_line, y_line, sel_bbox))
 
     pd.set_option('display.max_columns', 200)
     pd.set_option('display.width', 200)
-    print(sel_df[['text', 'ocr_text', 'ocr_bbox', 'sel_bbox_converted', 'sel_bbox']])
+    print(sel_df[['text', 'ocr_text', 'ocr_bbox', 'sel_bbox_line_converted', 'sel_bbox']])
 
     print()
     print(f'x_line: {x_line}')
     print(f'y_line: {y_line}')
+    print(f'dpi:    {dpi}')
+    print(f'margin: {margin}')
 
     ############################################################################
     # since the words are already matched by text, figure out the statistical  #
@@ -221,6 +224,7 @@ if __name__ == '__main__':
     to_write.append(f'x_line: {x_line}')
     to_write.append(f'y_line: {y_line}')
 
+    to_write.append(f'dpi:    {dpi}')
+    to_write.append(f'margin: {margin}')
+
     utils.save_txt(output_dir / 'conversion_factors.txt', '\n'.join(to_write))
-
-
