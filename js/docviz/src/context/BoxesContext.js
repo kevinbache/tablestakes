@@ -36,17 +36,26 @@ with multiple state variables you just pick whatever you need.
   harder to coordinate with multiple arrays to line up state changes for rewind
  */
 export const BoxesProvider = props => {
-  const boxesFilenameInput = useInput('');
-  const boxesData = useArray([]);
-  const colorInput = useInput('rgba(240, 20, 20, 0.2)');
+  const [boxesFilename, setBoxesFilename] = useState('');
+  const [boxesColor, setBoxesColor] = useState('blue');
+  const [boxesData, setBoxesData] = useState([]);
 
-  const xOffsetInput = useInput(0.0);
-  const xScaleInput = useInput(1.0);
-  const yOffsetInput = useInput(0.0);
-  const yScaleInput = useInput(1.0);
+  // const boxesFilenameInput = useInput('');
+  // const boxesData = useArray([]);
+  // const colorInput = useInput('rgba(240, 20, 20, 0.2)');
 
+  const xOffsetInput = useInput(500);
+  const xScaleInput = useInput(4.18);
+  const yOffsetInput = useInput(476);
+  const yScaleInput = useInput(3.81);
+  // const yOffsetInput = useInput(500);
+  // const yScaleInput = useInput(4.18);
 
-  const outputs = [boxesFilenameInput, boxesData, colorInput, xOffsetInput, xScaleInput, yOffsetInput, yScaleInput];
+  const outputs = [
+    boxesFilename, setBoxesFilename,
+    boxesColor, setBoxesColor,
+    boxesData, setBoxesData,
+    xOffsetInput, xScaleInput, yOffsetInput, yScaleInput];
   return (
     <BoxesContext.Provider value={outputs}>
       {props.children}

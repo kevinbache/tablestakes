@@ -5,10 +5,11 @@ export const PagesContext = createContext();
 
 export const PagesProvider = props => {
   const imageFilenameInput = useInput('');
-  const scaleInput = useInput(0.2);
+  const scaleInput = useInput(0.13);
+  const [pageData, setPageData] = useState('');
 
   return (
-    <PagesContext.Provider value={[imageFilenameInput, scaleInput]}>
+    <PagesContext.Provider value={[imageFilenameInput, scaleInput, pageData, setPageData]}>
       {props.children}
     </PagesContext.Provider>
   );

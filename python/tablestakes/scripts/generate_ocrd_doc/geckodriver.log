@@ -697,3 +697,13 @@ update@XPIProvider.jsm:2052:13
 1585095990516	Marionette	INFO	Listening on port 65296
 1585095990622	Marionette	WARN	TLS certificate errors will be ignored for this session
 1585095991347	Marionette	INFO	Stopped listening on port 65296
+1585848963479	mozrunner::runner	INFO	Running command: "/Applications/Firefox.app/Contents/MacOS/firefox-bin" "-marionette" "-headless" "-foreground" "-no-remote" "-profile" "/var/folders/2k/5x9j8y_x6dq21jdxj3z5hyzw0000gn/T/rust_mozprofile.z4ZaRfqmJNfd"
+*** You are running in headless mode.
+1585848963966	addons.webextension.doh-rollout@mozilla.org	WARN	Loading extension 'doh-rollout@mozilla.org': Reading manifest: Invalid extension permission: networkStatus
+1585848964246	addons.webextension.screenshots@mozilla.org	WARN	Loading extension 'screenshots@mozilla.org': Reading manifest: Invalid extension permission: mozillaAddons
+1585848964246	addons.webextension.screenshots@mozilla.org	WARN	Loading extension 'screenshots@mozilla.org': Reading manifest: Invalid extension permission: telemetry
+1585848964246	addons.webextension.screenshots@mozilla.org	WARN	Loading extension 'screenshots@mozilla.org': Reading manifest: Invalid extension permission: resource://pdf.js/
+1585848964246	addons.webextension.screenshots@mozilla.org	WARN	Loading extension 'screenshots@mozilla.org': Reading manifest: Invalid extension permission: about:reader*
+1585848966116	Marionette	INFO	Listening on port 52088
+1585848966163	Marionette	WARN	TLS certificate errors will be ignored for this session
+1585848967036	Marionette	INFO	Stopped listening on port 52088

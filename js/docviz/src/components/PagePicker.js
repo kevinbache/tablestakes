@@ -1,11 +1,11 @@
 import React, {useState, useContext} from 'react';
-import PropTypes from 'prop-types';
 import {PagesContext} from "../context/PagesContext";
+import {readFileAsDataURL} from "../utils";
 
 
 const PagePicker = props => {
-  const [imageFilenameInput, scaleInput] = useContext(PagesContext);
-
+  const [imageFilenameInput, scaleInput, pageData, setPageData] =
+    useContext(PagesContext);
 
   const clipValue = (value, min, max) => {
     return Math.max(Math.min(value, max), min);
@@ -14,8 +14,14 @@ const PagePicker = props => {
   const handleScaleChange = (e) => {
     e.target.value = clipValue(e.target.value, 0.01, 5.0);
     scaleInput.onChange(e);
-
   };
+
+  const changeImageFilename = (e) => {
+    const filename = e.target.files[0];
+    imageFilenameInput.onChange(e);
+    readFileAsDataURL(filename, contents => setPageData(contents));
+  };
+
   return (
     <div className={"pagePicker"}>
       Page Picker
@@ -26,9 +32,10 @@ const PagePicker = props => {
           type='file'
           name='page-filename'
           id='page-filename'
-          onChange={ (e) => imageFilenameInput.onChange(e) }
+          onChange={ (e) => changeImageFilename(e) }
           value={imageFilenameInput.value}
         />
+
         <label htmlFor='page-scale'>Scale</label>
         <input
           type='number'
@@ -36,6 +43,7 @@ const PagePicker = props => {
           id='page-scale'
           onChange={ (e) => handleScaleChange(e) }
           value={scaleInput.value}
+          step={0.01}
         />
       </form>
     </div>

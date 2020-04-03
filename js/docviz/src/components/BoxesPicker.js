@@ -1,80 +1,36 @@
 import React, {useContext, useState} from 'react';
 import Papa from "papaparse";
-import PropTypes from 'prop-types';
 import {BoxesContext} from "../context/BoxesContext";
 
 // https://github.com/kitze/react-hanger
 import * as d3 from "d3";
+import {readFileAsText} from "../utils";
 
 
 const BoxesPicker = props => {
-  const [boxesFilename, setBoxesFilename] = useState('');
-  const [boxesColor, setBoxesColor] = useState('blue');
-  const [boxesData, setBoxesData] = useState([]);
+  // const [boxesFilename, setBoxesFilename] = useState('');
+  // const [boxesColor, setBoxesColor] = useState('blue');
+  // const [boxesData, setBoxesData] = useState([]);
+  const [
+    boxesFilename, setBoxesFilename,
+    boxesColor, setBoxesColor,
+    boxesData, setBoxesData,
+    xOffsetInput, xScaleInput, yOffsetInput, yScaleInput
+  ] = useContext(BoxesContext);
 
   const changeFilename = (e) => {
-    // console.log('starting changeFilename');
-    // console.log('e.target.files: ');
-    // console.log(e.target.files);
     const filename = e.target.files[0];
     setBoxesFilename(filename);
-    // console.log('finished changeFilename');
-    let reader = new FileReader();
-    function readFile(event) {
-      // console.log('readFile event:');
-      // console.log(event);
 
-      const content = event.target.result;
-      console.log('readFile content:');
-      console.log(content);
-
-
-      function setDataInState(result) {
-        var data = result.data;
-        // setState({
-        //   state_bak: this.state,
-        //   data: data,
-        // });
-        console.log('papa complete data:');
-        console.log(data);
-      }
-
-      const results = Papa.parse(content, {
+    const parseCsv = (contents) => {
+      const results = Papa.parse(contents, {
         header: true,
         dynamicTyping: true,
-        complete: setDataInState,
       });
+      setBoxesData(results.data);
+    };
 
-      console.log('papa parse final results:');
-      console.log(results);
-
-
-      // const data = event.target.result;
-      // console.log('d3 rows:');
-      // d3.csv(data).then(function(row) {
-      //   console.log(row);
-      //   boxesData.push(row);
-      // });
-    }
-    reader.addEventListener('load', readFile);
-    reader.readAsText(filename);
-    // console.log('text:');
-    // console.log(text);
-
-    // // var reader = new FileReader();
-    // reader.readAsText(file);
-
-    //
-    // function changeFile() {
-    //   var file = input.files[0];
-    // }
-
-
-    // console.log('changed boxes filename.  about to read file:');
-    // d3.csv(boxesFilename).then(function(row) {
-    //   console.log(row);
-    // });
-    // console.log('done');
+    readFileAsText(filename, parseCsv)
   };
 
   return (
@@ -87,10 +43,10 @@ const BoxesPicker = props => {
           type="file"
           name="boxes-filename"
           id="boxes-filename"
-          // value={boxesFilename}
           onChange={ (e) => changeFilename(e) }
         />
-        <label htmlFor="color">Boxes Color:</label>
+
+        <label htmlFor="color">Color:</label>
         <input
           type='text'
           name='color'
@@ -98,6 +54,44 @@ const BoxesPicker = props => {
           onChange={ (e) => setBoxesColor(e.target.value) }
           value={boxesColor}
         />
+
+        <label htmlFor="xOffset">xOffset:</label>
+        <input
+          type='number'
+          name='xOffset'
+          id='xOffset'
+          onChange={ (e) => xOffsetInput.onChange(e) }
+          value={xOffsetInput.value}
+        />
+
+        <label htmlFor="xScale">xScale:</label>
+        <input
+          type='number'
+          name='xScale'
+          id='xScale'
+          onChange={ (e) => xScaleInput.onChange(e) }
+          value={xScaleInput.value}
+        />
+
+        <label htmlFor="yOffset">yOffset:</label>
+        <input
+          type='number'
+          name='yOffset'
+          id='yOffset'
+          onChange={ (e) => yOffsetInput.onChange(e) }
+          value={yOffsetInput.value}
+        />
+
+        <label htmlFor="yScale">yScale:</label>
+        <input
+          type='number'
+          name='yScale'
+          id='yScale'
+          onChange={ (e) => yScaleInput.onChange(e) }
+          value={yScaleInput.value}
+        />
+
+
       </form>
     </div>
   );
