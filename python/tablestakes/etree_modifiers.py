@@ -9,7 +9,7 @@ from lxml.cssselect import CSSSelector
 from lxml import etree
 from selenium import webdriver
 
-from tablestakes import html_css as hc
+from tablestakes import html_css as hc, utils
 
 
 class EtreeModifier(abc.ABC):
@@ -29,13 +29,18 @@ class EtreeModifier(abc.ABC):
 
 
 class EtreeModifierStack(EtreeModifier):
-    def __init__(self, modifiers: List[EtreeModifier]):
+    def __init__(self, modifiers: List[EtreeModifier], do_use_timers=True):
         self.modifiers = modifiers
+        self.do_use_timers = do_use_timers
 
     def __call__(self, doc: hc.Document) -> hc.Document:
         doc_root = doc.to_etree()
         for modifier in self.modifiers:
-            modifier(doc_root)
+            if self.do_use_timers:
+                with utils.Timer(f'Doc modifier {modifier.__class__.__name__}'):
+                    modifier(doc_root)
+            else:
+                modifier(doc_root)
         doc.replace_contents_with_etree(doc_root)
         return doc
 
@@ -314,6 +319,9 @@ class SeleniumWordLocatorModifier(EtreeModifier):
             word_location = self.driver.execute_script(script)
         except BaseException as e:
             raise ValueError(f"Your Selenium script failed.  Script: {script}.").with_traceback(e.__traceback__)
+
+        if word_location['top'] != word_location['y']:
+            raise ValueError(f"Word location failed.  Got word_location: {word_location} for word_id={word_id}.")
 
         num_template = '{:0.3f}'
         word.attrib[self.LEFT_ATTRIB_NAME] = num_template.format(word_location['left'])
