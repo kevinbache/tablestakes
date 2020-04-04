@@ -271,10 +271,11 @@ class SeleniumWordLocatorModifier(EtreeModifier):
     var rect = w.getBoundingClientRect();
     return rect;
     """
-    LEFT_ATTRIB_NAME = 'screen_dpi_left'
-    RIGHT_ATTRIB_NAME = 'screen_dpi_right'
-    TOP_ATTRIB_NAME = 'screen_dpi_top'
-    BOTTOM_ATTRIB_NAME = 'screen_dpi_bottom'
+
+    LEFT_ATTRIB_NAME = 'left'
+    RIGHT_ATTRIB_NAME = 'right'
+    TOP_ATTRIB_NAME = 'top'
+    BOTTOM_ATTRIB_NAME = 'bottom'
 
     def __init__(
             self,
@@ -333,7 +334,7 @@ class SeleniumWordLocatorModifier(EtreeModifier):
         except BaseException as e:
             raise ValueError(f"Your Selenium script failed.  Script: {script}.").with_traceback(e.__traceback__)
 
-        if word_location['top'] != word_location['y']:
+        if word_location['top'] != word_location['y'] or word_location['left'] != word_location['x']:
             raise ValueError(f"Word location failed.  Got word_location: {word_location} for word_id={word_id}.")
 
         num_template = '{:0.3f}'
