@@ -115,7 +115,7 @@ if __name__ == '__main__':
     output_dir = Path('.') / 'docs' / 'doc_99'
     utils.mkdir_if_not_exist(output_dir)
 
-    word_id_2_word = wrapper.get_used_id_to_word()
+    word_id_2_word = wrapper.get_used_id_to_word_dict()
     sel_df = sel_ocr_word_match.get_word_pixel_locations(
         html_file=f'file:///Users/kevin/projects/tablestakes/python/tablestakes/scripts/generate_ocrd_doc/{html_filename}',
         word_id_to_word=word_id_2_word,
