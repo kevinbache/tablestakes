@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import numpy as np
+np.random.seed(42)
 
 from tablestakes import utils, html_css as hc, etree_modifiers
 from tablestakes.scripts.generate_ocrd_doc_2.basic import doc
@@ -10,7 +11,6 @@ if __name__ == '__main__':
     ##############
     # Parameters #
     ##############
-    np.random.seed(42)
     dpi = 500
     margin = '1in'
     page_size = hc.PageSize.LETTER
