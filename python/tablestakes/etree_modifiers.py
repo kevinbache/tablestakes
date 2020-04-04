@@ -7,6 +7,7 @@ from typing import Any, Callable, List
 import pandas as pd
 from lxml.cssselect import CSSSelector
 from lxml import etree
+from selenium import webdriver
 
 from tablestakes import html_css as hc
 
@@ -46,6 +47,9 @@ class WordWrapper(EtreeModifier):
     WHITESPACE_TAG = 'wsp'
 
     PARENT_CLASS_ATTRIB_NAME = 'parent_class'
+
+    # NOTE: do not change this from 'id'.  The Selenium code uses getElementById to find each word.
+    WORD_ID_ATTRIB_NAME = 'id'
 
     def __init__(self, starting_word_id=0):
         self._used_word_ids = {}
@@ -121,7 +125,7 @@ class WordWrapper(EtreeModifier):
             if node.tag == self.WORD_TAG:
                 # TODO: factor out word_id definition
                 word_id = f'word_{docwide_word_id:0>6d}'
-                node.attrib['id'] = word_id
+                node.attrib[self.WORD_ID_ATTRIB_NAME] = word_id
                 self._used_word_ids[word_id] = node
                 docwide_word_id += 1
 
@@ -249,3 +253,70 @@ class SaveWordAttribsToDataFrame(EtreeModifier):
     def get_df(self):
         return pd.DataFrame(self._attrib_dicts)
 
+
+class SeleniumWordLocator(EtreeModifier):
+    """Find the pixel bounding box location of each word and save that info into its attribs."""
+
+    JAVASCRIPT_SCRIPT_TEMPLATE = """
+    var w = document.getElementById("{word_id}");
+    var rect = w.getBoundingClientRect();
+    return rect;
+    """
+    LEFT_ATTRIB_NAME = 'screen_dpi_left'
+    RIGHT_ATTRIB_NAME = 'screen_dpi_right'
+    TOP_ATTRIB_NAME = 'screen_dpi_top'
+    BOTTOM_ATTRIB_NAME = 'screen_dpi_bottom'
+
+    def __init__(self, window_width_px: float = 500 * 8.5, window_height_px: float = 500 * 11.0):
+        self._word_locations = []
+        self.window_width_px = window_width_px
+        self.window_height_px = window_height_px
+
+    def __call__(self, root: etree._Element):
+        options = webdriver.firefox.options.Options()
+        options.headless = True
+        self.driver = webdriver.Firefox(options=options)
+        try:
+            self.driver.set_window_position(0, 0)
+            self.driver.set_window_size(self.window_width_px, self.window_height_px)
+
+            html_str = "data:text/html;charset=utf-8," + etree.tostring(root, encoding='unicode')
+            self.driver.get(html_str)
+
+            self._modify_nodes_inplace(
+                root=root,
+                css_selector_str=WordWrapper.WORD_TAG,
+                fn=self._save_word_location,
+            )
+        finally:
+            self.driver.quit()
+
+    def _save_word_location(self, word: etree._Element):
+        word_id = word.attrib[WordWrapper.WORD_ID_ATTRIB_NAME]
+        script = self.JAVASCRIPT_SCRIPT_TEMPLATE.format(word_id=word_id)
+        """
+        Example word_location value: 
+        word_location = {
+            'left': 12,
+            'right': 58.75,
+            'top': 12,
+            'bottom': 33,
+            'x': 12,
+            'width': 46.75,
+            'y': 12,
+            'height': 21,
+        }
+        
+        These pixel values are scaled based on your screen's DPI rather than the pdf rendered DPI which is used for 
+        the OCR'd word locations, so they still need to be converted in order to apply real labels to each OCR'd word        
+        """
+        try:
+            word_location = self.driver.execute_script(script)
+        except BaseException as e:
+            raise ValueError(f"Your Selenium script failed.  Script: {script}.").with_traceback(e.__traceback__)
+
+        num_template = '{:0.3f}'
+        word.attrib[self.LEFT_ATTRIB_NAME] = num_template.format(word_location['left'])
+        word.attrib[self.RIGHT_ATTRIB_NAME] = num_template.format(word_location['right'])
+        word.attrib[self.TOP_ATTRIB_NAME] = num_template.format(word_location['top'])
+        word.attrib[self.BOTTOM_ATTRIB_NAME] = num_template.format(word_location['bottom'])

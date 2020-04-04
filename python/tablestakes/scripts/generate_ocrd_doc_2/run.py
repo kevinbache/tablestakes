@@ -35,6 +35,7 @@ if __name__ == '__main__':
             etree_modifiers.SetIsValueOnWordsModifier(),
             etree_modifiers.ConvertParentClassNamesToWordAttribsModifier(),
             etree_modifiers.CopyWordTextToAttribModifier(),
+            etree_modifiers.SeleniumWordLocator(),
             df_saver,
         ],
     )
