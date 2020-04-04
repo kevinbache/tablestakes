@@ -1,15 +1,15 @@
 from pathlib import Path
 
 from tablestakes import utils, html_css as hc, etree_modifiers
-utils.set_seed(42)
 
-from tablestakes.scripts.generate_ocrd_doc_2.basic import doc
+from tablestakes.scripts.generate_ocrd_doc_2 import basic
 
 
 if __name__ == '__main__':
     ##############
     # Parameters #
     ##############
+    seed = 42
     dpi = 500
     margin = '1in'
     page_size = hc.PageSize.LETTER
@@ -17,8 +17,12 @@ if __name__ == '__main__':
     window_width_px = dpi * page_size.width
     window_height_px = dpi * page_size.height
 
-    doc_ind = 1
+    doc = basic.make_doc(seed)
 
+    #########
+    # setup #
+    #########
+    doc_ind = 1
     output_dir = Path('.') / 'docs' / f'doc_{doc_ind:02d}'
     utils.mkdir_if_not_exist(output_dir)
 
