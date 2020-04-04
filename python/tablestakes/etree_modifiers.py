@@ -254,7 +254,7 @@ class SaveWordAttribsToDataFrame(EtreeModifier):
         return pd.DataFrame(self._attrib_dicts)
 
 
-class SeleniumWordLocator(EtreeModifier):
+class SeleniumWordLocatorModifier(EtreeModifier):
     """Find the pixel bounding box location of each word and save that info into its attribs."""
 
     JAVASCRIPT_SCRIPT_TEMPLATE = """
