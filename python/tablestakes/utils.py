@@ -138,6 +138,13 @@ def set_pandas_width(width=200):
     pd.set_option('display.width', width)
 
 
+def set_seed(seed: int):
+    import numpy as np
+    from faker import Faker
+    np.random.seed(seed)
+    Faker.seed(seed)
+
+
 if __name__ == '__main__':
     assert levenshtein('', '') == 0
     assert levenshtein('asdf', '') == 4

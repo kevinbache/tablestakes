@@ -1,12 +1,8 @@
 from pathlib import Path
 
-import numpy as np
-seed = 42
-np.random.seed(seed)
-from faker import Faker
-Faker.seed(seed)
-
 from tablestakes import utils, html_css as hc, etree_modifiers
+utils.set_seed(42)
+
 from tablestakes.scripts.generate_ocrd_doc_2.basic import doc
 
 
