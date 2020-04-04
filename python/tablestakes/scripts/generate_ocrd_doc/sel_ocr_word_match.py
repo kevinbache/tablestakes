@@ -98,10 +98,10 @@ def get_word_pixel_locations(
                 'right': 58.75,
                 'top': 12,
                 'bottom': 33,
-                'width': 46.75,
-                'height': 21,
                 'x': 12,
+                'width': 46.75,
                 'y': 12,
+                'height': 21,
             }
             """
             word_location = driver.execute_script(script)

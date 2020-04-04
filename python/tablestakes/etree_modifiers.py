@@ -27,6 +27,18 @@ class EtreeModifier(abc.ABC):
         w.attrib[k] = v
 
 
+class EtreeModifierStack(EtreeModifier):
+    def __init__(self, modifiers: List[EtreeModifier]):
+        self.modifiers = modifiers
+
+    def __call__(self, doc: hc.Document) -> hc.Document:
+        doc_root = doc.to_etree()
+        for modifier in self.modifiers:
+            modifier(doc_root)
+        doc.replace_contents_with_etree(doc_root)
+        return doc
+
+
 class WordWrapper(EtreeModifier):
     """Wraps each word in the bare textual content of the document in a <w> tag, whitespace in <wsp> tag."""
     re_whitespace = re.compile(r'(\s+)')
@@ -236,45 +248,4 @@ class SaveWordAttribsToDataFrame(EtreeModifier):
 
     def get_df(self):
         return pd.DataFrame(self._attrib_dicts)
-
-
-class EtreeModifierStack(EtreeModifier):
-    def __init__(self, modifiers: List[EtreeModifier]):
-        self.modifiers = modifiers
-
-    def __call__(self, doc: hc.Document) -> hc.Document:
-        doc_root = doc.to_etree()
-        for modifier in self.modifiers:
-            modifier(doc_root)
-        doc.replace_contents_with_etree(doc_root)
-        return doc
-
-
-if __name__ == '__main__':
-    from tablestakes import utils
-    h = '''
-    <div class='container'>
-        blah_1
-        <a>
-            <aaa>
-            </aaa>
-            blah_a
-            <aa>
-                blah_aa1 blah_aa2
-            </aa>
-        </a>
-        <b>
-            blah_b1 blah_b2 <br>
-            blah_b3  blah_b4
-        </b>
-        blah_2 blah_3 
-    </div>
-    '''
-    root = etree.fromstring(text=h, parser=etree.HTMLParser()).find('.//div')
-    utils.hprint('before:')
-    print(utils.root_2_pretty_str(root))
-
-    WordWrapper.wrap_words_in_str(root=root)
-    utils.hprint('after:')
-    print(utils.root_2_pretty_str(root))
 

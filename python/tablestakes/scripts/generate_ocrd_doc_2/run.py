@@ -1,13 +1,10 @@
-from tablestakes import etree_modifiers
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 
-from tablestakes import utils, ocr, html_css as hc
-from tablestakes.scripts.generate_ocrd_doc import sel_ocr_word_match
-
+from tablestakes import utils, html_css as hc, etree_modifiers
 from tablestakes.scripts.generate_ocrd_doc_2.basic import doc
+
 
 if __name__ == '__main__':
     ##############
@@ -43,11 +40,13 @@ if __name__ == '__main__':
     )
     doc = post_proc_stack(doc)
 
+    ###################################
+    # save html, pdf, words.csv files #
+    ###################################
     doc_html_file = output_dir / 'doc.html'
     doc_pdf_file = output_dir / 'doc.pdf'
     doc.save_html(doc_html_file)
     doc.save_pdf(doc_pdf_file)
-    doc.open_in_browser()
 
     words_df = output_dir / 'words.csv'
     df_saver.get_df().to_csv(words_df)
