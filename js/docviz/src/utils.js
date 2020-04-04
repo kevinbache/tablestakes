@@ -18,3 +18,4 @@ export const readFileAsDataURL = (filename, contentsCallback) => {
   const reader = _readFileInner(filename, contentsCallback);
   reader.readAsDataURL(filename);
 };
+

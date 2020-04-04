@@ -9,6 +9,7 @@ from typing import List, Union, Optional
 
 import pdfkit
 import yattag
+from lxml import etree
 
 from tablestakes import utils
 
@@ -412,11 +413,14 @@ class Grid(StyledHtmlTag):
 
 
 class PageSize(enum.Enum):
-    A4 = 'A4',
-    LETTER = 'Letter',
+    """width and height in inches"""
+    A4 = ('A4', 8.27, 11.69)
+    LETTER = ('Letter', 8.5, 11.0)
 
-    def __init__(self, size_str: str):
+    def __init__(self, size_str: str, width: float, height: float):
         self.size_str = size_str
+        self.width = width
+        self.height = height
 
 
 class BaseCss(enum.Enum):
@@ -481,6 +485,15 @@ class Document:
 
     def save_html(self, output_fullfile: str):
         utils.save_txt(output_fullfile, str(self))
+
+    def to_etree(self):
+        if len(self.contents) > 1:
+            raise ValueError(f"Undefined if len contents > 0.  contents: {self.contents}")
+        return etree.fromstring(text=self.contents[0], parser=etree.HTMLParser())
+
+    def replace_contents_with_etree(self, root: etree._Element):
+        self.contents = [etree.tostring(root, encoding='unicode')]
+
 
 
 

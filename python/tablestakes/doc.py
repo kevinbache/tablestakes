@@ -152,6 +152,7 @@ class Document(HasWordsMixin):
         return self._flatten_words(self.pages)
 
 
+
 class GoogleOcrDocumentFactory:
     """Factory for creating Document structure from GoogleOcr json blob loaded as a dict.
 

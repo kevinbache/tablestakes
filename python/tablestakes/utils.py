@@ -9,6 +9,7 @@ import os
 import xml.dom.minidom
 
 import numpy as np
+import pandas as pd
 from lxml import etree
 
 StrDict = Dict[str, Union[str, int, float]]
@@ -130,6 +131,11 @@ def prepend_before_extension(f: str, to_append: str, new_ext: Optional[str]=None
     p = Path(f)
     ext = new_ext if new_ext is not None else p.suffix
     return p.parent / f'{p.stem}{to_append}{ext}'
+
+
+def set_pandas_width(width=200):
+    pd.set_option('display.max_columns', width)
+    pd.set_option('display.width', width)
 
 
 if __name__ == '__main__':

@@ -1,5 +1,8 @@
+from collections import defaultdict
+
 import tablestakes.etree_modifiers
 from pathlib import Path
+from typing import Callable, Any
 
 import numpy as np
 import pandas as pd
@@ -9,112 +12,57 @@ from tablestakes import html_css as hc
 from tablestakes.html_css import SelectorType
 from tablestakes.scripts.generate_ocrd_doc import sel_ocr_word_match
 
+from tablestakes.scripts.generate_ocrd_doc_2.basic import doc
 
 if __name__ == '__main__':
-    ######################################################
-    # randomly create html representing a print document #
-    ######################################################
+    ##############
+    # Parameters #
+    ##############
     np.random.seed(42)
-    margin = '2in'
+    dpi = 500
+    margin = '1in'
+    page_size = hc.PageSize.LETTER
 
-    with utils.Timer('hc creation'):
-        my_date_creator = creators.DateCreator()
-        kv_creators = [
-            creators.KvCreator(
-                name='to_address',
-                key_contents_creator=creators.ChoiceCreator(['Receiving', 'Receiving Address', 'Sent To', 'To']),
-                value_contents_creator=creators.AddressCreator(),
-            ),
-            creators.KvCreator(
-                name='sale_address',
-                key_contents_creator=creators.ChoiceCreator(['Sale Address', 'Sold To']),
-                value_contents_creator=creators.AddressCreator(),
-            ),
-            creators.KvCreator(
-                name='from_address',
-                key_contents_creator=creators.ChoiceCreator(['Shipping', 'Shipping Address', 'From', 'Address From']),
-                value_contents_creator=creators.AddressCreator(),
-            ),
-            creators.KvCreator(
-                name='date_sent',
-                key_contents_creator=creators.ChoiceCreator(['Sent', 'Date Sent', 'Statement Date']),
-                value_contents_creator=my_date_creator,
-            ),
-            creators.KvCreator(
-                name='date_received',
-                key_contents_creator=creators.ChoiceCreator(['Received', 'Date Received']),
-                value_contents_creator=my_date_creator,
-            ),
-            creators.KvCreator(
-                name='invoice_number',
-                key_contents_creator=creators.ChoiceCreator(['Invoice', 'Invoice number', 'Account']),
-                value_contents_creator=creators.IntCreator(),
-            ),
-        ]
+    window_width_px = dpi * page_size.width
+    window_height_px = dpi * page_size.height
 
-        # group = LColonKvGroup('lcolon_group')
-        # group.set_font_weight()
-        # group.do_add_colon_to_keys()
-        # group.set_kv_horz_alignment(KvAlign.LR)
-        # # group.set_bg_color(selector_type=SelectorType.KV_KEY)
-        # # group.set_color(selector_type=SelectorType.KV_KEY)
-        # group.set_kv_horz_alignment(KvAlign.RL)
+    doc_ind = 1
 
-        # group = ATableKvGroup('atable_group')
-        # group.set_invisible_border()
-        # group.set_font_weight()
-        # group.do_add_colon_to_keys()
-        # group.set_kv_horz_alignment(KvAlign.CL)
-        # group.set_kv_vert_alignment(KvAlign.TT)
-        # group.set_padding('4px')
-        # group.set_bg_color()
-        # group.set_color()
-        # group.set_font_family('Verdana, Arial, Helvetica, sans-serif;', SelectorType.GROUP)
-        # group.set_text_transform()
+    output_dir = Path('.') / 'docs' / f'doc_{doc_ind:02d}'
+    utils.mkdir_if_not_exist(output_dir)
 
-        group = kv_styles.LTableKvGroup('ltable_group')
-        group.set_invisible_border()
-        group.set_font_weight()
-        # group.do_add_colon_to_keys()
-        group.set_kv_horz_alignment(kv_styles.KvAlign.LL)
-        group.set_kv_vert_alignment(kv_styles.KvAlign.TT)
-        group.set_padding('4px')
-        group.set_font_family('Verdana, Arial, Helvetica, sans-serif;', SelectorType.GROUP)
-        group.set_text_transform()
+    #################
+    # wrap contents #
+    #################
+    wrapper = tablestakes.etree_modifiers.WordWrapper()
+    doc.contents = [wrapper.wrap_words_in_str(doc.contents[0])]
 
-        for kvc in kv_creators:
-            group.add_both(*kvc())
+    # base_filename = 'doc_wrapped'
+    # html_filename = f'{base_filename}.html'
+    # pdf_filename = f'{base_filename}.pdf'
+    # with utils.Timer('save wrapped'):
+    #     doc.save_html(html_filename)
+    #     doc.save_pdf(pdf_filename, page_size=hc.PageSize.LETTER, margin=margin)
+    #     # doc.open_in_browser()
 
-        doc = hc.Document()
-        doc.add_styled_html(group)
 
-    base_filename = 'doc_unwrapped'
-    with utils.Timer('save unwrapped'):
-        doc.save_html(f'{base_filename}.html')
-        doc.save_pdf(f'{base_filename}.pdf')
-        # doc.open_in_browser()
+    doc_root = doc.to_etree()
+    key_words_selector = f'.{SelectorType.KEY.html_class_name} w'
+    value_words_selector = f'.{SelectorType.VALUE.html_class_name} w'
 
-    with utils.Timer('wrap contents'):
-        wrapper = tablestakes.etree_modifiers.WordWrapper()
-        doc.contents = [wrapper.wrap_words_in_str(doc.contents[0])]
+    print("isKey:")
+    set_words_boolean(doc_root, key_words_selector, 'isKey')
+    print("isKey done")
 
-    base_filename = 'doc_wrapped'
-    html_filename = f'{base_filename}.html'
-    pdf_filename = f'{base_filename}.pdf'
-    with utils.Timer('save wrapped'):
-        doc.save_html(html_filename)
-        doc.save_pdf(pdf_filename, page_size=hc.PageSize.LETTER, margin=margin)
-        # doc.open_in_browser()
+    print("isValue:")
+    set_words_boolean(doc_root, value_words_selector, 'isValue')
+    print("isValue done")
+
+    doc = doc.replace_contents_with_etree(doc_root)
 
     ##############################################
     # use selenium to get locations of all words #
     ##############################################
-    dpi = 1000
-    window_width_px = dpi * 8.5
-    window_height_px = dpi * 11.00
-    output_dir = Path('.') / 'docs' / 'doc_99'
-    utils.mkdir_if_not_exist(output_dir)
-
     word_id_2_word = wrapper.get_used_id_to_word()
     sel_df = sel_ocr_word_match.get_word_pixel_locations(
         html_file=f'file:///Users/kevin/projects/tablestakes/python/tablestakes/scripts/generate_ocrd_doc/{html_filename}',

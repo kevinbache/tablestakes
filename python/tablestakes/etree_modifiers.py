@@ -1,8 +1,33 @@
 import re
 
+from typing import Any, Callable
+
+from lxml.cssselect import CSSSelector
 from lxml import etree
 
-from tablestakes import utils
+from functools import partial
+
+
+def _add_kv(w: etree._Element, k: Any, v: str):
+    w.attrib[k] = v
+
+
+def _modify_nodes_inplace(root: etree._Element, css_selector_str: str, fn: Callable):
+    # root = etree.fromstring(text=doc_contents, parser=etree.HTMLParser())
+    sel = CSSSelector(css_selector_str, translator='html')
+    print('modify_nodes starting')
+    for w in sel(root):
+        fn(w)
+        print('  ', w, w.attrib, w.text)
+    print('modify_nodes done \n')
+
+
+def set_words_boolean(root: etree._Element, true_word_css_selector: str, key_name: str):
+    # note: you can't use the :not() css selector with compound predicates.  so instead:
+    # first set all nodes to false
+    _modify_nodes_inplace(root, f'w', partial(_add_kv, k=key_name, v="0"))
+    # then modify some nodes to true
+    _modify_nodes_inplace(root, true_word_css_selector, partial(_add_kv, k=key_name, v="1"))
 
 
 class WordWrapper:
@@ -11,7 +36,6 @@ class WordWrapper:
 
     def __init__(self):
         self._used_word_ids = {}
-
 
     @classmethod
     def str_2_word_nodes(cls, str_to_wrap: str):
@@ -35,7 +59,7 @@ class WordWrapper:
         return word_nodes
 
     @classmethod
-    def handle_text(cls, node: etree._Element, do_handle_tail_instead=False):
+    def _handle_text(cls, node: etree._Element, do_handle_tail_instead=False):
         if do_handle_tail_instead:
             if not node.tail or not node.tail.strip():
                 return
@@ -73,13 +97,14 @@ class WordWrapper:
         while to_visit:
             node = to_visit.pop(0)
             to_visit.extend(list(node))
-            self.handle_text(node)
-            self.handle_text(node, do_handle_tail_instead=True)
+            self._handle_text(node)
+            self._handle_text(node, do_handle_tail_instead=True)
 
         docwide_word_id = starting_word_id
 
         for node in root.iter():
             if node.tag == self.WORD_TAG:
+                # TODO: factor out word_id definition
                 word_id = f'word_{docwide_word_id:0>6d}'
                 node.attrib['id'] = word_id
                 self._used_word_ids[word_id] = node
@@ -90,6 +115,7 @@ class WordWrapper:
 
 
 if __name__ == '__main__':
+    from tablestakes import utils
     h = '''
     <div class='container'>
         blah_1
@@ -112,7 +138,7 @@ if __name__ == '__main__':
     utils.hprint('before:')
     print(utils.root_2_pretty_str(root))
 
-    WordWrapper.wrap_words_in_str(root)
+    WordWrapper.wrap_words_in_str(root=root)
     utils.hprint('after:')
     print(utils.root_2_pretty_str(root))
 

@@ -45,6 +45,8 @@ setup(
         'google-cloud-storage',
         'yattag',
         'faker',
+        'lxml',
+        'cssselect',
     ],
 
     classifiers=[
