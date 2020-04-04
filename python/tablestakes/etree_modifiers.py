@@ -266,9 +266,12 @@ class SaveWordAttribsToDataFrame(EtreeModifier):
 class SeleniumWordLocatorModifier(EtreeModifier):
     """Find the pixel bounding box location of each word and save that info into its attribs."""
 
+    # ref: https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect
     JAVASCRIPT_SCRIPT_TEMPLATE = """
     var w = document.getElementById("{word_id}");
     var rect = w.getBoundingClientRect();
+    rect.left += window.scrollX
+    rect.top += window.scrollY
     return rect;
     """
 
