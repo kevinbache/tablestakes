@@ -1,8 +1,12 @@
+import os
+
+from pathlib import Path
+
 import abc
 import copy
 from functools import partial
 import re
-from typing import Any, Callable, List
+from typing import Any, Callable, List, Union, Optional
 
 import pandas as pd
 from lxml.cssselect import CSSSelector
@@ -272,15 +276,24 @@ class SeleniumWordLocatorModifier(EtreeModifier):
     TOP_ATTRIB_NAME = 'screen_dpi_top'
     BOTTOM_ATTRIB_NAME = 'screen_dpi_bottom'
 
-    def __init__(self, window_width_px: float = 500 * 8.5, window_height_px: float = 500 * 11.0):
+    def __init__(
+            self,
+            log_dir: Optional[Union[Path, str]] = None,
+            window_width_px: float = 500 * 8.5,
+            window_height_px: float = 500 * 11.0,
+    ):
         self._word_locations = []
+        if log_dir:
+            self.log_path = Path(log_dir) / 'geckodriver.log'
+        else:
+            self.log_path = os.path.devnull
         self.window_width_px = window_width_px
         self.window_height_px = window_height_px
 
     def __call__(self, root: etree._Element):
         options = webdriver.firefox.options.Options()
         options.headless = True
-        self.driver = webdriver.Firefox(options=options)
+        self.driver = webdriver.Firefox(options=options, log_path=self.log_path)
         try:
             self.driver.set_window_position(0, 0)
             self.driver.set_window_size(self.window_width_px, self.window_height_px)

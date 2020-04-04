@@ -26,11 +26,10 @@ if __name__ == '__main__':
     ########################################
     # postproc doc to add word_ids, labels #
     ########################################
-    wrapper = etree_modifiers.WordWrapper()
     df_saver = etree_modifiers.SaveWordAttribsToDataFrame()
     post_proc_stack = etree_modifiers.EtreeModifierStack(
         modifiers=[
-            wrapper,
+            etree_modifiers.WordWrapper(),
             etree_modifiers.SetIsKeyOnWordsModifier(),
             etree_modifiers.SetIsValueOnWordsModifier(),
             etree_modifiers.ConvertParentClassNamesToWordAttribsModifier(),
