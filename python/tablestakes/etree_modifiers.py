@@ -9,9 +9,9 @@ import re
 from typing import Any, Callable, List, Union, Optional
 
 import pandas as pd
+from selenium import webdriver
 from lxml.cssselect import CSSSelector
 from lxml import etree
-from selenium import webdriver
 
 from tablestakes import html_css as hc, utils
 
@@ -109,12 +109,6 @@ class WordWrapper(EtreeModifier):
             insert_node.insert(word_ind + insert_start, word_node)
 
         return
-
-    # def wrap_words_in_str(self, root: str, starting_word_id=0):
-    #     # TODO: this will autowrap to <html><body>CONTENTS</html></body> but you might not want the <html><body>
-    #     root = etree.fromstring(text=root, parser=etree.HTMLParser())
-    #     self.wrap_words_on_tree_inplace(root, starting_word_id)
-    #     return etree.tostring(root, encoding='unicode')
 
     def __call__(self, root: etree._Element):
         # do it as a BFS rather than using etree._Element.iter().
