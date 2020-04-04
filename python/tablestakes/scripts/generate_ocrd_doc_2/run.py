@@ -1,7 +1,6 @@
 from pathlib import Path
 
 from tablestakes import utils, html_css as hc, etree_modifiers
-
 from tablestakes.scripts.generate_ocrd_doc_2 import basic
 
 
