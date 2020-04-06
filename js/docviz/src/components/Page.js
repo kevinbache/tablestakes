@@ -59,7 +59,7 @@ const Page = props => {
   });
 
   return (
-    <div className={"page"} style={bg_div_style}>
+    <div id={"page_id"} className={"page"} style={bg_div_style}>
       Page
       {boxesDivs}
     </div>

@@ -1,15 +1,13 @@
-import os
-
-from pathlib import Path
-
 import abc
 import copy
 from functools import partial
+import os
+from pathlib import Path
 import re
 from typing import Any, Callable, List, Union, Optional
 
-import pandas as pd
 from selenium import webdriver
+import pandas as pd
 from lxml.cssselect import CSSSelector
 from lxml import etree
 
@@ -17,8 +15,21 @@ from tablestakes import html_css as hc, utils
 
 
 class EtreeModifier(abc.ABC):
+    def __call__(self, root_or_doc: Union[etree._Element, hc.Document]) -> Optional[hc.Document]:
+        """If called on a document, wrap yourself in a Stack which does etree wrapping / unwrapping.
+
+        This lets you write
+            doc = etree_modifiers.WordColorDocCssAdder(doc)(doc)
+        which looks funny but works.
+        """
+        if isinstance(root_or_doc, hc.Document):
+            stack = EtreeModifierStack([self])
+            return stack(root_or_doc)
+        else:
+            self._call_inner(root_or_doc)
+
     @abc.abstractmethod
-    def __call__(self, root: etree._Element):
+    def _call_inner(self, root: etree._Element):
         pass
 
     @staticmethod
@@ -32,7 +43,7 @@ class EtreeModifier(abc.ABC):
         w.attrib[k] = v
 
 
-class EtreeModifierStack(EtreeModifier):
+class EtreeModifierStack:
     def __init__(self, modifiers: List[EtreeModifier], do_use_timers=True):
         self.modifiers = modifiers
         self.do_use_timers = do_use_timers
@@ -110,7 +121,7 @@ class WordWrapper(EtreeModifier):
 
         return
 
-    def __call__(self, root: etree._Element):
+    def _call_inner(self, root: etree._Element):
         # do it as a BFS rather than using etree._Element.iter().
         # using iter, you add nodes to the tree as you go and they get double visited.
         # with the BFS, you've already got the parent nodes in your queue when you visit the child
@@ -141,7 +152,7 @@ class SetBooleanAttribOnWordsModifier(EtreeModifier):
         self.true_word_css_selector = true_word_css_selector
         self.key_name = key_name
 
-    def __call__(self, root: etree._Element):
+    def _call_inner(self, root: etree._Element):
         self._modify_nodes_inplace(root, WordWrapper.WORD_TAG, partial(self._add_kv, k=self.key_name, v="0"))
         # then modify some nodes to true
         self._modify_nodes_inplace(root, self.true_word_css_selector, partial(self._add_kv, k=self.key_name, v="1"))
@@ -189,7 +200,7 @@ class ConvertParentClassNamesToWordAttribsModifier(EtreeModifier):
     def __init__(self):
         self._seen_parent_classes = []
 
-    def __call__(self, root: etree._Element):
+    def _call_inner(self, root: etree._Element):
         # first make a list of all parent classes in the document
         self._modify_nodes_inplace(
             root=root,
@@ -225,9 +236,9 @@ class ConvertParentClassNamesToWordAttribsModifier(EtreeModifier):
 
 
 class CopyWordTextToAttribModifier(EtreeModifier):
-    TEXT_ATTRIB_NAME = 'word_text'
+    TEXT_ATTRIB_NAME = 'text'
 
-    def __call__(self, root: etree._Element):
+    def _call_inner(self, root: etree._Element):
         self._modify_nodes_inplace(
             root=root,
             css_selector_str=WordWrapper.WORD_TAG,
@@ -243,7 +254,8 @@ class SaveWordAttribsToDataFrame(EtreeModifier):
     def __init__(self):
         self._attrib_dicts = []
 
-    def __call__(self, root: etree._Element):
+    def _call_inner(self, root: etree._Element):
+        self._attrib_dicts = []
         self._modify_nodes_inplace(
             root=root,
             css_selector_str='w',
@@ -288,7 +300,7 @@ class SeleniumWordLocatorModifier(EtreeModifier):
         self.window_width_px = window_width_px
         self.window_height_px = window_height_px
 
-    def __call__(self, root: etree._Element):
+    def _call_inner(self, root: etree._Element):
         options = webdriver.firefox.options.Options()
         options.headless = True
         self.driver = webdriver.Firefox(options=options, log_path=self.log_path)
@@ -339,3 +351,82 @@ class SeleniumWordLocatorModifier(EtreeModifier):
         word.attrib[self.RIGHT_ATTRIB_NAME] = num_template.format(word_location['right'])
         word.attrib[self.TOP_ATTRIB_NAME] = num_template.format(word_location['top'])
         word.attrib[self.BOTTOM_ATTRIB_NAME] = num_template.format(word_location['bottom'])
+
+
+class WordColorizer(EtreeModifier):
+    R_ATTRIB_NAME = 'r'
+    G_ATTRIB_NAME = 'g'
+    B_ATTRIB_NAME = 'b'
+
+    def __init__(self):
+        self._word_count = 0
+        self.colors = []
+
+    def _call_inner(self, root: etree._Element):
+        self._word_count = 0
+        self._modify_nodes_inplace(
+            root=root,
+            css_selector_str=WordWrapper.WORD_TAG,
+            fn=self._count_words,
+        )
+
+        if not self._word_count:
+            return
+
+        self.color_array = utils.generate_unique_color_matrix(num_colors=self._word_count)
+        self._current_color_ind = 0
+        self._modify_nodes_inplace(
+            root=root,
+            css_selector_str=WordWrapper.WORD_TAG,
+            fn=self._add_colors_to_nodes,
+        )
+
+    def _count_words(self, word: etree._Element):
+        self._word_count += 1
+
+    def _add_colors_to_nodes(self, word: etree._Element):
+        color = self.color_array[self._current_color_ind]
+
+        word.attrib[self.R_ATTRIB_NAME] = str(color[0])
+        word.attrib[self.G_ATTRIB_NAME] = str(color[1])
+        word.attrib[self.B_ATTRIB_NAME] = str(color[2])
+
+        self._current_color_ind += 1
+
+
+class WordColorDocCssAdder(EtreeModifier):
+    def __init__(self, doc: hc.Document):
+        self.doc = doc
+
+    def _call_inner(self, root: etree._Element):
+        self._modify_nodes_inplace(
+            root=root,
+            css_selector_str=WordWrapper.WORD_TAG,
+            fn=self._add_css_to_doc,
+        )
+
+    @staticmethod
+    def get_color_for_word(word: etree._Element):
+        """This assumes you've already set the color attributes on this word."""
+        r = word.attrib[WordColorizer.R_ATTRIB_NAME]
+        g = word.attrib[WordColorizer.G_ATTRIB_NAME]
+        b = word.attrib[WordColorizer.B_ATTRIB_NAME]
+        return f'rgb({r}, {g}, {b})'
+
+    def _add_css_to_doc(self, word: etree._Element):
+        self.doc.add_style(
+            self._get_css_chunk(
+                word_id=word.attrib[WordWrapper.WORD_ID_ATTRIB_NAME],
+                color_str=self.get_color_for_word(word)
+            )
+        )
+
+    @staticmethod
+    def _get_css_chunk(word_id: str, color_str: str):
+        return hc.CssChunk(
+            selector=f'#{word_id}',
+            values={
+                'background-color': color_str,
+                'color': color_str,
+            },
+        )

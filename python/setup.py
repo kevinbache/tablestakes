@@ -47,6 +47,7 @@ setup(
         'faker',
         'lxml',
         'cssselect',
+        'colorspacious',
     ],
 
     classifiers=[

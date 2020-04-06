@@ -22,6 +22,34 @@ const PagePicker = props => {
     readFileAsDataURL(filename, contents => setPageData(contents));
   };
 
+
+  console.log("hello from hc.Document.__str__.Head.Script! --- erm PagePicker.js");
+  const get_loc = (word_id) => {
+      const w = document.getElementById(word_id);
+      if (w == null) {
+        return '(null)';
+      }
+      let rect = w.getBoundingClientRect();
+
+      rect = {
+        left: rect.left + window.scrollX,
+        top: rect.top + window.scrollY,
+        right: rect.right + window.scrollX,
+        bottom: rect.bottom + window.scrollY,
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+      };
+      return rect;
+  };
+  console.log("function read");
+  const word_id = 'page_id';
+  console.log("***** WORD LOC:", word_id, get_loc(word_id));
+
+
+
+
   return (
     <div className={"pagePicker"}>
       Page Picker

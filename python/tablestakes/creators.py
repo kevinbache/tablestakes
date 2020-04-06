@@ -159,6 +159,11 @@ class AddressCreator(AbstractFakerCreator):
         return f'{self.faker.company()}<br>\n{address}'
 
 
+class NameCreator(AbstractFakerCreator):
+    def _call_inner(self, *args, **kwargs):
+        return self.faker.name()
+
+
 class DateCreator(AbstractFakerCreator):
     patterns = [
         '%Y-%m-%d',      # 2019-12-17
@@ -193,6 +198,24 @@ class IntCreator(AbstractFakerCreator):
             return f'{num:d}'
         else:
             return f'{num:0{self.zero_pad_to_width}d}'
+
+
+class RandomStrCreator(AbstractFakerCreator):
+    CHARS = 'qwertyuiopasdfghjkklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890'
+
+    def __init__(self, num_chars_per_word=10, min_words=1, max_words=10, seed=None):
+        super().__init__(seed)
+        self.num_chars = num_chars_per_word
+        self.min_words = min_words
+        self.max_words = max_words
+
+    def _call_inner(self, *args, **kwargs):
+        num_words = np.random.randint(self.min_words, self.max_words, size=1)[0]
+        words = [self._generate_word() for _ in range(num_words)]
+        return ' '.join(words)
+
+    def _generate_word(self):
+        return ''.join(np.random.choice([c for c in self.CHARS], self.num_chars))
 
 
 class KvCssCreator(Creator):

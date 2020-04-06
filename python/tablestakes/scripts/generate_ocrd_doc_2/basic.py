@@ -36,6 +36,14 @@ def make_doc(seed: int):
             value_contents_creator=creators.IntCreator(),
         ),
     ]
+    for ind in range(20):
+        kv_creators.append(
+            creators.KvCreator(
+                name=f'field_{ind}',
+                key_contents_creator=creators.RandomStrCreator(min_words=1, max_words=2),
+                value_contents_creator=creators.RandomStrCreator(min_words=1, max_words=10),
+            )
+        )
 
     group = kv_styles.LTableKvGroup('ltable_group')
     group.set_invisible_border()

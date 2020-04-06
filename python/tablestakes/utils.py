@@ -1,15 +1,17 @@
-from pathlib import Path
+import random
 
-import time
-
-from typing import *
 from collections.abc import Iterable
+from typing import Dict, Union, Any, List, Optional
+from pathlib import Path
+import time
 import json
 import os
 import xml.dom.minidom
 
+from PIL import Image
 import numpy as np
 import pandas as pd
+import pdf2image
 from lxml import etree
 
 StrDict = Dict[str, Union[str, int, float]]
@@ -115,7 +117,7 @@ def levenshtein(a: str, b: str):
     return d[na, nb]
 
 
-def mkdir_if_not_exist(d: str):
+def mkdir_if_not_exist(d: str, make_parents=True):
     p = Path(d)
     if p.exists():
         if p.is_dir():
@@ -123,11 +125,11 @@ def mkdir_if_not_exist(d: str):
         else:
             raise ValueError(f'{d} exists but is not a directory.')
     else:
-        p.mkdir(parents=True)
+        p.mkdir(parents=make_parents)
         return
 
 
-def prepend_before_extension(f: str, to_append: str, new_ext: Optional[str]=None):
+def prepend_before_extension(f: str, to_append: str, new_ext: Optional[str] = None):
     p = Path(f)
     ext = new_ext if new_ext is not None else p.suffix
     return p.parent / f'{p.stem}{to_append}{ext}'
@@ -143,6 +145,39 @@ def set_seed(seed: int):
     from faker import Faker
     np.random.seed(seed)
     Faker.seed(seed)
+
+
+class PdfHandler:
+    @classmethod
+    def load_pdf_to_images(cls, pdf_filename: Union[str, Path], dpi: int) -> List[Image.Image]:
+        return pdf2image.convert_from_path(str(pdf_filename), dpi=dpi)
+
+    @classmethod
+    def make_page_file_name(cls, page_ind: int) -> str:
+        return f'page_{page_ind:02d}.png'
+
+    @classmethod
+    def save_page_images(cls, input_pdf_file: Union[Path, str], output_dir: Path, dpi: int):
+        page_images = cls.load_pdf_to_images(input_pdf_file, dpi)
+        page_filenames = []
+        for page_ind, page_image in enumerate(page_images):
+            page_filename = output_dir / cls.make_page_file_name(page_ind)
+            page_filenames.append(page_filename)
+            page_image.save(page_filename)
+        return page_filenames
+
+
+def generate_unique_color_matrix(num_colors: int) -> np.ndarray:
+    init_rgb = np.random.randint(0, 255, 3)
+    step = np.ones((3,)) * 256 / num_colors
+    steps = np.arange(num_colors).reshape(-1, 1) * step
+    datapoint_by_color = ((init_rgb + steps) % 256).astype('int')
+    return datapoint_by_color
+
+
+def generate_unique_color_strings(num_colors: int) -> List[str]:
+    datapoint_by_color = generate_unique_color_matrix(num_colors)
+    return ['rgb({r}, {g}, {b})'.format(r=e[0], g=e[1], b=e[2]) for e in datapoint_by_color]
 
 
 if __name__ == '__main__':

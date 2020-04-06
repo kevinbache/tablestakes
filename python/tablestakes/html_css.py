@@ -1,11 +1,10 @@
-import re
-import tempfile
-import webbrowser
-
 import abc
 import enum
-
+from pathlib import Path
+import re
+import tempfile
 from typing import List, Union, Optional
+import webbrowser
 
 import pdfkit
 import yattag
@@ -288,6 +287,16 @@ class Style(HtmlTag):
         super().__init__('style', contents, classes, attributes)
 
 
+class Script(HtmlTag):
+    def __init__(
+            self,
+            contents: DirtyHtmlChunk,
+            classes: HtmlClassesType = None,
+            attributes: Optional[utils.StrDict] = None,
+    ):
+        super().__init__('script', contents, classes, attributes)
+
+
 class Head(HtmlTag):
     def __init__(
             self,
@@ -457,8 +466,69 @@ class Document:
         self.add_style(styled_html.get_css())
 
     def __str__(self):
+        script = """
+          console.log("hello from hc.Document.__str__.Head.Script! --- erm PagePicker.js");
+          const word_id = 'word_000001';
+          console.log("done with word_id");
+          const w = document.getElementById(word_id);
+          console.log("done with w");
+
+          if (w == null) {
+            console.log('w is null');
+          }
+          console.log('w is NOT null');
+          let rect = w.getBoundingClientRect();
+          console.log('done with rect');
+        """
+
+        """
+          function get_loc(word_id) => {
+              const w = document.getElementById(word_id);
+              if (w == null) {
+                return '(null)';
+              }
+              let rect = w.getBoundingClientRect();
+        
+              rect = {
+                left: rect.left + window.scrollX,
+                top: rect.top + window.scrollY,
+                right: rect.right + window.scrollX,
+                bottom: rect.bottom + window.scrollY,
+                x: rect.x,
+                y: rect.y,
+                width: rect.width,
+                height: rect.height,
+              };
+              return rect;
+          };
+          console.log("function read");
+          const word_id = 'word_000001';
+          console.log("***** WORD LOC:", word_id, get_loc(word_id));
+          
+          
+          const ()
+          const words = document.getElementsByTagName('w')
+          words.map((w) => )
+        """
         html = Html([
-            Head(['<meta charset="utf-8"/>', Style(f'\n{str(self.css)}\n')]),
+            Head([
+                '<meta charset="utf-8"/>',
+                Style(f'\n{str(self.css)}\n'),
+                # # Script(f'console.log("hello from hc.Document.__str__.Head.Script!"); ' + script)
+                # Script("""var jsver = 1.0;""", attributes={'type': "text/javascript"}),
+                # Script("""jsver = 1.1;""", attributes={'language': "Javascript1.1"}),
+                # Script("""jsver = 1.2;""", attributes={'language': "Javascript1.2"}),
+                # Script("""jsver = 1.3;""", attributes={'language': "Javascript1.3"}),
+                # Script("""jsver = 1.4;""", attributes={'language': "Javascript1.4"}),
+                # Script("""jsver = 1.5;""", attributes={'language': "Javascript1.5"}),
+                # Script("""jsver = 1.6;""", attributes={'language': "Javascript1.6"}),
+                # Script("""jsver = 1.7;""", attributes={'language': "Javascript1.7"}),
+                # Script("""jsver = 1.8;""", attributes={'language': "Javascript1.8"}),
+                # Script("""jsver = 1.9;""", attributes={'language': "Javascript1.9"}),
+                # Script("""jsver = 2.0;""", attributes={'language': "Javascript2.0"}),
+                # Script("""console.log('jsver: ' + jsver)"""),
+                # Script(script),
+            ]),
             Body(_html_chunk_to_str(self.contents)),
         ])
 
@@ -471,17 +541,52 @@ class Document:
             webbrowser.open(url)
             f.close()
 
-    def save_pdf(self, output_fullfile: str, page_size=PageSize.LETTER, margin='1in') -> Optional[str]:
+    def save_pdf(
+            self,
+            output_fullfile: str,
+            page_size=PageSize.LETTER,
+            margin='1in',
+            do_save_page_images_too=True,
+            dpi=500,
+    ) -> Optional[List[str]]:
+
+        # these are passed on to wkhtmltopdf
+        # ref: https://wkhtmltopdf.org/usage/wkhtmltopdf.txt
+        """
+          -d, --dpi <dpi>                     Change the dpi explicitly (this has no
+                                      effect on X11 based systems) (default 96)
+        """
         options = {
             'page-size': page_size.size_str,
+            # TODO: remove me?
+            'debug-javascript': None,
+            'enable-javascript': None,
+            'disable-smart-shrinking': None,
+            # TODO: evaluate me
+            'dpi': dpi,
         }
         for side in ('top', 'bottom', 'left', 'right'):
             options[f'margin-{side}'] = margin
-        return pdfkit.from_string(
+
+        pdfkit.from_string(
             input=str(self),
             output_path=output_fullfile,
             options=options,
         )
+
+        if do_save_page_images_too:
+            pdf_dir = Path(output_fullfile).parent
+            pages_dir = pdf_dir / 'pages'
+            utils.mkdir_if_not_exist(pages_dir, make_parents=True)
+
+            page_names = utils.PdfHandler.save_page_images(
+                input_pdf_file=output_fullfile,
+                output_dir=pages_dir,
+                dpi=dpi,
+            )
+            return page_names
+        else:
+            return None
 
     def save_html(self, output_fullfile: str):
         utils.save_txt(output_fullfile, str(self))
