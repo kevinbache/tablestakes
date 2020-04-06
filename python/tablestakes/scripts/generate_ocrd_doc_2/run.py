@@ -151,4 +151,40 @@ if __name__ == '__main__':
 
     ocr_df.to_csv(ocr_df_file)
 
+    joined_df = pd.merge(
+        ocr_df, words_df,
+        how='outer',
+        left_on='closest_color_word_id',
+        right_on='id',
+        suffixes=['_ocr', '_matched'],
+    )
+    joined_df['text_lev_distance'] = \
+        joined_df.apply(lambda row: utils.levenshtein(row['text_ocr'].lower(), row['text_matched'].lower()), axis=1)
 
+    joined_df_file = output_dir / 'joined.csv'
+    joined_df.to_csv(joined_df_file)
+
+    # now you've got ocr_df word_ids
+    # join with word_df word_ids and now you've got labels on ocr words
+    # quantify ocr text errors, missing words on either side
+    #   missing real words: real word scanned as smudge
+    #   missing ocr_words: ocr thought a smudge was a word
+    #   mismatched text: ocr got a word wrong probably needs more dpi
+    # that's enough for a model
+    # char counters
+
+    # xymeta csvs
+    #
+    # x:
+    #     lrtb
+    #     text
+    #     meta attributes
+    #
+    # y:
+    #     label attributes
+    #
+    # meta:
+    #     word_id
+    #     (color)
+    #
+    # iterator data loadier
