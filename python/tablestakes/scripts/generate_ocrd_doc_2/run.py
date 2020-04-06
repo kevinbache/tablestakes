@@ -156,10 +156,10 @@ if __name__ == '__main__':
         how='outer',
         left_on='closest_color_word_id',
         right_on='id',
-        suffixes=['_ocr', '_matched'],
+        suffixes=['_x', '_y'],
     )
     joined_df['text_lev_distance'] = \
-        joined_df.apply(lambda row: utils.levenshtein(row['text_ocr'].lower(), row['text_matched'].lower()), axis=1)
+        joined_df.apply(lambda row: utils.levenshtein(row['text_x'].lower(), row['text_y'].lower()), axis=1)
 
     joined_df_file = output_dir / 'joined.csv'
     joined_df.to_csv(joined_df_file)
@@ -187,4 +187,15 @@ if __name__ == '__main__':
     #     word_id
     #     (color)
     #
-    # iterator data loadier
+    # iterator data loader over csv files
+
+    # need 3D color spacing
+
+
+    """
+    training setup:
+        abstract away saving / loading
+            to local directory
+            to online database + blob store
+     
+    """
