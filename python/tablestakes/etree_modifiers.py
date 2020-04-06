@@ -266,7 +266,9 @@ class SaveWordAttribsToDataFrame(EtreeModifier):
         self._attrib_dicts.append(copy.copy(word.attrib))
 
     def get_df(self):
-        return pd.DataFrame(self._attrib_dicts)
+        df = pd.DataFrame(self._attrib_dicts)
+        df.apply(pd.to_numeric, errors='ignore')
+        return df
 
 
 class SeleniumWordLocatorModifier(EtreeModifier):
@@ -357,6 +359,8 @@ class WordColorizer(EtreeModifier):
     R_ATTRIB_NAME = 'r'
     G_ATTRIB_NAME = 'g'
     B_ATTRIB_NAME = 'b'
+
+    RGB = [R_ATTRIB_NAME, G_ATTRIB_NAME, B_ATTRIB_NAME]
 
     def __init__(self):
         self._word_count = 0

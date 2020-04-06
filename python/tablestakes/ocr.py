@@ -136,13 +136,26 @@ class TesseractOcrDfFactory:
     4,5,0,1,1,1,1,2107,2067,379,101,95,SENT
     5,5,0,1,1,1,2,2536,2067,195,101,96,TO
     """
-    @staticmethod
-    def from_tesseract_df(pyt_df: pd.DataFrame):
+    LEFT = 'left'
+    RIGHT = 'right'
+    TOP = 'top'
+    BOTTOM = 'bottom'
+
+    @classmethod
+    def from_tesseract_df(cls, pyt_df: pd.DataFrame):
         df = pyt_df[pyt_df['level'] == 5].copy()
         df['right'] = df['left'] + df['width']
         df['bottom'] = df['top'] + df['height']
         df.rename(columns={'conf': 'confidence'}, inplace=True)
-        df = df[['page_num', 'left', 'right', 'top', 'bottom', 'confidence', 'text']]
+        df = df[[
+            TesseractOcrProvider.PAGE_NUM_COL_NAME,
+            cls.LEFT,
+            cls.RIGHT,
+            cls.TOP,
+            cls.BOTTOM,
+            'confidence',
+            'text',
+        ]]
         return df
 
 

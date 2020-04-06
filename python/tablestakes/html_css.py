@@ -547,6 +547,7 @@ class Document:
             page_size=PageSize.LETTER,
             margin='1in',
             do_save_page_images_too=True,
+            pages_dirname='pages',
             dpi=500,
     ) -> Optional[List[str]]:
 
@@ -576,7 +577,7 @@ class Document:
 
         if do_save_page_images_too:
             pdf_dir = Path(output_fullfile).parent
-            pages_dir = pdf_dir / 'pages'
+            pages_dir = pdf_dir / pages_dirname
             utils.mkdir_if_not_exist(pages_dir, make_parents=True)
 
             page_names = utils.PdfHandler.save_page_images(

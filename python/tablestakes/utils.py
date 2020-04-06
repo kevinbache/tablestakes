@@ -1,18 +1,17 @@
-import random
-
 from collections.abc import Iterable
-from typing import Dict, Union, Any, List, Optional
-from pathlib import Path
-import time
 import json
 import os
+from pathlib import Path
+import time
+from typing import Dict, Union, Any, List, Optional
 import xml.dom.minidom
 
+from lxml import etree
 from PIL import Image
+from matplotlib.image import imread
 import numpy as np
 import pandas as pd
 import pdf2image
-from lxml import etree
 
 StrDict = Dict[str, Union[str, int, float]]
 
@@ -157,7 +156,13 @@ class PdfHandler:
         return f'page_{page_ind:02d}.png'
 
     @classmethod
-    def save_page_images(cls, input_pdf_file: Union[Path, str], output_dir: Path, dpi: int):
+    def save_page_images(
+            cls,
+            input_pdf_file: Union[Path, str],
+            output_dir: Path,
+            dpi: int,
+    ):
+
         page_images = cls.load_pdf_to_images(input_pdf_file, dpi)
         page_filenames = []
         for page_ind, page_image in enumerate(page_images):
@@ -165,6 +170,11 @@ class PdfHandler:
             page_filenames.append(page_filename)
             page_image.save(page_filename)
         return page_filenames
+
+
+def load_image_files_to_arrays(filenames: List[Union[Path, str]]):
+    """output is height x width x color array scaled [0, 255] """
+    return [(imread(str(f)) * 255).astype('uint8') for f in filenames]
 
 
 def generate_unique_color_matrix(num_colors: int) -> np.ndarray:
