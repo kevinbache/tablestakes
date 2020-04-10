@@ -6,7 +6,6 @@ from pathlib import Path
 import re
 from typing import Any, Callable, List, Union, Optional
 
-from selenium import webdriver
 import pandas as pd
 from lxml.cssselect import CSSSelector
 from lxml import etree
@@ -68,7 +67,7 @@ class WordWrapper(EtreeModifier):
 
     PARENT_CLASS_ATTRIB_NAME = 'parent_class'
 
-    # NOTE: do not change this from 'id'.  The Selenium code uses getElementById to find each word.
+    # can change
     WORD_ID_ATTRIB_NAME = 'id'
 
     def __init__(self, starting_word_id=0):
@@ -269,90 +268,6 @@ class SaveWordAttribsToDataFrame(EtreeModifier):
         df = pd.DataFrame(self._attrib_dicts)
         df.apply(pd.to_numeric, errors='ignore')
         return df
-
-
-class SeleniumWordLocatorModifier(EtreeModifier):
-    """Find the pixel bounding box location of each word and save that info into its attribs."""
-
-    # ref: https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect
-    JAVASCRIPT_SCRIPT_TEMPLATE = """
-    var w = document.getElementById("{word_id}");
-    var rect = w.getBoundingClientRect();
-    rect.left += window.scrollX
-    rect.top += window.scrollY
-    return rect;
-    """
-
-    LEFT_ATTRIB_NAME = 'left'
-    RIGHT_ATTRIB_NAME = 'right'
-    TOP_ATTRIB_NAME = 'top'
-    BOTTOM_ATTRIB_NAME = 'bottom'
-
-    def __init__(
-            self,
-            log_dir: Optional[Union[Path, str]] = None,
-            window_width_px: float = 500 * 8.5,
-            window_height_px: float = 500 * 11.0,
-    ):
-        self._word_locations = []
-        if log_dir:
-            self.log_path = Path(log_dir) / 'geckodriver.log'
-        else:
-            self.log_path = os.path.devnull
-        self.window_width_px = window_width_px
-        self.window_height_px = window_height_px
-
-    def _call_inner(self, root: etree._Element):
-        options = webdriver.firefox.options.Options()
-        options.headless = True
-        self.driver = webdriver.Firefox(options=options, log_path=self.log_path)
-        try:
-            self.driver.set_window_position(0, 0)
-            self.driver.set_window_size(self.window_width_px, self.window_height_px)
-
-            html_str = "data:text/html;charset=utf-8," + etree.tostring(root, encoding='unicode')
-            self.driver.get(html_str)
-
-            self._modify_nodes_inplace(
-                root=root,
-                css_selector_str=WordWrapper.WORD_TAG,
-                fn=self._save_word_location,
-            )
-        finally:
-            self.driver.quit()
-
-    def _save_word_location(self, word: etree._Element):
-        word_id = word.attrib[WordWrapper.WORD_ID_ATTRIB_NAME]
-        script = self.JAVASCRIPT_SCRIPT_TEMPLATE.format(word_id=word_id)
-        """
-        Example word_location value: 
-        word_location = {
-            'left': 12,
-            'right': 58.75,
-            'top': 12,
-            'bottom': 33,
-            'x': 12,
-            'width': 46.75,
-            'y': 12,
-            'height': 21,
-        }
-        
-        These pixel values are scaled based on your screen's DPI rather than the pdf rendered DPI which is used for 
-        the OCR'd word locations, so they still need to be converted in order to apply real labels to each OCR'd word        
-        """
-        try:
-            word_location = self.driver.execute_script(script)
-        except BaseException as e:
-            raise ValueError(f"Your Selenium script failed.  Script: {script}.").with_traceback(e.__traceback__)
-
-        if word_location['top'] != word_location['y'] or word_location['left'] != word_location['x']:
-            raise ValueError(f"Word location failed.  Got word_location: {word_location} for word_id={word_id}.")
-
-        num_template = '{:0.3f}'
-        word.attrib[self.LEFT_ATTRIB_NAME] = num_template.format(word_location['left'])
-        word.attrib[self.RIGHT_ATTRIB_NAME] = num_template.format(word_location['right'])
-        word.attrib[self.TOP_ATTRIB_NAME] = num_template.format(word_location['top'])
-        word.attrib[self.BOTTOM_ATTRIB_NAME] = num_template.format(word_location['bottom'])
 
 
 class WordColorizer(EtreeModifier):
