@@ -13,7 +13,9 @@ table
 
 def make_doc(seed: int):
     utils.set_seed(seed)
-    my_date_creator = creators.DateCreator()
+    date_creator = creators.DateCreator()
+    phone_creator = creators.PhoneCreator()
+
     kv_creators = [
         creators.KvCreator(
             name='to_address',
@@ -33,12 +35,12 @@ def make_doc(seed: int):
         creators.KvCreator(
             name='date_sent',
             key_contents_creator=creators.ChoiceCreator(['Sent', 'Date Sent', 'Statement Date']),
-            value_contents_creator=my_date_creator,
+            value_contents_creator=date_creator,
         ),
         creators.KvCreator(
             name='date_received',
             key_contents_creator=creators.ChoiceCreator(['Received', 'Date Received']),
-            value_contents_creator=my_date_creator,
+            value_contents_creator=date_creator,
         ),
         creators.KvCreator(
             name='invoice_number',
@@ -47,7 +49,8 @@ def make_doc(seed: int):
         ),
         creators.KvCreator(
             name='total',
-            key_contents_creator=creators.ChoiceCreator(['Total', 'Total Due', 'Amount', 'Amount Due', 'After tax']),
+            key_contents_creator=creators.ChoiceCreator(
+                ['Total', 'Total Due', 'Charges', 'Total Charges', 'Amount', 'Amount Due', 'After tax']),
             value_contents_creator=creators.DollarsCreator(),
         ),
         creators.KvCreator(
@@ -58,12 +61,12 @@ def make_doc(seed: int):
         creators.KvCreator(
             name='phone',
             key_contents_creator=creators.ChoiceCreator(['Phone', 'Phone Number', 'Phone No', 'Call']),
-            value_contents_creator=creators.PhoneCreator(),
+            value_contents_creator=phone_creator,
         ),
         creators.KvCreator(
             name='fax',
             key_contents_creator=creators.ChoiceCreator(['Fax', 'Fax Number']),
-            value_contents_creator=creators.PhoneCreator(),
+            value_contents_creator=phone_creator,
         ),
     ]
     for ind in range(20):

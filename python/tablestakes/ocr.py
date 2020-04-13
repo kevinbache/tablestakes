@@ -192,8 +192,8 @@ def calibrate_conversion_parameters(words_df: pd.DataFrame, ocr_df: pd.DataFrame
 if __name__ == '__main__':
     import pandas as pd
 
-    ocr_csv_file = '/Users/kevin/projects/tablestakes/python/tablestakes/scripts/generate_ocrd_doc_2/docs/doc_01/ocr.csv'
-    words_csv_file = '/Users/kevin/projects/tablestakes/python/tablestakes/scripts/generate_ocrd_doc_2/docs/doc_01/words.csv'
+    ocr_csv_file = '/python/tablestakes/scripts/generate_ocrd_doc_2/docs/doc_01_bak/ocr.csv'
+    words_csv_file = '/python/tablestakes/scripts/generate_ocrd_doc_2/docs/doc_01_bak/words.csv'
 
     ocr_df = pd.read_csv(ocr_csv_file)
     words_df = pd.read_csv(words_csv_file)

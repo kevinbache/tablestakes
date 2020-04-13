@@ -48,6 +48,7 @@ setup(
         'lxml',
         'cssselect',
         'colorspacious',
+        'glasbey',
     ],
 
     classifiers=[

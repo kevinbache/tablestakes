@@ -136,8 +136,9 @@ if __name__ == '__main__':
     word_ids = []
     dists = []
     for ocr_word_ind, color_stat_of_ocr_box in enumerate(color_stats_of_ocr_boxes):
+        # Todo: save mean and median?  median will be all 0s, mean is useful for diagnosis
         distances_from_current_ocr_word_to_each_words_color = \
-            np.linalg.norm(color_stat_of_ocr_box['mean'] - word_colors_df, ord=1, axis=1)
+            np.linalg.norm(color_stat_of_ocr_box['median'] - word_colors_df, ord=1, axis=1)
         index_of_closest_color = np.argmin(distances_from_current_ocr_word_to_each_words_color)
         mae_to_closest_color = distances_from_current_ocr_word_to_each_words_color[index_of_closest_color]
         # TODO: Factor out id str

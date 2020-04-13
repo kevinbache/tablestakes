@@ -366,15 +366,15 @@ class CharCountModifier(EtreeModifier):
         total = 0
 
         num_lower = sum(c.islower() for c in word.text)
-        word.attrib[cls.LOWER_COUNT_NAME] = num_lower
+        word.attrib[cls.LOWER_COUNT_NAME] = str(num_lower)
         total += num_lower
 
         num_upper = sum(c.isupper() for c in word.text)
-        word.attrib[cls.UPPER_COUNT_NAME] = num_upper
+        word.attrib[cls.UPPER_COUNT_NAME] = str(num_upper)
         total += num_upper
 
         num_number = sum(c.isdigit() for c in word.text)
-        word.attrib[cls.NUMBER_COUNT_NAME] = num_number
+        word.attrib[cls.NUMBER_COUNT_NAME] = str(num_number)
         total += num_number
 
-        word.attrib[cls.NUMBER_COUNT_NAME] = len(word.text) - total
+        word.attrib[cls.NUMBER_COUNT_NAME] = str(len(word.text) - total)

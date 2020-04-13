@@ -226,12 +226,14 @@ class DollarsCreator(AbstractFakerCreator):
         range = self.max - self.min
         num = np.random.random() * range + self.min
         dollar_str = '$' if np.random.random() < self.prob_include_dollar else ''
-        f_str = 'f.2' if self.do_include_cents else 'f.0'
+        f_str = '.2f' if self.do_include_cents else '.0f'
         return f'{dollar_str}{num:{f_str}}'
 
 
 class PhoneCreator(AbstractFakerCreator):
     DEFAULT_FORMATS = (
+        '### ### ####',
+        '(###) ### ####',
         '###-###-####',
         '(###) ###-####',
         '(###)###-####',
@@ -242,10 +244,10 @@ class PhoneCreator(AbstractFakerCreator):
 
     def __init__(self, formats=DEFAULT_FORMATS, seed=None):
         super().__init__(seed)
-        self.formats = formats
+        self.format = self.faker.random_element(formats)
 
     def _phone_number(self):
-        return self.faker.numerify(self.faker.random_element(self.formats))
+        return self.faker.numerify(self.faker.random_element(self.format))
 
     def _call_inner(self, *args, **kwargs):
         return self._phone_number()

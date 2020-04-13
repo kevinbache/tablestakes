@@ -134,8 +134,9 @@ def prepend_before_extension(f: str, to_append: str, new_ext: Optional[str] = No
     return p.parent / f'{p.stem}{to_append}{ext}'
 
 
-def set_pandas_width(width=200):
+def set_pandas_disp(width=200, max_rows=200):
     pd.set_option('display.max_columns', width)
+    pd.set_option('display.max_rows', max_rows)
     pd.set_option('display.width', width)
 
 
@@ -178,11 +179,21 @@ def load_image_files_to_arrays(filenames: List[Union[Path, str]]):
 
 
 def generate_unique_color_matrix(num_colors: int) -> np.ndarray:
-    init_rgb = np.random.randint(0, 255, 3)
-    step = np.ones((3,)) * 256 / num_colors
-    steps = np.arange(num_colors).reshape(-1, 1) * step
-    datapoint_by_color = ((init_rgb + steps) % 256).astype('int')
-    return datapoint_by_color
+    """Make a maximally distant grid of colors in RGB color space.
+
+    Note that these colors aren't perceptually dissimilar but it's a computer looking at them, not a human.
+    """
+    MAX = 255
+    num_steps = int(np.ceil(np.power(num_colors, 1 / 3)))
+
+    steps = np.linspace(0, MAX, num_steps).astype('uint8')
+    rs, gs, bs = np.meshgrid(steps, steps, steps)
+
+    out = np.array([rs.ravel(), gs.ravel(), bs.ravel()]).T
+
+    out = out[:num_colors]
+
+    return out
 
 
 def generate_unique_color_strings(num_colors: int) -> List[str]:
