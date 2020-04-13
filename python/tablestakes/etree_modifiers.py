@@ -67,7 +67,7 @@ class WordWrapper(EtreeModifier):
 
     PARENT_CLASS_ATTRIB_NAME = 'parent_class'
 
-    WORD_ID_ATTRIB_NAME = 'id'
+    WORD_ID_ATTRIB_NAME = 'word_id'
 
     def __init__(self, starting_word_id=0):
         self._used_word_ids = {}
@@ -191,9 +191,13 @@ class ConvertParentClassNamesToWordAttribsModifier(EtreeModifier):
     So if the document has kvs named "from_address", "to_address", and "date_received", this will convert:
         <w parent_class="kv_key from_address">From</w>
             to
-        <w from_address="1", to_address="0", date_received="0">From</w>
+        <w kv=from_address="1", kv=to_address="0", kv=date_received="0">From</w>
     """
     PARENT_CLASSES_TO_IGNORE = [st.html_class_name for st in hc.SelectorType if st.html_class_name]
+
+    # prefix assigned to parent class names when they're set on each word.
+    # currenttly, this class is being used to propagate the id of the kv that this word came from so name it for that.
+    TAG_PREFIX = 'kv_is_'
 
     def __init__(self):
         self._seen_parent_classes = []
@@ -223,12 +227,16 @@ class ConvertParentClassNamesToWordAttribsModifier(EtreeModifier):
             if parent_class not in self._seen_parent_classes:
                 self._seen_parent_classes.append(parent_class)
 
+    @classmethod
+    def _set_word_attrib(cls, word: etree._Element, key: str, value: str):
+        word.attrib[f'{cls.TAG_PREFIX}{key}'] = value
+
     def _convert_parent_classes_to_tags(self, word: etree._Element):
         for seen_parent_class in self._seen_parent_classes:
-            word.attrib[seen_parent_class] = '0'
+            self._set_word_attrib(word, seen_parent_class, '0')
 
         for current_parent_class in self._get_parent_classes(word):
-            word.attrib[current_parent_class] = '1'
+            self._set_word_attrib(word, current_parent_class, '1')
 
         del word.attrib[WordWrapper.PARENT_CLASS_ATTRIB_NAME]
 
