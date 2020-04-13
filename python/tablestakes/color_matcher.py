@@ -8,30 +8,35 @@ import pandas as pd
 
 
 class WordColorMatcher:
-    """Matches """
+    """Matches ocr words to true words via parallel color lookup images"""
 
     @classmethod
-    def _get_color_block_stats_under_ocr_words(cls, ocr_df: pd.DataFrame, colored_page_image_files: List[Union[Path, str]]):
-        def get_colors_under_word(colored_page_image_arrays: List[np.ndarray], row: pd.Series):
-            """row from the ocr df (ocr.csv) representing a word and including fields for page_num, LRTB"""
-            page_num = row[ocr.TesseractOcrProvider.PAGE_NUM_COL_NAME]
-            if page_num > len(colored_page_image_arrays):
-                raise ValueError(f"page_num: {page_num}, len(page_image_arrays): {len(colored_page_image_arrays)}")
+    def get_colors_under_word(cls, colored_page_image_arrays: List[np.ndarray], row: pd.Series):
+        """row from the ocr df (ocr.csv) representing a word and including fields for page_num, LRTB"""
+        page_num = row[ocr.TesseractOcrProvider.PAGE_NUM_COL_NAME]
+        if page_num > len(colored_page_image_arrays):
+            raise ValueError(f"page_num: {page_num}, len(page_image_arrays): {len(colored_page_image_arrays)}")
 
-            page = colored_page_image_arrays[page_num]
+        page = colored_page_image_arrays[page_num]
 
-            word_slice = page[row[ocr.TesseractOcrDfFactory.TOP]:row[ocr.TesseractOcrDfFactory.BOTTOM], :]
-            word_slice = word_slice[:, row[ocr.TesseractOcrDfFactory.LEFT]:row[ocr.TesseractOcrDfFactory.RIGHT]]
+        word_slice = page[row[ocr.TesseractOcrDfFactory.TOP]:row[ocr.TesseractOcrDfFactory.BOTTOM], :]
+        word_slice = word_slice[:, row[ocr.TesseractOcrDfFactory.LEFT]:row[ocr.TesseractOcrDfFactory.RIGHT]]
 
-            return {
-                'median': np.median(word_slice, axis=(0, 1)),
-                'mean': np.mean(word_slice, axis=(0, 1)),
-            }
+        return {
+            'median': np.median(word_slice, axis=(0, 1)),
+            'mean': np.mean(word_slice, axis=(0, 1)),
+        }
 
+    @classmethod
+    def _get_color_block_stats_under_ocr_words(
+            cls,
+            ocr_df: pd.DataFrame,
+            colored_page_image_files: List[Union[Path, str]],
+    ):
         colored_page_image_arrays = utils.load_image_files_to_arrays(colored_page_image_files)
 
         color_stats_of_ocr_boxes = [
-            get_colors_under_word(colored_page_image_arrays, row)
+            cls.get_colors_under_word(colored_page_image_arrays, row)
             for _, row in ocr_df.iterrows()
         ]
 

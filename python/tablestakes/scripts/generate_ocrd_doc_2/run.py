@@ -82,7 +82,8 @@ if __name__ == '__main__':
     colored_page_image_files = doc.save_pdf(
         colored_doc_pdf_file,
         do_save_page_images_too=True,
-        dpi=dpi, pages_dirname='pages_colored',
+        dpi=dpi,
+        pages_dirname='pages_colored',
     )
 
     ########################################
@@ -106,12 +107,18 @@ if __name__ == '__main__':
     joined_df_file = output_dir / 'joined.csv'
     joined_df.to_csv(joined_df_file)
 
+    # now make ocr_df modifier to add in meta stuff
+
     # xymeta csvs
     #
     # x:
-    #     lrtb
-    #     text
-    #     meta attributes
+    #     left__x, right__x, top__x, bottom__x, confidence__x, text__x
+    #     ocr.OcrDfFactory.LEFT
+    #     ocr.OcrDfFactory.RIGHT
+    #     ocr.OcrDfFactory.TOP
+    #     ocr.OcrDfFactory.BOTTOM
+    #     ocr.OcrDfFactory.CONFIDENCE
+    #     ocr.OcrDfFactory.TEXT
     #
     # y:
     #     label attributes
