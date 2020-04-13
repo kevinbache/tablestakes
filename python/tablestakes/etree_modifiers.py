@@ -1,4 +1,6 @@
 import abc
+import html
+
 import copy
 from functools import partial
 import re
@@ -378,3 +380,26 @@ class CharCountModifier(EtreeModifier):
         total += num_number
 
         word.attrib[cls.NUMBER_COUNT_NAME] = str(len(word.text) - total)
+
+
+class DetailedOtherCharCountModifier(EtreeModifier):
+    COUNT_TEMPLATE = 'num_chars_{}'
+    CHARS_TO_CHECK = r"""~!@#$%^&*()_+{}[]\|;:"',.?<>/"""
+
+    def _call_inner(self, root: etree._Element):
+        self._modify_nodes_inplace(
+            root=root,
+            css_selector_str=WordWrapper.WORD_TAG,
+            fn=self._count_chars,
+        )
+
+    @classmethod
+    def _count_chars(cls, word: etree._Element):
+        for c in cls.CHARS_TO_CHECK:
+            attrib_name = cls.COUNT_TEMPLATE.format(c)
+            attrib_name = html.escape(attrib_name)
+
+            # / causes problems in html doc rendering
+            attrib_name = attrib_name.replace('/', r'backslash')
+            word.attrib[attrib_name] = str(sum(t == c for t in word.text))
+

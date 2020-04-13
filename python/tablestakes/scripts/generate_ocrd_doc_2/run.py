@@ -51,6 +51,7 @@ if __name__ == '__main__':
             etree_modifiers.CopyWordTextToAttribModifier(),
             etree_modifiers.WordColorizer(),
             etree_modifiers.CharCountModifier(),
+            etree_modifiers.DetailedOtherCharCountModifier(),
             df_saver,
         ],
     )

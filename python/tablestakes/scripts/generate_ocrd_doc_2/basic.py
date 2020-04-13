@@ -13,8 +13,11 @@ table
 
 def make_doc(seed: int):
     utils.set_seed(seed)
+
+    # create the complex creators up here so they'll use consistent formatting throughout.
     date_creator = creators.DateCreator()
     phone_creator = creators.PhoneCreator()
+    dollars_creator = creators.DollarsCreator()
 
     kv_creators = [
         creators.KvCreator(
@@ -51,12 +54,12 @@ def make_doc(seed: int):
             name='total',
             key_contents_creator=creators.ChoiceCreator(
                 ['Total', 'Total Due', 'Charges', 'Total Charges', 'Amount', 'Amount Due', 'After tax']),
-            value_contents_creator=creators.DollarsCreator(),
+            value_contents_creator=dollars_creator,
         ),
         creators.KvCreator(
             name='subtotal',
             key_contents_creator=creators.ChoiceCreator(['Subtotal', 'Subtotal Due', 'Sans Tax']),
-            value_contents_creator=creators.DollarsCreator(),
+            value_contents_creator=dollars_creator,
         ),
         creators.KvCreator(
             name='phone',

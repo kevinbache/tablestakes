@@ -247,7 +247,7 @@ class PhoneCreator(AbstractFakerCreator):
         self.format = self.faker.random_element(formats)
 
     def _phone_number(self):
-        return self.faker.numerify(self.faker.random_element(self.format))
+        return self.faker.numerify(self.format)
 
     def _call_inner(self, *args, **kwargs):
         return self._phone_number()
