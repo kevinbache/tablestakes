@@ -1,8 +1,6 @@
 import abc
 import copy
 from functools import partial
-import os
-from pathlib import Path
 import re
 from typing import Any, Callable, List, Union, Optional
 
@@ -67,7 +65,6 @@ class WordWrapper(EtreeModifier):
 
     PARENT_CLASS_ATTRIB_NAME = 'parent_class'
 
-    # can change
     WORD_ID_ATTRIB_NAME = 'id'
 
     def __init__(self, starting_word_id=0):
@@ -349,3 +346,35 @@ class WordColorDocCssAdder(EtreeModifier):
                 'color': color_str,
             },
         )
+
+
+class CharCountModifier(EtreeModifier):
+    LOWER_COUNT_NAME = 'num_chars_lower'
+    UPPER_COUNT_NAME = 'num_chars_upper'
+    NUMBER_COUNT_NAME = 'num_chars_number'
+    OTHER_COUNT_NAME = 'num_chars_other'
+
+    def _call_inner(self, root: etree._Element):
+        self._modify_nodes_inplace(
+            root=root,
+            css_selector_str=WordWrapper.WORD_TAG,
+            fn=self._count_chars,
+        )
+
+    @classmethod
+    def _count_chars(cls, word: etree._Element):
+        total = 0
+
+        num_lower = sum(c.islower() for c in word.text)
+        word.attrib[cls.LOWER_COUNT_NAME] = num_lower
+        total += num_lower
+
+        num_upper = sum(c.isupper() for c in word.text)
+        word.attrib[cls.UPPER_COUNT_NAME] = num_upper
+        total += num_upper
+
+        num_number = sum(c.isdigit() for c in word.text)
+        word.attrib[cls.NUMBER_COUNT_NAME] = num_number
+        total += num_number
+
+        word.attrib[cls.NUMBER_COUNT_NAME] = len(word.text) - total

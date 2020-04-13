@@ -3,7 +3,6 @@ from typing import List
 
 import numpy as np
 import pandas as pd
-from PIL import Image as pil_image
 
 from tablestakes import utils, html_css as hc, etree_modifiers, ocr
 from tablestakes.scripts.generate_ocrd_doc_2 import basic
@@ -51,6 +50,7 @@ if __name__ == '__main__':
             etree_modifiers.ConvertParentClassNamesToWordAttribsModifier(),
             etree_modifiers.CopyWordTextToAttribModifier(),
             etree_modifiers.WordColorizer(),
+            etree_modifiers.CharCountModifier(),
             df_saver,
         ],
     )
@@ -191,11 +191,9 @@ if __name__ == '__main__':
 
     # need 3D color spacing
 
-
     """
     training setup:
         abstract away saving / loading
             to local directory
             to online database + blob store
-     
     """

@@ -2,6 +2,8 @@ import abc
 from typing import Callable, Union, Iterable, Optional, Any, Tuple
 
 import faker
+from faker.providers import internet, phone_number
+
 import numpy as np
 
 from tablestakes import chunks, kv, utils
@@ -149,6 +151,8 @@ class BoldTagWrapper(TagWrapperCreator):
 class AbstractFakerCreator(Creator, abc.ABC):
     def __init__(self, seed: Optional[int] = None):
         self.faker = faker.Faker()
+        self.faker.add_provider(internet)
+        self.faker.add_provider(phone_number)
         if seed is not None:
             self.faker.seed(seed)
 
@@ -200,6 +204,53 @@ class IntCreator(AbstractFakerCreator):
             return f'{num:0{self.zero_pad_to_width}d}'
 
 
+class UrlCreator(AbstractFakerCreator):
+    def _call_inner(self, *args, **kwargs):
+        return self.faker.url()
+
+
+class EmailCreator(AbstractFakerCreator):
+    def _call_inner(self, *args, **kwargs):
+        return self.faker.email()
+
+
+class DollarsCreator(AbstractFakerCreator):
+    def __init__(self, min=0, max=1e5, do_include_cents=True, prob_include_dollar=0.5, seed=None):
+        super().__init__(seed)
+        self.min = min
+        self.max = max
+        self.do_include_cents = do_include_cents
+        self.prob_include_dollar = prob_include_dollar
+
+    def _call_inner(self, *args, **kwargs):
+        range = self.max - self.min
+        num = np.random.random() * range + self.min
+        dollar_str = '$' if np.random.random() < self.prob_include_dollar else ''
+        f_str = 'f.2' if self.do_include_cents else 'f.0'
+        return f'{dollar_str}{num:{f_str}}'
+
+
+class PhoneCreator(AbstractFakerCreator):
+    DEFAULT_FORMATS = (
+        '###-###-####',
+        '(###) ###-####',
+        '(###)###-####',
+        '###.###.####',
+        '(###) ###.####',
+        '(###)###.####',
+    )
+
+    def __init__(self, formats=DEFAULT_FORMATS, seed=None):
+        super().__init__(seed)
+        self.formats = formats
+
+    def _phone_number(self):
+        return self.faker.numerify(self.faker.random_element(self.formats))
+
+    def _call_inner(self, *args, **kwargs):
+        return self._phone_number()
+
+
 class RandomStrCreator(AbstractFakerCreator):
     CHARS = 'qwertyuiopasdfghjkklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890'
 
@@ -220,7 +271,6 @@ class RandomStrCreator(AbstractFakerCreator):
 
 class KvCssCreator(Creator):
     def __init__(self, kv_loc: kv.KLoc, extra_css_creator: Optional[CssCreator] = None):
-        # self.kv_name = kv_name
         self.kv_loc = kv_loc
         self.extra_css_creator = extra_css_creator
 

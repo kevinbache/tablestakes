@@ -1,5 +1,15 @@
 from tablestakes import creators, kv_styles, html_css as hc, utils
 
+"""
+make a list of fields
+randomly choose them
+throw them into different groups
+groups are randomly laid out
+
+other elements
+table
+"""
+
 
 def make_doc(seed: int):
     utils.set_seed(seed)
@@ -34,6 +44,26 @@ def make_doc(seed: int):
             name='invoice_number',
             key_contents_creator=creators.ChoiceCreator(['Invoice', 'Invoice number', 'Account']),
             value_contents_creator=creators.IntCreator(),
+        ),
+        creators.KvCreator(
+            name='total',
+            key_contents_creator=creators.ChoiceCreator(['Total', 'Total Due', 'Amount', 'Amount Due', 'After tax']),
+            value_contents_creator=creators.DollarsCreator(),
+        ),
+        creators.KvCreator(
+            name='subtotal',
+            key_contents_creator=creators.ChoiceCreator(['Subtotal', 'Subtotal Due', 'Sans Tax']),
+            value_contents_creator=creators.DollarsCreator(),
+        ),
+        creators.KvCreator(
+            name='phone',
+            key_contents_creator=creators.ChoiceCreator(['Phone', 'Phone Number', 'Phone No', 'Call']),
+            value_contents_creator=creators.PhoneCreator(),
+        ),
+        creators.KvCreator(
+            name='fax',
+            key_contents_creator=creators.ChoiceCreator(['Fax', 'Fax Number']),
+            value_contents_creator=creators.PhoneCreator(),
         ),
     ]
     for ind in range(20):
