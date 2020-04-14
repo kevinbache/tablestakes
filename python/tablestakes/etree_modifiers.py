@@ -67,7 +67,8 @@ class WordWrapper(EtreeModifier):
 
     PARENT_CLASS_ATTRIB_NAME = 'parent_class'
 
-    WORD_ID_ATTRIB_NAME = 'word_id'
+    # leave as 'id' so that id selectors work for the css selector that's used to set colors on each word box
+    WORD_ID_ATTRIB_NAME = 'id'
 
     def __init__(self, starting_word_id=0):
         self._used_word_ids = {}
@@ -169,7 +170,7 @@ class SetIsKeyOnWordsModifier(SetBooleanAttribOnWordsModifier):
 
 class SetIsValueOnWordsModifier(SetBooleanAttribOnWordsModifier):
     KEY_NAME = 'isValue'
-    TRUE_WORD_CSS_SELECTOR = f'.{hc.SelectorType.VALUE.html_class_name} w'
+    TRUE_WORD_CSS_SELECTOR = f'.{hc.SelectorType.VALUE.html_class_name} {WordWrapper.WORD_TAG}'
 
     def __init__(self):
         super().__init__(
@@ -206,14 +207,14 @@ class ConvertParentClassNamesToWordAttribsModifier(EtreeModifier):
         # first make a list of all parent classes in the document
         self._modify_nodes_inplace(
             root=root,
-            css_selector_str='w',
+            css_selector_str=WordWrapper.WORD_TAG,
             fn=self._note_parent_classes
         )
 
         # then add a many-hot vector for this word's parent classes
         self._modify_nodes_inplace(
             root=root,
-            css_selector_str='w',
+            css_selector_str=WordWrapper.WORD_TAG,
             fn=self._convert_parent_classes_to_tags
         )
 
@@ -264,7 +265,7 @@ class SaveWordAttribsToDataFrame(EtreeModifier):
         self._attrib_dicts = []
         self._modify_nodes_inplace(
             root=root,
-            css_selector_str='w',
+            css_selector_str=WordWrapper.WORD_TAG,
             fn=self._save_node_attribs
         )
 
@@ -333,7 +334,7 @@ class WordColorDocCssAdder(EtreeModifier):
 
     @staticmethod
     def get_color_for_word(word: etree._Element):
-        """This assumes you've already set the color attributes on this word."""
+        """This assumes you've already set the color attributes on this word with ."""
         r = word.attrib[WordColorizer.R_ATTRIB_NAME]
         g = word.attrib[WordColorizer.G_ATTRIB_NAME]
         b = word.attrib[WordColorizer.B_ATTRIB_NAME]

@@ -1,7 +1,8 @@
 from pathlib import Path
 
-from tablestakes import utils, html_css as hc, etree_modifiers, ocr, color_matcher
+from tablestakes import utils, html_css as hc, etree_modifiers, ocr, color_matcher, xymeta_makers
 from tablestakes.scripts.generate_ocrd_doc_2 import basic
+
 
 if __name__ == '__main__':
     ##############
@@ -45,8 +46,6 @@ if __name__ == '__main__':
             etree_modifiers.ConvertParentClassNamesToWordAttribsModifier(),
             etree_modifiers.CopyWordTextToAttribModifier(),
             etree_modifiers.WordColorizer(),
-            etree_modifiers.CharCountModifier(),
-            etree_modifiers.DetailedOtherCharCountModifier(),
             df_saver,
         ],
     )
@@ -100,36 +99,14 @@ if __name__ == '__main__':
     # match ocr words to true words by color #
     ##########################################
     joined_df = color_matcher.WordColorMatcher.get_joined_df(ocr_df, words_df, colored_page_image_files)
-
+    joined_df.to_csv(output_dir / 'joined.csv')
     # ocr_df gets the join word_id columns added in WordColorMatcher.get_joined_df
     ocr_df.to_csv(ocr_df_file)
 
-    joined_df_file = output_dir / 'joined.csv'
-    joined_df.to_csv(joined_df_file)
-
-    # now make ocr_df modifier to add in meta stuff
-
-    # xymeta csvs
-    #
-    # x:
-    #     left__x, right__x, top__x, bottom__x, confidence__x, text__x
-    #     ocr.OcrDfFactory.LEFT
-    #     ocr.OcrDfFactory.RIGHT
-    #     ocr.OcrDfFactory.TOP
-    #     ocr.OcrDfFactory.BOTTOM
-    #     ocr.OcrDfFactory.CONFIDENCE
-    #     ocr.OcrDfFactory.TEXT
-    #
-    # y:
-    #     label attributes
-    #
-    # meta:
-    #     word_id
-    #     (color)
-    #
-    # iterator data loader over csv files
-
-    # need 3D color spacing
+    x_df, y_df, meta_df = xymeta_makers.make_xymeta(joined_df)
+    x_df.to_csv(output_dir / 'x.csv', index=False)
+    y_df.to_csv(output_dir / 'y.csv', index=False)
+    meta_df.to_csv(output_dir / 'meta.csv', index=False)
 
     """
     training setup:

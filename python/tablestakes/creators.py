@@ -215,17 +215,17 @@ class EmailCreator(AbstractFakerCreator):
 
 
 class DollarsCreator(AbstractFakerCreator):
-    def __init__(self, min=0, max=1e5, do_include_cents=True, prob_include_dollar=0.5, seed=None):
+    def __init__(self, min=0, max=1e5, do_include_cents=True, do_include_dollar=True, seed=None):
         super().__init__(seed)
         self.min = min
         self.max = max
         self.do_include_cents = do_include_cents
-        self.prob_include_dollar = prob_include_dollar
+        self.do_include_dollar = do_include_dollar
 
     def _call_inner(self, *args, **kwargs):
         range = self.max - self.min
         num = np.random.random() * range + self.min
-        dollar_str = '$' if np.random.random() < self.prob_include_dollar else ''
+        dollar_str = '$' if self.do_include_dollar else ''
         f_str = '.2f' if self.do_include_cents else '.0f'
         return f'{dollar_str}{num:{f_str}}'
 

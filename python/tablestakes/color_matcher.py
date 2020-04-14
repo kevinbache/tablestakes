@@ -9,6 +9,16 @@ import pandas as pd
 
 class WordColorMatcher:
     """Matches ocr words to true words via parallel color lookup images"""
+    OCR_SUFFIX = '__x'
+    WORDS_SUFFIX = '__y'
+
+    @classmethod
+    def get_x_name(cls, col_name: str):
+        return f'{col_name}{cls.OCR_SUFFIX}'
+
+    @classmethod
+    def get_y_name(cls, col_name: str):
+        return f'{col_name}{cls.WORDS_SUFFIX}'
 
     @classmethod
     def get_colors_under_word(cls, colored_page_image_arrays: List[np.ndarray], row: pd.Series):
@@ -75,8 +85,6 @@ class WordColorMatcher:
             ocr_df: pd.DataFrame,
             words_df: pd.DataFrame,
             colored_page_image_files: List[Union[Path, str]],
-            ocr_suffix='__x',
-            words_suffix='__y',
     ) -> pd.DataFrame:
         """DOES modify dataframes"""
         color_stats_of_ocr_boxes = cls._get_color_block_stats_under_ocr_words(ocr_df, colored_page_image_files)
@@ -92,25 +100,28 @@ class WordColorMatcher:
         ocr_df[CLOSEST_WORD_ID] = word_ids
         ocr_df[CLOSEST_DIST] = dists
 
-        ocr_df.rename(columns=lambda name: f'{name}{ocr_suffix}', inplace=True)
-        words_df.rename(columns=lambda name: f'{name}{words_suffix}', inplace=True)
+        ocr_df.rename(columns=lambda name: f'{name}{cls.OCR_SUFFIX}', inplace=True)
+        words_df.rename(columns=lambda name: f'{name}{cls.WORDS_SUFFIX}', inplace=True)
 
         joined_df = pd.merge(
             ocr_df,
             words_df,
             how='outer',
-            left_on=f'{CLOSEST_WORD_ID}{ocr_suffix}',
-            right_on=f'{WORD_ID_NAME}{words_suffix}',
+            left_on=f'{CLOSEST_WORD_ID}{cls.OCR_SUFFIX}',
+            right_on=f'{WORD_ID_NAME}{cls.WORDS_SUFFIX}',
         )
 
         # todo: more formal error checking for unmatched rows.  this will fail if there are any.
-        joined_df['text_lev_distance'] = \
-            joined_df.apply(
-                lambda row: utils.levenshtein(
-                    row[f'{TEXT_NAME}{ocr_suffix}'].lower(),
-                    row[f'{TEXT_NAME}{words_suffix}'].lower()
-                ),
-                axis=1,
-            )
+        # try:
+        #     joined_df['text_lev_distance'] = \
+        #         joined_df.apply(
+        #             lambda row: utils.levenshtein(
+        #                 row[f'{TEXT_NAME}{cls.OCR_SUFFIX}'].lower(),
+        #                 row[f'{TEXT_NAME}{cls.WORDS_SUFFIX}'].lower()
+        #             ),
+        #             axis=1,
+        #         )
+        # except BaseException as e:
+        #     raise e
 
         return joined_df

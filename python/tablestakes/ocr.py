@@ -161,4 +161,3 @@ class TesseractOcrDfFactory(OcrDfFactory):
             cls.TEXT,
         ]]
         return df
-
