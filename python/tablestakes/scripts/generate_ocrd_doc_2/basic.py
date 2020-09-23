@@ -11,7 +11,7 @@ table
 """
 
 
-def make_doc(seed: int):
+def make_doc(seed: int, num_extra_fields=50):
     utils.set_seed(seed)
 
     # create the complex creators up here so they'll use consistent formatting throughout.
@@ -52,8 +52,17 @@ def make_doc(seed: int):
         ),
         creators.KvCreator(
             name='total',
-            key_contents_creator=creators.ChoiceCreator(
-                ['Total', 'Total Due', 'Charges', 'Total Charges', 'Amount', 'Amount Due', 'After tax']),
+            key_contents_creator=creators.ChoiceCreator([
+                'Total',
+                'Total Due',
+                'Charges',
+                'Total Charges',
+                'Amount',
+                'Amount Due',
+                'Balance',
+                'Balance Due',
+                'After tax',
+            ]),
             value_contents_creator=dollars_creator,
         ),
         creators.KvCreator(
@@ -72,7 +81,7 @@ def make_doc(seed: int):
             value_contents_creator=phone_creator,
         ),
     ]
-    for ind in range(20):
+    for ind in range(num_extra_fields):
         kv_creators.append(
             creators.KvCreator(
                 name=f'field_{ind}',

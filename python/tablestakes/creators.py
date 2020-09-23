@@ -176,7 +176,7 @@ class DateCreator(AbstractFakerCreator):
         '%m/%d/%y',      # 12/17/19
         '%b %d, %Y'      # Dec 17, 2019
         '%B %d, %Y'      # December 17, 2019
-        '%A, %B %d, %Y'  # Monday, December 17, 2019
+        # '%A, %B %d, %Y'  # Monday, December 17, 2019
     ]
 
     def __init__(self, pattern: Optional[str] = '%m/%d/%Y', seed=None):

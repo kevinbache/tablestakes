@@ -79,7 +79,7 @@ class WordWrapper(EtreeModifier):
         # re.spitting on whitespaces keeps the whitespace regions as entries in the resulting list
         word_strs = re.split(cls.re_whitespace, str_to_wrap.strip())
 
-        # don't worry about word_ids, we'll set those in a future iteration through the tree
+         # don't worry about word_ids, we'll set those in a future iteration through the tree
         word_nodes = []
         for word_ind, word_str in enumerate(word_strs):
             tag = cls.WHITESPACE_TAG if re.match(cls.re_whitespace, word_str) else cls.WORD_TAG
@@ -243,7 +243,7 @@ class ConvertParentClassNamesToWordAttribsModifier(EtreeModifier):
 
 
 class CopyWordTextToAttribModifier(EtreeModifier):
-    TEXT_ATTRIB_NAME = 'text'
+    TEXT_ATTRIB_NAME = 'text_ground_truth'
 
     def _call_inner(self, root: etree._Element):
         self._modify_nodes_inplace(

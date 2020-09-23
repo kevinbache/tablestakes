@@ -49,6 +49,9 @@ setup(
         'cssselect',
         'colorspacious',
         'glasbey',
+        'torch',
+        'torchnlp',
+        'pytorch-lightning',
     ],
 
     classifiers=[
