@@ -28,6 +28,7 @@ class TrapezoidConv1Module(pl.LightningModule):
         self.hp.num_y_dims = self.ds.num_y_dims
         self.hp.num_vocab = self.ds.num_vocab
 
+        assert self.hp.batch_size_log2 == 0
         self.hp.batch_size = int(math.pow(2, self.hp.batch_size_log2))
 
         # save all variables in __init__ signature to self.hparams
@@ -96,91 +97,77 @@ class TrapezoidConv1Module(pl.LightningModule):
 
     def forward(self, x):
         x_base, vocab_ids = x
-
-        # emb = torch.squeeze(self.embedder(vocab_ids), dim=2)
         emb = self.embedder(vocab_ids)
-        # print('forward.x_base type:', type(x_base))
-        # print('forward.emb    type:', type(emb))
-        # print('forward.x_base.size:', x_base.size())
-        # print('forward.emb.   size:', emb.size())
         emb = emb.squeeze(2)
-        # print('forward.emb.   size:', emb.size())
 
         x = torch.cat([x_base.float(), emb], dim=-1).permute([0, 2, 1])
-        # print('now conv:')
         for layer in self.conv_layers:
-            # print(x.shape, layer)
             x = layer(x)
 
-        # print('now fc:')
         for layer in self.fc_layers:
-            # print(x.shape, layer)
             x = layer(x)
 
-        # print('final')
-        # print(x.shape)
         x = x.permute([0, 2, 1])
         return x
 
+    def _inner_forward_step(self, batch, name):
+        x, y = batch
+        y = y.argmax(dim=-1)
+        y_hat = self(x)
+        loss = F.cross_entropy(y_hat.squeeze(0), y.squeeze(0))
+        return x, y, y_hat, loss
+
+    def _inner_valid_step(self, y, y_hat):
+        is_correct = y == torch.argmax(y_hat, dim=-1)
+        word_acc = is_correct.float().mean().item()
+        return word_acc
+
+    # TODO: yuck!
+    TRAIN_LOSS_NAME = 'train_loss'
+    TRAIN_WORD_ACC_NAME = 'acc'
     def training_step(self, batch, batch_idx):
         """
         Lightning calls this inside the training loop with the data from the training dataloader
         passed in as `batch`.
         """
-        # forward pass
-        x, y = batch
-        y = y.argmax(dim=1)
-        y_hat = self(x)
-        loss = F.cross_entropy(y_hat, y)
-        tensorboard_logs = {'train_loss': loss}
-        return {'loss': loss, 'log': tensorboard_logs}
+        x, y, y_hat, loss = self._inner_forward_step(batch, 'train')
+        word_acc = self._inner_valid_step(y, y_hat)
+        logs = {self.TRAIN_LOSS_NAME: loss, self.TRAIN_WORD_ACC_NAME: word_acc}
+        return {'loss': loss, 'log': logs, 'progress_bar': logs}
 
+    VALID_LOSS_NAME = 'val_loss'
+    VALID_WORD_ACC_NAME = 'val_word_acc'
     def validation_step(self, batch, batch_idx):
         """
         Lightning calls this inside the validation loop with the data from the validation dataloader
         passed in as `batch`.
         """
-        x, y = batch
-        y = y[0]
-        # print('validation_step y.shape', y.shape)
-        y = y.argmax(dim=1)
-        # print('validation_step y.shape', y.shape)
-        y_hat = self(x)
-        # print('valid_step shapes:')
-        # print('y    ', y.shape)
-        # print('y_hat', y_hat.shape)
-        val_loss = F.cross_entropy(y_hat.squeeze(0), y)
-        labels_hat = torch.argmax(y_hat, dim=-1)
-        # print('y     ', y.shape)
-        # print('yhat  ', y_hat.shape)
-        # print('labhat', labels_hat.shape)
-        n_correct_pred = torch.sum(y == labels_hat).item()
-        return {'val_loss': val_loss, "n_correct_pred": n_correct_pred, "n_pred": len(x)}
-
-    def test_step(self, batch, batch_idx):
-        x, y = batch
-        y = y[0].argmax(dim=1)
-        y_hat = self(x)
-        test_loss = F.cross_entropy(y_hat, y)
-        labels_hat = torch.argmax(y_hat, dim=-1)
-        n_correct_pred = torch.sum(y == labels_hat).item()
-        return {'test_loss': test_loss, "n_correct_pred": n_correct_pred, "n_pred": len(x)}
+        x, y, y_hat, loss = self._inner_forward_step(batch, 'valid')
+        word_acc = self._inner_valid_step(y, y_hat)
+        return {self.VALID_LOSS_NAME: loss, self.VALID_WORD_ACC_NAME: word_acc}
 
     def validation_epoch_end(self, outputs):
         """
         Called at the end of validation to aggregate outputs.
         :param outputs: list of individual outputs of each validation step.
         """
-        avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-        val_acc = sum([x['n_correct_pred'] for x in outputs]) / sum(x['n_pred'] for x in outputs)
-        tensorboard_logs = {'val_loss': avg_loss, 'val_acc': val_acc}
-        return {'val_loss': avg_loss, 'log': tensorboard_logs}
+        loss = torch.stack([d[self.VALID_LOSS_NAME] for d in outputs]).mean().item()
+        word_acc = np.mean([d[self.VALID_WORD_ACC_NAME] for d in outputs])
+        logs = {self.VALID_LOSS_NAME: loss, self.VALID_WORD_ACC_NAME: word_acc}
+        return {'loss': loss, 'log': logs, 'progress_bar': logs}
+
+    TEST_LOSS_NAME = 'test_loss'
+    TEST_WORD_ACC_NAME = 'test_word_acc'
+    def test_step(self, batch, batch_idx):
+        x, y, y_hat, loss = self._inner_forward_step(batch, 'test')
+        word_acc = self._inner_valid_step(y, y_hat)
+        return {self.TEST_LOSS_NAME: loss, self.TEST_WORD_ACC_NAME: word_acc}
 
     def test_epoch_end(self, outputs):
-        avg_loss = torch.stack([x['test_loss'] for x in outputs]).mean()
-        test_acc = sum([x['n_correct_pred'] for x in outputs]) / sum(x['n_pred'] for x in outputs)
-        tensorboard_logs = {'test_loss': avg_loss, 'test_acc': test_acc}
-        return {'test_loss': avg_loss, 'log': tensorboard_logs}
+        loss = torch.stack([d[self.TEST_LOSS_NAME] for d in outputs]).mean().item()
+        word_acc = np.mean([d[self.TEST_WORD_ACC_NAME] for d in outputs])
+        logs = {self.TEST_LOSS_NAME: loss, self.TEST_WORD_ACC_NAME: word_acc}
+        return {'loss': loss, 'log': logs, 'progress_bar': logs}
 
     # ---------------------
     # TRAINING SETUP
@@ -231,6 +218,9 @@ if __name__ == '__main__':
     trainer = pl.Trainer(
         max_epochs=hp.num_epochs,
         weights_summary=ModelSummary.MODE_FULL,
+        fast_dev_run=False,
+
+
     )
     net = TrapezoidConv1Module(hp)
 
