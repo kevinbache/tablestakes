@@ -39,12 +39,17 @@ def print_dict(d: Dict, indent_width=2, extra_key_width=0, do_norm_key_width=Tru
     print(dict_to_str(d, indent_width, extra_key_width, do_norm_key_width, line_end))
 
 
-def read_json(filename: str):
+def load_json(filename: str):
     with open(filename, mode='r') as f:
         return json.load(f)
 
 
-def read_txt(filename: str):
+def save_json(filename: str, json_obj: Any):
+    with open(filename, mode='w') as f:
+        return json.dump(json_obj, f)
+
+
+def load_txt(filename: str):
     with open(filename, mode='r') as f:
         return f.read()
 
@@ -98,13 +103,13 @@ def levenshtein(a: str, b: str):
     na = len(a)
     nb = len(b)
 
-    d = np.zeros((na+1, nb+1))
+    d = np.zeros((na + 1, nb + 1))
 
     d[0, :] = np.arange(nb + 1)
     d[:, 0] = np.arange(na + 1)
 
-    for bi in range(1, nb+1):
-        for ai in range(1, na+1):
+    for bi in range(1, nb + 1):
+        for ai in range(1, na + 1):
             sub_cost = 0 if a[ai - 1] == b[bi - 1] else 1
 
             d[ai, bi] = np.min([
@@ -163,7 +168,6 @@ class PdfHandler:
             output_dir: Path,
             dpi: int,
     ):
-
         page_images = cls.load_pdf_to_images(input_pdf_file, dpi)
         page_filenames = []
         for page_ind, page_image in enumerate(page_images):

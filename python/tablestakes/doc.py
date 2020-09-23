@@ -227,7 +227,7 @@ class GoogleOcrDocumentFactory:
 
 
 if __name__ == '__main__':
-    d = utils.read_json('../data/ocr/sample_invoice_google_ocr_output.json')
+    d = utils.load_json('../data/ocr/sample_invoice_google_ocr_output.json')
 
     # print("================ Paragraph ================")
     # pd = d['fullTextAnnotation']['pages'][0]['blocks'][0]['paragraphs'][0]

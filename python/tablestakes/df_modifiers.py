@@ -217,6 +217,9 @@ class Vocabulizer(DfModifier):
         df[self.VOCAB_NAME] = df[self.TEXT_NAME].apply(lambda token: self.vocab[token])
         return df
 
+    def get_vocab_size(self):
+        return len(self.vocab)
+
 
 if __name__ == '__main__':
     t = Tokenizer()

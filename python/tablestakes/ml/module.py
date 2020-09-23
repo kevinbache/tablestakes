@@ -1,63 +1,20 @@
-import os
-from argparse import ArgumentParser
+import math
 
 import numpy as np
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchvision.transforms as transforms
+import utils
 from tablestakes.ml import data
+from tablestakes.ml.hyperparams import MyHyperparams
 from torch import optim
 from torch.utils.data import DataLoader
-from torchvision.datasets import MNIST
 
 import pytorch_lightning as pl
 
-from chillpill import params
 
-
-class MyHyperparams(params.ParameterSet):
-    ##############
-    # model
-    #  conv
-    num_conv_layers = 4
-    log2num_filters_start = 5
-    log2num_filters_end = 4
-
-    kernel_size = 3
-
-    num_conv_layers_per_pool = 2
-    pool_size = 2
-
-    #  fc
-    num_fc_hidden_layers = 2
-    log2num_neurons_start = 6
-    log2num_neurons_end = 5
-
-    num_fc_layers_per_dropout = 2
-    dropout_p = 0.5
-
-    num_vocab = 10
-    num_embedding_dim = 32
-
-    ##############
-    # optimization
-    lr = 0.001
-    momentum = 0.9
-    limit_n_data = None
-
-    num_epochs = 10
-
-    ##############
-    # data
-    batch_size_log2 = 2
-    p_valid = 0.1
-    p_test = 0.1
-    data_dir = '../scripts/generate_ocrd_doc_2/docs'
-
-
-class TrapezoidConv1Model(pl.LightningModule):
+class TrapezoidConv1Module(pl.LightningModule):
     def __init__(
             self,
             hp: MyHyperparams,
@@ -65,26 +22,27 @@ class TrapezoidConv1Model(pl.LightningModule):
         super().__init__()
 
         self.hp = hp
+        self.ds = data.XYCsvDataset(self.hp.data_dir, ys_postproc=lambda ys: [y[0] for y in ys])
 
-        ds = data.XYCsvDataset(self.hp.data_dir)
+        self.hp.num_x_dims = self.ds.num_x_dims
+        self.hp.num_y_dims = self.ds.num_y_dims
+        self.hp.num_vocab = self.ds.num_vocab
+
+        self.hp.batch_size = int(math.pow(2, self.hp.batch_size_log2))
 
         # save all variables in __init__ signature to self.hparams
-        self.save_hyperparameters()
         self.hparams = self.hp.to_dict()
+        self.save_hyperparameters()
 
         self.train_dataset, self.valid_dataset, self.test_dataset = None, None, None
 
         #############
-        # conv
+        # emb
         self.embedder = nn.Embedding(self.hp.num_vocab, self.hp.num_embedding_dim)
-
-        prev_num_filters = hp.num_input_features + hp.num_embedding_dim
 
         #############
         # conv
-        conv_layers = []
-
-        #  alright, so it's really more of a funnel than a trapezoid
+        #  alright, so the logspace makes it really more of a funnel than a trapezoid
         num_conv_filters = np.logspace(
             start=hp.log2num_filters_start,
             stop=hp.log2num_filters_end,
@@ -92,16 +50,25 @@ class TrapezoidConv1Model(pl.LightningModule):
             base=2,
         ).astype(np.integer)
 
+        conv_layers = []
+        prev_num_filters = hp.num_x_dims[0] + hp.num_embedding_dim
         for conv_ind, num_filters in enumerate(num_conv_filters):
-            conv_layers.append(nn.Conv1d(prev_num_filters, num_filters, hp.kernel_size))
+            conv_layers.append(nn.Conv1d(prev_num_filters, num_filters, hp.kernel_size, padding=int(hp.kernel_size/2)))
             conv_layers.append(nn.ReLU(inplace=True))
             prev_num_filters = num_filters
 
-            if not conv_ind % hp.num_conv_layers_per_pool:
-                conv_layers.append(nn.MaxPool2d(hp.pool_size))
+            # if not conv_ind % hp.num_conv_layers_per_pool:
+            #     conv_layers.append(nn.MaxPool1d(hp.pool_size))
 
         # so torch can find your parameters
         self.conv_layers = nn.ModuleList(conv_layers)
+
+        ## upsample tensor 'src' to have the same spatial size with tensor 'tar'
+        def _upsample_like(src, tar):
+
+            src = F.upsample(src, size=tar.shape[2:], mode='bilinear')
+
+            return src
 
         #############
         # fc
@@ -122,21 +89,37 @@ class TrapezoidConv1Model(pl.LightningModule):
             if not fc_ind % hp.num_fc_layers_per_dropout:
                 fc_layers.append(nn.Dropout(p=hp.dropout_p))
 
-        fc_layers.append(nn.Linear(prev_num_neurons, self.INPUT_NUM_CLASSES))
+        # output
+        fc_layers.append(nn.Conv1d(prev_num_neurons, self.hp.num_y_dims[0], 1))
+
         self.fc_layers = nn.ModuleList(fc_layers)
 
     def forward(self, x):
         x_base, vocab_ids = x
 
+        # emb = torch.squeeze(self.embedder(vocab_ids), dim=2)
         emb = self.embedder(vocab_ids)
-        print('forward.x_base.size:', x_base.size())
-        print('forward.emb.size:', emb.size())
+        # print('forward.x_base type:', type(x_base))
+        # print('forward.emb    type:', type(emb))
+        # print('forward.x_base.size:', x_base.size())
+        # print('forward.emb.   size:', emb.size())
+        emb = emb.squeeze(2)
+        # print('forward.emb.   size:', emb.size())
 
-        x = torch.cat([x_base, emb], dim=1)
-        for layer in self.conv_layers + self.fc_layers:
+        x = torch.cat([x_base.float(), emb], dim=-1).permute([0, 2, 1])
+        # print('now conv:')
+        for layer in self.conv_layers:
+            # print(x.shape, layer)
             x = layer(x)
 
-        print('forward.x.size at end:', x.size())
+        # print('now fc:')
+        for layer in self.fc_layers:
+            # print(x.shape, layer)
+            x = layer(x)
+
+        # print('final')
+        # print(x.shape)
+        x = x.permute([0, 2, 1])
         return x
 
     def training_step(self, batch, batch_idx):
@@ -146,6 +129,7 @@ class TrapezoidConv1Model(pl.LightningModule):
         """
         # forward pass
         x, y = batch
+        y = y.argmax(dim=1)
         y_hat = self(x)
         loss = F.cross_entropy(y_hat, y)
         tensorboard_logs = {'train_loss': loss}
@@ -157,17 +141,28 @@ class TrapezoidConv1Model(pl.LightningModule):
         passed in as `batch`.
         """
         x, y = batch
+        y = y[0]
+        # print('validation_step y.shape', y.shape)
+        y = y.argmax(dim=1)
+        # print('validation_step y.shape', y.shape)
         y_hat = self(x)
-        val_loss = F.cross_entropy(y_hat, y)
-        labels_hat = torch.argmax(y_hat, dim=1)
+        # print('valid_step shapes:')
+        # print('y    ', y.shape)
+        # print('y_hat', y_hat.shape)
+        val_loss = F.cross_entropy(y_hat.squeeze(0), y)
+        labels_hat = torch.argmax(y_hat, dim=-1)
+        # print('y     ', y.shape)
+        # print('yhat  ', y_hat.shape)
+        # print('labhat', labels_hat.shape)
         n_correct_pred = torch.sum(y == labels_hat).item()
         return {'val_loss': val_loss, "n_correct_pred": n_correct_pred, "n_pred": len(x)}
 
     def test_step(self, batch, batch_idx):
         x, y = batch
+        y = y[0].argmax(dim=1)
         y_hat = self(x)
         test_loss = F.cross_entropy(y_hat, y)
-        labels_hat = torch.argmax(y_hat, dim=1)
+        labels_hat = torch.argmax(y_hat, dim=-1)
         n_correct_pred = torch.sum(y == labels_hat).item()
         return {'test_loss': test_loss, "n_correct_pred": n_correct_pred, "n_pred": len(x)}
 
@@ -201,13 +196,15 @@ class TrapezoidConv1Model(pl.LightningModule):
 
     def prepare_data(self):
         # called on one gpu
-        self.hp.num_data_total = len(ds)
+        self.hp.num_data_total = len(self.ds)
         self.hp.num_data_test = int(self.hp.num_data_total * self.hp.p_test)
         self.hp.num_data_valid = int(self.hp.num_data_total * self.hp.p_valid)
         self.hp.num_data_train = self.hp.num_data_total - self.hp.num_data_test - self.hp.num_data_valid
 
-        dataset_counts = [self.hp.num_data_train, self.hp.num_data_valid, self.hp.num_data_test]
-        self.train_dataset, self.valid_dataset, self.test_dataset = torch.utils.data.random_split(ds, dataset_counts)
+        num_data_per_phase = [self.hp.num_data_train, self.hp.num_data_valid, self.hp.num_data_test]
+
+        self.train_dataset, self.valid_dataset, self.test_dataset = \
+            torch.utils.data.random_split(self.ds, num_data_per_phase)
 
     def setup(self, stage):
         # called on every gpu
@@ -235,6 +232,9 @@ if __name__ == '__main__':
         max_epochs=hp.num_epochs,
         weights_summary=ModelSummary.MODE_FULL,
     )
-    net = TrapezoidConv1Model(hp)
+    net = TrapezoidConv1Module(hp)
+
+    print("HP:")
+    utils.print_dict(hp.to_dict())
     fit_out = trainer.fit(net)
-    print(fit_out)
+    print('fit_out:', fit_out)

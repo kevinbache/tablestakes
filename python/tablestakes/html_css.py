@@ -440,7 +440,7 @@ class BaseCss(enum.Enum):
         self.filename = filename
 
     def __str__(self):
-        return utils.read_txt(self.filename)
+        return utils.load_txt(self.filename)
 
 
 # TODO: subclass StyledHtmlTag?  StyledHtmlContents?

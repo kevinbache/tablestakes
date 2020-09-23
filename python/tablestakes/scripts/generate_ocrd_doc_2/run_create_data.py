@@ -21,15 +21,19 @@ if __name__ == '__main__':
     num_docs = 1
     num_extra_fields = 20
 
+    vocabulizer = df_modifiers.Vocabulizer()
+
     #########
     # setup #
     #########
+    docs_dir = Path('.') / 'docs'
     for doc_ind in range(num_docs):
         seed = seed_start + doc_ind
         doc = basic.make_doc(seed, num_extra_fields)
-        output_dir = Path('.') / 'docs' / f'doc_{doc_ind:02d}'
+        output_dir = docs_dir / f'doc_{doc_ind:02d}'
         utils.mkdir_if_not_exist(output_dir)
 
+        # used way down below too
         params_file = output_dir / 'params.txt'
         params_dict = {
             'seed': seed,
@@ -37,7 +41,7 @@ if __name__ == '__main__':
             'margin': margin,
             'page_size': page_size.name,
         }
-        utils.save_txt(params_file, str(params_dict))
+        utils.save_json(params_file, params_dict)
 
         ########################################
         # postproc doc to add word_ids, labels #
@@ -111,7 +115,7 @@ if __name__ == '__main__':
         # Tokenizer change the number of rows of the DF if there are any rows with multi-word text
         joined_df = df_modifiers.DfModifierStack([
             df_modifiers.Tokenizer(),
-            df_modifiers.Vocabulizer(),
+            vocabulizer,
             df_modifiers.CharCounter(),
             df_modifiers.DetailedOtherCharCounter(),
         ])(joined_df)
@@ -164,9 +168,5 @@ if __name__ == '__main__':
         y_df.to_csv(output_dir / 'y.csv', index=False)
         meta_df.to_csv(output_dir / 'meta.csv', index=False)
 
-        """
-        training setup:
-            abstract away saving / loading
-                to local directory
-                to online database + blob store
-        """
+    # vocab_size_file = docs_dir / 'vocab_size.txt'
+    # utils.save_txt(vocab_size_file, vocabulizer.get_vocab_size())

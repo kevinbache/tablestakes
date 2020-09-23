@@ -4,6 +4,8 @@ from typing import *
 
 import numpy as np
 import pandas as pd
+import torch
+from tablestakes.ml.hyperparams import MyHyperparams
 
 from torch.utils.data import Dataset, DataLoader
 
@@ -15,9 +17,11 @@ class XYCsvDataset(Dataset):
     data_dir
         datapoint_dir_1
             x.csv
+            x_2.csv
             y.csv
         datapoint_dir_2
             x.csv
+            x_2.csv
             y.csv
     """
 
@@ -37,17 +41,33 @@ class XYCsvDataset(Dataset):
     def turn_inside_out(list_of_lists):
         return list(zip(*list_of_lists))
 
-    def __init__(
-            self,
-            data_dir: Union[Path, str],
-    ):
+    def __init__(self, data_dir: Union[Path, str], ys_postproc: Callable):
         self.data_dir = Path(data_dir)
 
         self._x_filess = self._find_files_matching_patterns(self.data_dir, self.X_NAMES)
         self._y_filess = self._find_files_matching_patterns(self.data_dir, self.Y_NAMES)
 
+        # before turn_inside_out, self._x_df_sets[0] = [
+        #       [x_df_datapoint1, x_df_datapoint2, ...],
+        #       [x2_df_datapoint1, x2_df_datapoint2, ...],
+        # ]
+        # after turn_inside_out, self._x_df_sets[0] = [
+        #       [x_df_datapoint1, x2_df_datapoint1],
+        #       [x_df_datapoint2, x2_df_datapoint2],
+        #       ...
+        # ]
         self._x_df_sets = self.turn_inside_out([self._read_dfs(file_set) for file_set in self._x_filess])
         self._y_df_sets = self.turn_inside_out([self._read_dfs(file_set) for file_set in self._y_filess])
+
+        # convert to tensors
+        self._xs = [[torch.tensor(df.values) for df in df_set] for df_set in self._x_df_sets]
+        self._ys = [[torch.tensor(df.values) for df in df_set] for df_set in self._y_df_sets]
+
+        self._ys = ys_postproc(self._ys)
+
+        self.num_x_dims = [x_input.shape[1] for x_input in self._x_df_sets[0]]
+        self.num_y_dims = [y_input.shape[1] for y_input in self._y_df_sets[0]]
+        self.num_vocab = max([max(x_vocab) for _, x_vocab in self._xs]).item() + 1
 
         def all_same(x: List):
             return all(e == x[0] for e in x)
@@ -69,13 +89,10 @@ class XYCsvDataset(Dataset):
                 raise ValueError(f"Datapoint {i} had mismatched number of rows across files: {s}.")
 
     def __len__(self):
-        return len(self._x_df_sets[0])
+        return len(self._x_df_sets)
 
     def __getitem__(self, item):
-        def _get_within_sets(item, sets):
-            return tuple(df_set[item] for df_set in sets)
-
-        return _get_within_sets(item, self._x_df_sets), _get_within_sets(item, self._y_df_sets)
+        return self._xs[item], self._ys[item]
 
 
 if __name__ == '__main__':
@@ -83,7 +100,7 @@ if __name__ == '__main__':
 
     dl = DataLoader(
         ds,
-        batch_size=2,
+        batch_size=1,
         shuffle=False,
         num_workers=0,
     )

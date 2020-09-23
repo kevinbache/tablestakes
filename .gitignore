@@ -3,6 +3,8 @@
 python/probably_trash
 python/output
 
+python/tablestakes/scripts/generate_ocrd_doc_2/docs/
+
 **/node_modules
 **/form-api
 
