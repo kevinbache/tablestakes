@@ -28,6 +28,7 @@ class TrapezoidConv1Module(pl.LightningModule):
         self.hp.num_y_dims = self.ds.num_y_dims
         self.hp.num_vocab = self.ds.num_vocab
 
+        # or implement only in gradient averaging
         assert self.hp.batch_size_log2 == 0
         self.hp.batch_size = int(math.pow(2, self.hp.batch_size_log2))
 
@@ -63,13 +64,6 @@ class TrapezoidConv1Module(pl.LightningModule):
 
         # so torch can find your parameters
         self.conv_layers = nn.ModuleList(conv_layers)
-
-        ## upsample tensor 'src' to have the same spatial size with tensor 'tar'
-        def _upsample_like(src, tar):
-
-            src = F.upsample(src, size=tar.shape[2:], mode='bilinear')
-
-            return src
 
         #############
         # fc
@@ -151,7 +145,7 @@ class TrapezoidConv1Module(pl.LightningModule):
         Called at the end of validation to aggregate outputs.
         :param outputs: list of individual outputs of each validation step.
         """
-        loss = torch.stack([d[self.VALID_LOSS_NAME] for d in outputs]).mean().item()
+        loss = torch.stack([d[self.VALID_LOSS_NAME] for d in outputs]).mean()
         word_acc = np.mean([d[self.VALID_WORD_ACC_NAME] for d in outputs])
         logs = {self.VALID_LOSS_NAME: loss, self.VALID_WORD_ACC_NAME: word_acc}
         return {'loss': loss, 'log': logs, 'progress_bar': logs}
@@ -164,7 +158,7 @@ class TrapezoidConv1Module(pl.LightningModule):
         return {self.TEST_LOSS_NAME: loss, self.TEST_WORD_ACC_NAME: word_acc}
 
     def test_epoch_end(self, outputs):
-        loss = torch.stack([d[self.TEST_LOSS_NAME] for d in outputs]).mean().item()
+        loss = torch.stack([d[self.TEST_LOSS_NAME] for d in outputs]).mean()
         word_acc = np.mean([d[self.TEST_WORD_ACC_NAME] for d in outputs])
         logs = {self.TEST_LOSS_NAME: loss, self.TEST_WORD_ACC_NAME: word_acc}
         return {'loss': loss, 'log': logs, 'progress_bar': logs}
@@ -219,8 +213,6 @@ if __name__ == '__main__':
         max_epochs=hp.num_epochs,
         weights_summary=ModelSummary.MODE_FULL,
         fast_dev_run=False,
-
-
     )
     net = TrapezoidConv1Module(hp)
 
