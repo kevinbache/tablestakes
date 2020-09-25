@@ -256,9 +256,10 @@ class PhoneCreator(AbstractFakerCreator):
 class RandomStrCreator(AbstractFakerCreator):
     CHARS = 'qwertyuiopasdfghjkklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890'
 
-    def __init__(self, num_chars_per_word=10, min_words=1, max_words=10, seed=None):
+    def __init__(self, min_chars_per_word=2, max_chars_per_word=10, min_words=1, max_words=10, seed=None):
         super().__init__(seed)
-        self.num_chars = num_chars_per_word
+        self.min_chars_per_word = min_chars_per_word
+        self.max_chars_per_word = max_chars_per_word
         self.min_words = min_words
         self.max_words = max_words
 
@@ -268,7 +269,8 @@ class RandomStrCreator(AbstractFakerCreator):
         return ' '.join(words)
 
     def _generate_word(self):
-        return ''.join(np.random.choice([c for c in self.CHARS], self.num_chars))
+        num_chars = np.random.randint(self.min_chars_per_word, self.max_chars_per_word)
+        return ''.join(np.random.choice([c for c in self.CHARS], num_chars))
 
 
 class KvCssCreator(Creator):

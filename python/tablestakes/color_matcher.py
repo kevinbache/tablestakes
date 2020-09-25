@@ -9,16 +9,6 @@ import pandas as pd
 
 class WordColorMatcher:
     """Matches ocr words to true words via parallel color lookup images"""
-    # OCR_SUFFIX = '__ocr'
-    # WORDS_SUFFIX = '__words'
-
-    # @classmethod
-    # def get_x_name(cls, col_name: str):
-    #     return f'{col_name}{cls.OCR_SUFFIX}'
-
-    # @classmethod
-    # def get_y_name(cls, col_name: str):
-    #     return f'{col_name}{cls.WORDS_SUFFIX}'
 
     @classmethod
     def get_colors_under_word(cls, colored_page_image_arrays: List[np.ndarray], row: pd.Series):
@@ -95,13 +85,9 @@ class WordColorMatcher:
         CLOSEST_DIST = 'closest_color_dist'
 
         WORD_ID_NAME = etree_modifiers.WordWrapper.WORD_ID_ATTRIB_NAME
-        # TEXT_NAME = etree_modifiers.CopyWordTextToAttribModifier.TEXT_ATTRIB_NAME
 
         ocr_df[CLOSEST_WORD_ID] = word_ids
         ocr_df[CLOSEST_DIST] = dists
-
-        # ocr_df.rename(columns=lambda name: f'{name}{cls.OCR_SUFFIX}', inplace=True)
-        # words_df.rename(columns=lambda name: f'{name}{cls.WORDS_SUFFIX}', inplace=True)
 
         joined_df = pd.merge(
             ocr_df,
@@ -109,9 +95,6 @@ class WordColorMatcher:
             how='outer',
             left_on=CLOSEST_WORD_ID,
             right_on=WORD_ID_NAME,
-            # left_on=f'{CLOSEST_WORD_ID}{cls.OCR_SUFFIX}',
-            # right_on=f'{WORD_ID_NAME}{cls.WORDS_SUFFIX}',
-            # suffixes=(cls.OCR_SUFFIX, cls.WORDS_SUFFIX)
         )
 
         # todo: more formal error checking for unmatched rows.  this will fail if there are any.

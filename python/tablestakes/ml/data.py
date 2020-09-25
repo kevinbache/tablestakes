@@ -2,11 +2,9 @@ import glob
 from pathlib import Path
 from typing import *
 
-import numpy as np
 import pandas as pd
-import torch
-from tablestakes.ml.hyperparams import MyHyperparams
 
+import torch
 from torch.utils.data import Dataset, DataLoader
 
 
@@ -24,10 +22,13 @@ class XYCsvDataset(Dataset):
             x_2.csv
             y.csv
     """
-
     X_NAMES = ['x.csv', 'x_vocab.csv']
-    Y_NAMES = ['y.csv']
+    Y_NAMES = ['y_korv.csv', 'y_which_kv.csv']
     DATAPOINT_DIR_NAME = '*'
+
+    @staticmethod
+    def all_same(x: List):
+        return all(e == x[0] for e in x)
 
     @classmethod
     def _find_files_matching_patterns(cls, data_dir: Union[Path, str], patterns: List[str]):
@@ -41,7 +42,7 @@ class XYCsvDataset(Dataset):
     def turn_inside_out(list_of_lists):
         return list(zip(*list_of_lists))
 
-    def __init__(self, data_dir: Union[Path, str], ys_postproc: Callable):
+    def __init__(self, data_dir: Union[Path, str]):
         self.data_dir = Path(data_dir)
 
         self._x_filess = self._find_files_matching_patterns(self.data_dir, self.X_NAMES)
@@ -63,14 +64,9 @@ class XYCsvDataset(Dataset):
         self._xs = [[torch.tensor(df.values) for df in df_set] for df_set in self._x_df_sets]
         self._ys = [[torch.tensor(df.values) for df in df_set] for df_set in self._y_df_sets]
 
-        self._ys = ys_postproc(self._ys)
-
         self.num_x_dims = [x_input.shape[1] for x_input in self._x_df_sets[0]]
         self.num_y_dims = [y_input.shape[1] for y_input in self._y_df_sets[0]]
         self.num_vocab = max([max(x_vocab) for _, x_vocab in self._xs]).item() + 1
-
-        def all_same(x: List):
-            return all(e == x[0] for e in x)
 
         # ensure num datapoints match across input types
         all_names = self.X_NAMES + self.Y_NAMES
@@ -79,7 +75,7 @@ class XYCsvDataset(Dataset):
             s = ', '.join([f'{name}: {l}' for name, l in zip(all_names, df_lens)])
             raise ValueError(f"Found mismatched datapoint counts across input types: {s}.")
 
-        # ensure num rows match within each set
+        # ensure num rows match within each datapoint
         for i, (x_df_set, y_df_set) in enumerate(zip(self._x_df_sets, self._y_df_sets)):
             all_dfs = x_df_set + y_df_set
             lens = [len(df) for df in all_dfs]

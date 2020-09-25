@@ -2,6 +2,9 @@
 .DS_Store
 python/probably_trash
 python/output
+data/images
+python/tablestakes/ml/lightning_logs/
+*.pdf
 
 python/tablestakes/scripts/generate_ocrd_doc_2/docs/
 

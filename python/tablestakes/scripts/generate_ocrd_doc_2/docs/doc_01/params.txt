@@ -1,1 +1,0 @@
-{'seed': 43, 'dpi': 500, 'margin': '1in', 'page_size': 'LETTER'}

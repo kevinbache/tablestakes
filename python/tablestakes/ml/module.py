@@ -1,28 +1,52 @@
 import math
+from typing import List, Any
+
+import utils
 
 import numpy as np
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import utils
+import pytorch_lightning as pl
+
 from tablestakes.ml import data
 from tablestakes.ml.hyperparams import MyHyperparams
 from torch import optim
 from torch.utils.data import DataLoader
 
-import pytorch_lightning as pl
+from pytorch_lightning.metrics import TensorMetric
+
+
+class WordAccuracy(TensorMetric):
+    def __init__(
+            self,
+            reduce_group: Any = None,
+            reduce_op: Any = None,
+    ):
+        super().__init__('word_acc', reduce_group, reduce_op)
+
+    def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        is_correct = target == torch.argmax(pred, dim=-1)
+        return is_correct.float().mean()
 
 
 class TrapezoidConv1Module(pl.LightningModule):
+    Y_NAMES = ['korv', 'which_kv']
+    LOSS_VAL_NAME = 'loss'
+    WORD_ACC_VAL_NAME = 'word_acc'
+
     def __init__(
             self,
             hp: MyHyperparams,
     ):
         super().__init__()
 
+        self.metrics = [WordAccuracy()]
+
         self.hp = hp
-        self.ds = data.XYCsvDataset(self.hp.data_dir, ys_postproc=lambda ys: [y[0] for y in ys])
+        # self.ds = data.XYCsvDataset(self.hp.data_dir, ys_postproc=lambda ys: [y[0] for y in ys])
+        self.ds = data.XYCsvDataset(self.hp.data_dir)
 
         self.hp.num_x_dims = self.ds.num_x_dims
         self.hp.num_y_dims = self.ds.num_y_dims
@@ -84,16 +108,21 @@ class TrapezoidConv1Module(pl.LightningModule):
             if not fc_ind % hp.num_fc_layers_per_dropout:
                 fc_layers.append(nn.Dropout(p=hp.dropout_p))
 
-        # output
-        fc_layers.append(nn.Conv1d(prev_num_neurons, self.hp.num_y_dims[0], 1))
-
         self.fc_layers = nn.ModuleList(fc_layers)
+
+        # output
+        self.heads = nn.ModuleList([
+            nn.Conv1d(prev_num_neurons, self.hp.num_y_dims[0], 1),
+            nn.Conv1d(prev_num_neurons, self.hp.num_y_dims[1], 1),
+        ])
 
     def forward(self, x):
         x_base, vocab_ids = x
         emb = self.embedder(vocab_ids)
+        # squeeze out the "time" dimension we expect for language models
         emb = emb.squeeze(2)
 
+        # batch x word x feature --> batch x feature x word
         x = torch.cat([x_base.float(), emb], dim=-1).permute([0, 2, 1])
         for layer in self.conv_layers:
             x = layer(x)
@@ -101,43 +130,67 @@ class TrapezoidConv1Module(pl.LightningModule):
         for layer in self.fc_layers:
             x = layer(x)
 
-        x = x.permute([0, 2, 1])
-        return x
+        y_hats = [layer(x).permute([0, 2, 1]) for layer in self.heads]
 
-    def _inner_forward_step(self, batch, name):
-        x, y = batch
-        y = y.argmax(dim=-1)
-        y_hat = self(x)
-        loss = F.cross_entropy(y_hat.squeeze(0), y.squeeze(0))
-        return x, y, y_hat, loss
+        return y_hats
 
-    def _inner_valid_step(self, y, y_hat):
-        is_correct = y == torch.argmax(y_hat, dim=-1)
-        word_acc = is_correct.float().mean().item()
-        return word_acc
+    def _inner_forward_step(self, batch):
+        xs, ys = batch
+        for y in ys:
+            print(y.shape)
+        ys = [y.argmax(dim=-1) for y in ys]
+        for y in ys:
+            print(y.shape)
+        print('y')
+        print(ys)
+        y_hats = self(xs)
 
-    # TODO: yuck!
-    TRAIN_LOSS_NAME = 'train_loss'
-    TRAIN_WORD_ACC_NAME = 'acc'
+        losses = torch.tensor([
+            F.cross_entropy(y_hat.squeeze(0), y.squeeze(0))
+            for y, y_hat in zip(ys, y_hats)
+        ])
+
+        loss = losses.dot(torch.tensor(hp.loss_weights, dtype=torch.float))
+
+        return xs, ys, y_hats, losses, loss
+
+    TRAIN_PHASE_NAME = 'train'
+    VALID_PHASE_NAME = 'valid'
+    TEST_PHASE_NAME = 'test'
+
+    @staticmethod
+    def _make_log_name(phase_name: str, metric_name: str):
+        return f'{phase_name}_{metric_name}'
+
+    @staticmethod
+    def _make_metrics_dict(y, y_hat, do_include_logs=True):
+        out = {}
+        if do_include_logs:
+            logs = {}
+
+    # def _make_losses_dict(self):
+
     def training_step(self, batch, batch_idx):
         """
         Lightning calls this inside the training loop with the data from the training dataloader
         passed in as `batch`.
         """
-        x, y, y_hat, loss = self._inner_forward_step(batch, 'train')
-        word_acc = self._inner_valid_step(y, y_hat)
-        logs = {self.TRAIN_LOSS_NAME: loss, self.TRAIN_WORD_ACC_NAME: word_acc}
-        return {'loss': loss, 'log': logs, 'progress_bar': logs}
+        xs, ys, y_hats, losses, loss = self._inner_forward_step(batch)
 
-    VALID_LOSS_NAME = 'val_loss'
-    VALID_WORD_ACC_NAME = 'val_word_acc'
+        word_acc = self._calculate_word_acc(ys, y_hats)
+
+        logs = {self.TRAIN_LOSS_NAME: losses, self.TRAIN_WORD_ACC_NAME: word_acc}
+        return {'loss': losses, 'log': logs, 'progress_bar': logs}
+
     def validation_step(self, batch, batch_idx):
         """
         Lightning calls this inside the validation loop with the data from the validation dataloader
         passed in as `batch`.
         """
-        x, y, y_hat, loss = self._inner_forward_step(batch, 'valid')
-        word_acc = self._inner_valid_step(y, y_hat)
+        phase = 'valid'
+
+        xs, ys, y_hats, loss = self._inner_forward_step(batch)
+        word_acc = self._calculate_word_acc(ys, y_hats)
         return {self.VALID_LOSS_NAME: loss, self.VALID_WORD_ACC_NAME: word_acc}
 
     def validation_epoch_end(self, outputs):
@@ -150,11 +203,9 @@ class TrapezoidConv1Module(pl.LightningModule):
         logs = {self.VALID_LOSS_NAME: loss, self.VALID_WORD_ACC_NAME: word_acc}
         return {'loss': loss, 'log': logs, 'progress_bar': logs}
 
-    TEST_LOSS_NAME = 'test_loss'
-    TEST_WORD_ACC_NAME = 'test_word_acc'
     def test_step(self, batch, batch_idx):
-        x, y, y_hat, loss = self._inner_forward_step(batch, 'test')
-        word_acc = self._inner_valid_step(y, y_hat)
+        x, y, y_hat, loss = self._inner_forward_step(batch)
+        word_acc = self._calculate_word_acc(y, y_hat)
         return {self.TEST_LOSS_NAME: loss, self.TEST_WORD_ACC_NAME: word_acc}
 
     def test_epoch_end(self, outputs):

@@ -5,7 +5,7 @@ import re
 import pandas as pd
 from nltk.tokenize import WordPunctTokenizer
 
-from tablestakes import color_matcher, ocr, utils, etree_modifiers
+from tablestakes import ocr, utils
 
 
 class DfModifier(abc.ABC):
@@ -28,68 +28,6 @@ class DfModifierStack:
                 df = mod(df)
 
         return df
-
-
-class ColSelector(DfModifier, abc.ABC):
-    def __init__(self):
-        self.col_names = []
-
-    @staticmethod
-    def _get_df(df, col_names):
-        return df[col_names].copy()
-
-
-class XMaker(ColSelector):
-    def __call__(self, df: pd.DataFrame) -> pd.DataFrame:
-        # don't include TEXT -- we're gonna use vocab id instead from the Vocabulizer but it's going in a separate df
-        self.col_names = [
-            ocr.OcrDfFactory.LEFT,
-            ocr.OcrDfFactory.RIGHT,
-            ocr.OcrDfFactory.TOP,
-            ocr.OcrDfFactory.BOTTOM,
-            ocr.OcrDfFactory.CONFIDENCE,
-        ]
-        self.col_names += [c for c in df.columns if c.startswith(CharCounter.PREFIX)]
-
-        return self._get_df(df, self.col_names)
-
-
-class XVocabMaker(ColSelector):
-    def __call__(self, df: pd.DataFrame) -> pd.DataFrame:
-        self.col_names = [Vocabulizer.VOCAB_NAME]
-        return self._get_df(df, self.col_names)
-
-
-class YMaker(ColSelector):
-    def __init__(self, do_include_key_value_cols=True, do_include_field_id_cols=True):
-        super().__init__()
-        self.do_include_field_id_cols = do_include_field_id_cols
-        self.do_include_key_value_cols = do_include_key_value_cols
-
-    def __call__(self, df: pd.DataFrame) -> pd.DataFrame:
-        if self.do_include_key_value_cols:
-            # e.g.: 'isKey'
-            self.col_names.append(self.get_y_name(etree_modifiers.SetIsKeyOnWordsModifier.KEY_NAME))
-
-            # e.g.: 'isValue'
-            self.col_names.append(self.get_y_name(etree_modifiers.SetIsValueOnWordsModifier.KEY_NAME))
-
-        if self.do_include_field_id_cols:
-            # e.g.: 'kv_is_'.  for selecting 'kv_is_to_address, 'kv_is_sale_address', etc.
-            kv_is_prefix = etree_modifiers.ConvertParentClassNamesToWordAttribsModifier.TAG_PREFIX
-            self.col_names.extend([c for c in df.columns if c.startswith(kv_is_prefix)])
-
-        return self._get_df(df, self.col_names)
-
-
-class MetaMaker(ColSelector):
-    def __init__(self, ignore_cols: List[str]):
-        super().__init__()
-        self.ignore_cols = ignore_cols
-
-    def __call__(self, df: pd.DataFrame) -> pd.DataFrame:
-        self.col_names = [c for c in df.columns if c not in self.ignore_cols]
-        return self._get_df(df, self.col_names)
 
 
 class CharCounter(DfModifier):
@@ -208,17 +146,21 @@ class Vocabulizer(DfModifier):
     VOCAB_NAME = 'vocab_id'
 
     def __init__(self):
-        self.vocab = {}
+        self.word_to_id = {}
+        self.word_to_count = {}
 
     def __call__(self, df: pd.DataFrame) -> pd.DataFrame:
         for token in df[self.TEXT_NAME]:
-            if token not in self.vocab:
-                self.vocab[token] = len(self.vocab)
-        df[self.VOCAB_NAME] = df[self.TEXT_NAME].apply(lambda token: self.vocab[token])
+            if token not in self.word_to_id:
+                self.word_to_id[token] = len(self.word_to_id)
+                self.word_to_count[token] = 0
+            self.word_to_count[token] += 1
+        df[self.VOCAB_NAME] = df[self.TEXT_NAME].apply(lambda token: self.word_to_id[token])
+
         return df
 
     def get_vocab_size(self):
-        return len(self.vocab)
+        return len(self.word_to_id)
 
 
 if __name__ == '__main__':

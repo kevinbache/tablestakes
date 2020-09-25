@@ -1,3 +1,5 @@
+import numpy as np
+
 from chillpill import params
 
 
@@ -29,6 +31,8 @@ class MyHyperparams(params.ParameterSet):
     lr = 0.001
     momentum = 0.9
     limit_n_data = None
+
+    loss_weights = np.array([1, 1])
 
     num_epochs = 100
 

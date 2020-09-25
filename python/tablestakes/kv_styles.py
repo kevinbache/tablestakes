@@ -160,7 +160,6 @@ class TableKvGroup(KvGroup, abc.ABC):
             }),
         ])
         self.add_style(css)
-        print(self.get_css())
 
     @abc.abstractmethod
     def get_html(self):
