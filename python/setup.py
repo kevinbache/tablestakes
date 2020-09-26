@@ -38,7 +38,6 @@ setup(
     },
 
     install_requires=[
-        'joblib',
         'numpy',
         'scipy',
         'pandas',
@@ -48,8 +47,11 @@ setup(
         'faker',
         'lxml',
         'cssselect',
+        'pdf2image',
+        'pdfkit',
+        'wkhtmltopdf',
+        'pytesseract',
         'colorspacious',
-        'glasbey',
         'torch',
         'torchnlp',
         'pytorch-lightning',
