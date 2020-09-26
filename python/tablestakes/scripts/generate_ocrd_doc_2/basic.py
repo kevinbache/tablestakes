@@ -1,15 +1,5 @@
 from tablestakes import creators, kv_styles, html_css as hc, utils
 
-"""
-make a list of fields
-randomly choose them
-throw them into different groups
-groups are randomly laid out
-
-other elements
-table
-"""
-
 
 def make_doc(seed: int, num_extra_fields=50):
     utils.set_seed(seed)

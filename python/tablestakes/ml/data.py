@@ -23,7 +23,8 @@ class XYCsvDataset(Dataset):
             y.csv
     """
     X_NAMES = ['x.csv', 'x_vocab.csv']
-    Y_NAMES = ['y_korv.csv', 'y_which_kv.csv']
+    # Y_NAMES = ['y_korv_vect.csv', 'y_which_kv_vect.csv']
+    Y_NAMES = ['y_korv_vect.csv']
     DATAPOINT_DIR_NAME = '*'
 
     @staticmethod
@@ -32,7 +33,7 @@ class XYCsvDataset(Dataset):
 
     @classmethod
     def _find_files_matching_patterns(cls, data_dir: Union[Path, str], patterns: List[str]):
-        return [glob.glob(str(data_dir / Path(cls.DATAPOINT_DIR_NAME) / Path(p)), recursive=True) for p in patterns]
+        return [sorted(glob.glob(str(data_dir / Path(cls.DATAPOINT_DIR_NAME) / Path(p)), recursive=True)) for p in patterns]
 
     @staticmethod
     def _read_dfs(files):
@@ -42,11 +43,16 @@ class XYCsvDataset(Dataset):
     def turn_inside_out(list_of_lists):
         return list(zip(*list_of_lists))
 
-    def __init__(self, data_dir: Union[Path, str]):
+    def __init__(self, data_dir: Union[Path, str], limit_num_data=None):
         self.data_dir = Path(data_dir)
+        self.limit_num_data = limit_num_data
 
         self._x_filess = self._find_files_matching_patterns(self.data_dir, self.X_NAMES)
         self._y_filess = self._find_files_matching_patterns(self.data_dir, self.Y_NAMES)
+
+        if limit_num_data is not None:
+            self._x_filess = [file_set[:self.limit_num_data] for file_set in self._x_filess]
+            self._y_filess = [file_set[:self.limit_num_data] for file_set in self._y_filess]
 
         # before turn_inside_out, self._x_df_sets[0] = [
         #       [x_df_datapoint1, x_df_datapoint2, ...],
@@ -66,12 +72,11 @@ class XYCsvDataset(Dataset):
 
         self.num_x_dims = [x_input.shape[1] for x_input in self._x_df_sets[0]]
         self.num_y_dims = [y_input.shape[1] for y_input in self._y_df_sets[0]]
-        self.num_vocab = max([max(x_vocab) for _, x_vocab in self._xs]).item() + 1
 
         # ensure num datapoints match across input types
         all_names = self.X_NAMES + self.Y_NAMES
         df_lens = [(len(x_set), len(y_set)) for x_set, y_set in zip(self._x_df_sets, self._y_df_sets)]
-        if not all_same(df_lens):
+        if not self.all_same(df_lens):
             s = ', '.join([f'{name}: {l}' for name, l in zip(all_names, df_lens)])
             raise ValueError(f"Found mismatched datapoint counts across input types: {s}.")
 
@@ -80,7 +85,7 @@ class XYCsvDataset(Dataset):
             all_dfs = x_df_set + y_df_set
             lens = [len(df) for df in all_dfs]
 
-            if not all_same(lens):
+            if not self.all_same(lens):
                 s = ', '.join([f'{name}: {l}' for name, l in zip(all_names, lens)])
                 raise ValueError(f"Datapoint {i} had mismatched number of rows across files: {s}.")
 

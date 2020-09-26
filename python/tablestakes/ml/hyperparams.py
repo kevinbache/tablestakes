@@ -1,3 +1,4 @@
+from tablestakes import constants
 import numpy as np
 
 from chillpill import params
@@ -25,16 +26,19 @@ class MyHyperparams(params.ParameterSet):
     dropout_p = 0.5
 
     num_embedding_dim = 32
+    do_include_embeddings = False
 
     ##############
     # optimization
     lr = 0.001
-    momentum = 0.9
-    limit_n_data = None
 
-    loss_weights = np.array([1, 1])
+    # doesn't entirely work cause vocab recalc...
+    limit_num_data = None
 
-    num_epochs = 100
+    # korv, which_kv
+    loss_weights = np.array([1.0, 0.0])
+
+    num_epochs = 5
 
     ##############
     # data
@@ -43,6 +47,7 @@ class MyHyperparams(params.ParameterSet):
     batch_size_log2 = 0
     p_valid = 0.1
     p_test = 0.1
-    data_dir = '../scripts/generate_ocrd_doc_2/docs'
+    data_dir = constants.DOCS_DIR
 
+    # for data loading
     num_workers = 2

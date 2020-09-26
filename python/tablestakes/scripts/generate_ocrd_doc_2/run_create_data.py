@@ -1,13 +1,12 @@
 import multiprocessing
-from functools import partial
+
 from joblib import Parallel, delayed
-from pathlib import Path
 from typing import List
 
 import pandas as pd
 import numpy as np
 
-from tablestakes import utils, html_css as hc, etree_modifiers, ocr, color_matcher, df_modifiers
+from tablestakes import utils, html_css as hc, etree_modifiers, ocr, color_matcher, df_modifiers, constants
 from tablestakes.scripts.generate_ocrd_doc_2 import basic
 
 
@@ -24,6 +23,7 @@ def make_and_ocr_docs(doc_ind, settings):
         'dpi': settings.dpi,
         'margin': settings.margin,
         'page_size': settings.page_size.name,
+        'num_extra_fields': settings.num_extra_fields,
     }
     utils.save_json(params_file, params_dict)
 
@@ -43,6 +43,7 @@ def make_and_ocr_docs(doc_ind, settings):
         ],
     )
     doc = post_proc_stack(doc)
+
     ###################################
     # save html, pdf, words.csv files #
     ###################################
@@ -57,10 +58,12 @@ def make_and_ocr_docs(doc_ind, settings):
     words_df_file = output_dir / 'words.csv'
     words_df = df_saver.get_df()
     words_df.to_csv(words_df_file)
+
     ############################################
     # paint all words with solid colored boxes #
     ############################################
     doc = etree_modifiers.WordColorDocCssAdder(doc)(doc)
+
     ###################################
     # save colored html and pdf files #
     ###################################
@@ -73,6 +76,7 @@ def make_and_ocr_docs(doc_ind, settings):
         dpi=settings.dpi,
         pages_dirname='pages_colored',
     )
+
     ########################################
     # ocr the non-colored page image files #
     ########################################
@@ -142,9 +146,14 @@ def create_and_save_xy_csvs(ocr_df, ocr_df_file, words_df, colored_page_image_fi
 
     # torch.cross_entropy expects ys to be 1 dim categorical
     y_korv_vect = np.argmax(y_korv_df.values, axis=-1).astype(np.int)
+    y_korv_vect = pd.DataFrame(y_korv_vect, columns=['y_korv'])
+    y_korv_vect.to_csv(output_dir / 'y_korv_vect.csv', index=False)
+
     y_which_kv_vect = np.argmax(y_which_kv_df.values, axis=-1).astype(np.int)
-    np.savetxt(output_dir / 'y_korv_vect.csv', y_korv_vect, fmt='%d', delimiter=',')
-    np.savetxt(output_dir / 'y_which_kv_vect.csv', y_which_kv_vect, fmt='%d', delimiter=',')
+    y_which_kv_vect = pd.DataFrame(y_which_kv_vect, columns=['y_which_kv'])
+    y_which_kv_vect.to_csv(output_dir / 'y_which_kv_vect.csv', index=False)
+
+    return len(y_korv_cols), len(y_which_kv_cols)
 
 
 if __name__ == '__main__':
@@ -161,9 +170,9 @@ if __name__ == '__main__':
         window_height_px = dpi * page_size.height
 
         num_docs = 30
-        num_extra_fields = 20
+        num_extra_fields = 0
 
-        docs_dir = Path('.') / 'docs'
+        docs_dir = constants.DOCS_DIR
 
     doc_settings = DocSettings()
 
@@ -181,19 +190,21 @@ if __name__ == '__main__':
 
     # run the rest serially so vocabulizer is consistent across docs
     vocabulizer = df_modifiers.Vocabulizer()
+    num_korv_classes, num_which_kv_classes = None, None
     for ocr_output in ocr_outputs:
-        # print('*****************************')
-        # print('*****************************')
-        # print('*****************************')
-        # print(ocr_output)
-        # print('-------')
-        # for ind, e in enumerate(ocr_output):
-        #     print(type(e))
         doc_ind, ocr_df, ocr_df_file, words_df, colored_page_image_files, output_dir = ocr_output
-        print(doc_ind)
-        create_and_save_xy_csvs(ocr_df, ocr_df_file, words_df, colored_page_image_files, output_dir)
-    utils.save_json(doc_settings.docs_dir / 'word_to_id.txt', vocabulizer.word_to_id)
-    utils.save_json(doc_settings.docs_dir / 'word_to_count.txt', vocabulizer.word_to_count)
+        print(f'Starting to postproc doc {doc_ind}')
+        num_korv_classes, num_which_kv_classes = \
+            create_and_save_xy_csvs(ocr_df, ocr_df_file, words_df, colored_page_image_files, output_dir)
 
+    utils.save_json(doc_settings.docs_dir / 'word_to_id.json', vocabulizer.word_to_id)
+    utils.save_json(doc_settings.docs_dir / 'word_to_count.json', vocabulizer.word_to_count)
 
+    utils.save_json(
+        doc_settings.docs_dir / 'num_y_classes.json',
+        {
+            'korv': num_korv_classes,
+            'which_kv': num_which_kv_classes,
+        },
+    )
 
