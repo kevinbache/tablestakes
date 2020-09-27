@@ -2,8 +2,6 @@ import math
 from pathlib import Path
 from typing import Any, Optional, List, Dict, Union
 
-import utils
-
 import numpy as np
 
 import torch
@@ -14,7 +12,7 @@ from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from pytorch_lightning.metrics import TensorMetric, Metric
 
-from tablestakes import constants
+from tablestakes import constants, utils
 from tablestakes.ml import data
 from tablestakes.ml.hyperparams import MyHyperparams
 
@@ -23,9 +21,9 @@ class WordAccuracy(TensorMetric):
     def __init__(
             self,
             reduce_group: Any = None,
-            reduce_op: Any = None,
+            # reduce_op: Any = None,
     ):
-        super().__init__('word_acc', reduce_group, reduce_op)
+        super().__init__('word_acc', reduce_group)
 
     def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         is_correct = target.view(-1) == torch.argmax(pred, dim=-1).view(-1)
@@ -102,7 +100,7 @@ class TrapezoidConv1Module(pl.LightningModule):
             stop=hp.log2num_filters_end,
             num=hp.num_conv_layers,
             base=2,
-        ).astype(np.integer)
+        ).astype(np.int32)
 
         conv_layers = []
         prev_num_filters = hp.num_x_dims[0]
@@ -131,17 +129,19 @@ class TrapezoidConv1Module(pl.LightningModule):
             stop=hp.log2num_neurons_end,
             num=hp.num_fc_hidden_layers,
             base=2,
-        ).astype(np.integer)
+        ).astype(np.int32)
         for fc_ind, num_neurons in enumerate(num_fc_neurons):
             fc_layers.append(nn.Conv1d(prev_num_neurons, num_neurons, 1))
             fc_layers.append(nn.ReLU())
             prev_num_neurons = num_neurons
 
-            # TODO: reenable dropout
-            if not fc_ind % hp.num_fc_layers_per_dropout:
-                fc_layers.append(nn.Dropout(p=hp.dropout_p))
+            # # TODO: reenable dropout
+            # if not fc_ind % hp.num_fc_layers_per_dropout:
+            #     fc_layers.append(nn.Dropout(p=hp.dropout_p))
 
         self.fc_layers = nn.ModuleList(fc_layers)
+
+        self.loss_weights = torch.tensor(self.hp.loss_weights, dtype=torch.float)
 
         # output
         self.heads = nn.ModuleList([
@@ -181,47 +181,12 @@ class TrapezoidConv1Module(pl.LightningModule):
         xs, ys = batch
         y_hats = self(*xs)
 
-        # losses = []
-        # for y, y_hat in zip(ys, y_hats):
-        #     this_loss = F.cross_entropy(y_hat.squeeze(0), y.view(-1))
-        #     print(f'this_loss: {this_loss}')
-        #     losses.append(this_loss)
-        # losses = torch.tensor(losses, dtype=torch.float, requires_grad=True)
-        #
-        # # losses = torch.tensor([
-        # #     F.cross_entropy(y_hat.squeeze(0), y.view(-1))
-        # #     for y, y_hat in zip(ys, y_hats)
-        # # ], requires_grad=True)
-        # weights = torch.tensor(hp.loss_weights, dtype=torch.float, requires_grad=True)
-        # print()
-        # print('losses1:')
-        # print(losses)
-        # losses = torch.mul(losses, weights)
-        # print()
-        # print('losses2:')
-        # print(losses)
-        #
-        # loss = losses.sum()
-        # print('loss:')
-        # print(loss)
-
-        y = ys[0]
-        y_hat = y_hats[0]
-        # print('y.shape: ', y.shape)
-        # print('y_hat.shape: ', y_hat.shape)
-        # ysq = y.squeeze(2).squeeze(0)
-        # print('ysq.shape: ', ysq.shape)
-
-        weights = torch.tensor(self.hp.loss_weights, dtype=torch.float, requires_grad=False)
-        loss = torch.tensor([F.cross_entropy(y_hat.squeeze(0), y.view(-1)), torch.tensor([0])], requires_grad=True)
-        print()
-        print('loss1:', loss)
-        loss = weights * loss
-        print()
-        print('loss:2', loss)
-        print()
-        losses = torch.tensor([0, 0])
-        # print('losses:', losses)
+        losses = torch.stack([
+            F.cross_entropy(y_hat.squeeze(0), y.view(-1))
+            for y, y_hat in zip(ys, y_hats)
+        ])
+        losses = torch.mul(losses, self.loss_weights)
+        loss = losses.sum()
 
         return xs, ys, y_hats, losses, loss
 

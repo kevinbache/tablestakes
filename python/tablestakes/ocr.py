@@ -55,6 +55,8 @@ class TesseractOcrProvider(OcrProvider):
     def _ocr_page_image(self, image: Image) -> pd.DataFrame:
         return pytesseract.image_to_data(
             image=image,
+            lang='eng',
+            config=r'-c tessedit_do_invert=0',
             output_type=pytesseract.Output.DATAFRAME,
         )
 

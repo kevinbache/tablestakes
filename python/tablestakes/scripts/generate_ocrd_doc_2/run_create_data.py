@@ -1,4 +1,12 @@
 import multiprocessing
+import os
+
+num_jobs = multiprocessing.cpu_count() - 1
+print(f'num_jobs: {num_jobs}')
+
+# https://tesseract-ocr.github.io/tessdoc/FAQ#can-i-increase-speed-of-ocr
+os.environ["OMP_THREAD_LIMIT"] = f'{num_jobs}'
+
 
 from joblib import Parallel, delayed
 from typing import List
@@ -157,6 +165,8 @@ def create_and_save_xy_csvs(ocr_df, ocr_df_file, words_df, colored_page_image_fi
 
 
 if __name__ == '__main__':
+    # https://tesseract-ocr.github.io/tessdoc/FAQ#can-i-increase-speed-of-ocr
+
     ##############
     # Parameters #
     ##############
@@ -170,7 +180,7 @@ if __name__ == '__main__':
         window_height_px = dpi * page_size.height
 
         num_docs = 30
-        num_extra_fields = 0
+        num_extra_fields = 20
 
         docs_dir = constants.DOCS_DIR
 
@@ -182,9 +192,6 @@ if __name__ == '__main__':
         doc_settings.num_extra_fields = 2
         doc_settings.num_docs = 4
 
-    # run ocr in parallel because it's slow
-    num_jobs = multiprocessing.cpu_count() - 1
-    print(f'num_jobs: {num_jobs}')
     ocr_func = lambda doc_ind: make_and_ocr_docs(doc_ind, doc_settings)
     ocr_outputs = Parallel(n_jobs=num_jobs)(delayed(ocr_func)(doc_ind) for doc_ind in range(doc_settings.num_docs))
 

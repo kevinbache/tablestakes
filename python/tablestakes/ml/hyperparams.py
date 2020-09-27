@@ -26,7 +26,7 @@ class MyHyperparams(params.ParameterSet):
     dropout_p = 0.5
 
     num_embedding_dim = 32
-    do_include_embeddings = False
+    do_include_embeddings = True
 
     ##############
     # optimization
@@ -38,7 +38,7 @@ class MyHyperparams(params.ParameterSet):
     # korv, which_kv
     loss_weights = np.array([1.0, 0.0])
 
-    num_epochs = 5
+    num_epochs = 10
 
     ##############
     # data
