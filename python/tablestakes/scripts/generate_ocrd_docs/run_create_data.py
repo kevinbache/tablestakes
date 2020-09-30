@@ -1,7 +1,7 @@
 import multiprocessing
 import os
 
-from tablestakes.ocr import TesseractOcrProvider
+from tablestakes.constants import Y_KORV_NAME, Y_WHICH_KV_NAME, X_BASIC_NAME, X_VOCAB_NAME
 
 num_jobs = multiprocessing.cpu_count() - 1
 print(f'num_jobs: {num_jobs}')
@@ -13,11 +13,8 @@ os.environ["OMP_THREAD_LIMIT"] = f'{num_jobs}'
 
 from joblib import Parallel, delayed
 
-import pandas as pd
-import numpy as np
-
 from tablestakes import utils, html_css as hc, etree_modifiers, ocr, color_matcher, df_modifiers, constants
-from tablestakes.scripts.generate_ocrd_doc_2 import basic
+from tablestakes.scripts.generate_ocrd_docs import basic
 
 
 def make_and_ocr_docs(doc_ind, settings):
@@ -113,7 +110,8 @@ def create_and_save_xy_csvs(
         words_df,
         colored_page_image_files,
         this_doc_dir,
-        min_count_to_keep_word=2,
+        vocabulizer: df_modifiers.Vocabulizer,
+        rare_word_eliminator: df_modifiers.RareWordEliminator,
 ):
     ##########################################
     # match ocr words to true words by color #
@@ -124,21 +122,22 @@ def create_and_save_xy_csvs(
     joined_df.to_csv(joined_dir / 'joined.csv')
     # ocr_df gets the join word_id columns added in WordColorMatcher.get_joined_df
     ocr_df.to_csv(ocr_df_file)
-    # Tokenizer change the number of rows of the DF if there are any rows with multi-word text
-
-    vocabulizer = df_modifiers.Vocabulizer()
-    rare_word_eliminator = df_modifiers.RareWordEliminator(vocabulizer=vocabulizer, min_count=min_count_to_keep_word)
+    # Tokenizer changes the number of rows of the DF if there are any rows with multi-word text
 
     joined_df = df_modifiers.DfModifierStack([
         df_modifiers.Tokenizer(),
-        vocabulizer,
-        rare_word_eliminator,
         df_modifiers.CharCounter(),
         df_modifiers.DetailedOtherCharCounter(),
+        df_modifiers.TokenPostProcessor(),
+        vocabulizer,
+    ])(joined_df)
+
+    joined_df = df_modifiers.DfModifierStack([
+        rare_word_eliminator,
     ])(joined_df)
 
     x_base_cols = [
-        TesseractOcrProvider.PAGE_NUM_COL_NAME,
+        ocr.TesseractOcrProvider.PAGE_NUM_COL_NAME,
         ocr.OcrDfNames.LEFT,
         ocr.OcrDfNames.RIGHT,
         ocr.OcrDfNames.TOP,
@@ -167,7 +166,7 @@ def create_and_save_xy_csvs(
         joined_df,
         [x_base_cols, x_vocab_cols, y_korv_cols, y_which_kv_cols],
         do_output_leftovers_df=True,
-        names=['x_base', 'x_vocab', 'y_korv', 'y_which_kv', 'meta'],
+        names=[X_BASIC_NAME, X_VOCAB_NAME, Y_KORV_NAME, Y_WHICH_KV_NAME, 'meta'],
     )
     Y_PREFIX = 'y_'
     for name, df in data_dfs.items():
@@ -198,7 +197,7 @@ if __name__ == '__main__':
         window_width_px = dpi * page_size.width
         window_height_px = dpi * page_size.height
 
-        num_docs = 1000
+        num_docs = 100
         num_extra_fields = 0
         do_randomize_field_order = True
 
@@ -222,8 +221,9 @@ if __name__ == '__main__':
 
     # run the rest serially so vocabulizer is consistent across docs
     num_korv_classes, num_which_kv_classes = None, None
-    vocabulizer = None
-    rare_word_eliminator = None
+    vocabulizer = df_modifiers.Vocabulizer()
+    rare_word_eliminator = \
+        df_modifiers.RareWordEliminator(vocabulizer=vocabulizer, min_count=doc_settings.min_count_to_keep_word)
     for ocr_output in ocr_outputs:
         doc_ind, ocr_df, ocr_df_file, words_df, colored_page_image_files, this_doc_dir = ocr_output
         print(f'Starting to postproc doc {doc_ind}')
@@ -234,7 +234,8 @@ if __name__ == '__main__':
                 words_df,
                 colored_page_image_files,
                 this_doc_dir,
-                doc_settings.min_count_to_keep_word,
+                vocabulizer,
+                rare_word_eliminator,
             )
 
     utils.save_json(doc_settings.docs_dir / 'word_to_id_pre_elimination.json', vocabulizer.word_to_id)

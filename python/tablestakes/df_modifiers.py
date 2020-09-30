@@ -40,7 +40,7 @@ class CharCounter(DfModifier):
     TOTAL_COUNT_NAME = f'{PREFIX}total'
 
     def __call__(self, df: pd.DataFrame) -> pd.DataFrame:
-        TOKEN_COL_NAME = Tokenizer.TOKEN_COL_NAME
+        TOKEN_COL_NAME = Tokenizer.TOKEN_NON_LOWERCASED_COL_NAME
 
         df[self.LOWER_COUNT_NAME] = df.apply(lambda row: sum(c.islower() for c in row[TOKEN_COL_NAME]), axis=1)
         totals = df[self.LOWER_COUNT_NAME].copy()
@@ -63,7 +63,7 @@ class DetailedOtherCharCounter(DfModifier):
     CHARS_TO_CHECK = r"""~!@#$%^&*()_+{}[]\|;:"',.?<>/"""
 
     def __call__(self, df: pd.DataFrame) -> pd.DataFrame:
-        TOKEN_COL_NAME = Tokenizer.TOKEN_COL_NAME
+        TOKEN_COL_NAME = Tokenizer.TOKEN_NON_LOWERCASED_COL_NAME
 
         for c in self.CHARS_TO_CHECK:
             attrib_name = self.COUNT_TEMPLATE.format(c)
@@ -77,29 +77,16 @@ class DetailedOtherCharCounter(DfModifier):
 
 class Tokenizer(DfModifier):
     """Break whitespace separated strings into multiple rows."""
-    NUMBER_REGEX = r'\d+'
-    NUMBER_TOKEN = r'<NUMBER>'
     ORIGINAL_INDEX_COL_NAME = 'pre_tokenized_row_index'
 
     ORIGINAL_TEXT_COL_NAME = ocr.OcrDfNames.TEXT
-    TOKEN_COL_NAME = 'token'
+    TOKEN_NON_LOWERCASED_COL_NAME = 'token_non_lowercased'
 
     def __init__(self):
         self.tokenizer = WordPunctTokenizer()
 
     def _tokenize(self, s: str) -> List[str]:
-        try:
-            tokens = self.tokenizer.tokenize(s)
-        except Exception as e:
-            print(s)
-            print(type(s))
-            raise e
-
-        return [
-            self.NUMBER_TOKEN if re.match(self.NUMBER_REGEX, token)
-            else token
-            for token in tokens
-        ]
+        return self.tokenizer.tokenize(s)
 
     @staticmethod
     def _break_up_bounding_box(bbox, tokens):
@@ -139,7 +126,7 @@ class Tokenizer(DfModifier):
             bboxes = self._break_up_bounding_box(bbox, tokens)
             for token, bbox in zip(tokens, bboxes):
                 row_copy = row.copy()
-                row_copy[self.TOKEN_COL_NAME] = token
+                row_copy[self.TOKEN_NON_LOWERCASED_COL_NAME] = token
                 row_copy[bbox_names] = bbox
                 row_copy[self.ORIGINAL_INDEX_COL_NAME] = index
                 tokenized_rows.append(row_copy)
@@ -148,10 +135,23 @@ class Tokenizer(DfModifier):
         return out_df
 
 
+class TokenPostProcessor(DfModifier):
+    TOKEN_NON_LOWERCASED_COL_NAME = Tokenizer.TOKEN_NON_LOWERCASED_COL_NAME
+    TOKEN_COL_NAME = 'token'
+
+    NUMBER_REGEX = r'\d+'
+    NUMBER_TOKEN = r'<NUMBER>'
+
+    def __call__(self, df: pd.DataFrame) -> pd.DataFrame:
+        df[self.TOKEN_COL_NAME] = df[self.TOKEN_NON_LOWERCASED_COL_NAME].apply(
+            lambda token: self.NUMBER_TOKEN if re.match(self.NUMBER_REGEX, token) else token.lower()
+        )
+        return df
+
+
 class Vocabulizer(DfModifier):
     """Convert tokens to vocab ids."""
-
-    TOKEN_COL_NAME = Tokenizer.TOKEN_COL_NAME
+    TOKEN_COL_NAME = TokenPostProcessor.TOKEN_COL_NAME
     VOCAB_ID_PRE_ELIMINATION_COL_NAME = 'vocab_id_pre_elimination'
 
     def __init__(self):
@@ -164,7 +164,8 @@ class Vocabulizer(DfModifier):
                 self.word_to_id[token] = len(self.word_to_id)
                 self.word_to_count[token] = 0
             self.word_to_count[token] += 1
-        df[self.VOCAB_ID_PRE_ELIMINATION_COL_NAME] = df[self.TOKEN_COL_NAME].apply(lambda token: self.word_to_id[token])
+        df[self.VOCAB_ID_PRE_ELIMINATION_COL_NAME] = \
+            df[self.TOKEN_COL_NAME].apply(lambda token: self.word_to_id[token])
 
         return df
 
@@ -182,12 +183,16 @@ class RareWordEliminator(DfModifier):
         self.vocabulizer = vocabulizer
 
     def __call__(self, df: pd.DataFrame) -> pd.DataFrame:
-        TOKEN_COL_NAME = Tokenizer.TOKEN_COL_NAME
+        TOKEN_COL_NAME = TokenPostProcessor.TOKEN_COL_NAME
         VOCAB_COL_NAME = self.VOCAB_ID_COL_NAME
 
         counts = self.vocabulizer.word_to_count
-        self.word_to_count = {k: v for k, v in counts.items() if v >= self.min_count}
-        self.word_to_id = {k: index for index, k, in enumerate(self.word_to_count.keys()) if k in self.word_to_count}
+        self.word_to_count = {k: v for k, v in sorted(counts.items()) if v >= self.min_count}
+        self.word_to_id = {
+            k: index
+            for index, k, in enumerate(self.word_to_count.keys())
+            if k in self.word_to_count
+        }
 
         unknown_id = len(self.word_to_id)
         self.word_to_id[self.UNKNOWN_TOKEN] = unknown_id
@@ -197,7 +202,6 @@ class RareWordEliminator(DfModifier):
         df[VOCAB_COL_NAME] = df[TOKEN_COL_NAME].apply(
             lambda token: self.word_to_id[token] if token in self.word_to_id else unknown_id,
         )
-
 
         df[self.WORD_WAS_ELIMINATED_COL_NAME] = (df[VOCAB_COL_NAME] == unknown_id).astype(np.int)
 

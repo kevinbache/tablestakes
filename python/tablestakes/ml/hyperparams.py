@@ -18,7 +18,7 @@ class MyHyperparams(params.ParameterSet):
     num_trans_heads = 8
     num_trans_fc_units = 2048
 
-    do_include_batch_norm = True
+    do_cat_x_base_before_fc = True
 
     #  fully connected
     num_fc_hidden_layers = 3
@@ -37,7 +37,7 @@ class MyHyperparams(params.ParameterSet):
     limit_num_data = None
 
     # korv, which_kv
-    loss_weights = np.array([0.0, 1.0])
+    loss_weights = np.array([0.3, 1.0])
     # loss_weights = np.array([1.0, 0.0])
 
     num_epochs = 50
