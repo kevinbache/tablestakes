@@ -23,8 +23,8 @@ class XYCsvDataset(Dataset):
             y.csv
     """
     X_NAMES = ['x.csv', 'x_vocab.csv']
-    # Y_NAMES = ['y_korv_vect.csv', 'y_which_kv_vect.csv']
-    Y_NAMES = ['y_korv_vect.csv']
+    Y_NAMES = ['y_korv_vect.csv', 'y_which_kv_vect.csv']
+    # Y_NAMES = ['y_korv_vect.csv']
     DATAPOINT_DIR_NAME = '*'
 
     @staticmethod

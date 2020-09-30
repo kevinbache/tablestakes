@@ -1,15 +1,17 @@
 import multiprocessing
 import os
 
+from tablestakes.ocr import TesseractOcrProvider
+
 num_jobs = multiprocessing.cpu_count() - 1
 print(f'num_jobs: {num_jobs}')
 
 # https://tesseract-ocr.github.io/tessdoc/FAQ#can-i-increase-speed-of-ocr
+# doesn't do much since we're already doing process parallelizations
+# 7.5 sec / page -> 6.5 sec / page
 os.environ["OMP_THREAD_LIMIT"] = f'{num_jobs}'
 
-
 from joblib import Parallel, delayed
-from typing import List
 
 import pandas as pd
 import numpy as np
@@ -21,17 +23,18 @@ from tablestakes.scripts.generate_ocrd_doc_2 import basic
 def make_and_ocr_docs(doc_ind, settings):
     print(f"STARTING TO CREATE DOC {doc_ind}")
     seed = settings.seed_start + doc_ind
-    doc = basic.make_doc(seed, settings.num_extra_fields)
-    output_dir = settings.docs_dir / f'doc_{doc_ind:02d}'
-    utils.mkdir_if_not_exist(output_dir)
+    doc = basic.make_doc(seed, settings.num_extra_fields, do_randomize_field_order=settings.do_randomize_field_order)
+    this_doc_dir = settings.docs_dir / f'doc_{doc_ind:02d}'
+    utils.mkdir_if_not_exist(this_doc_dir)
 
-    params_file = output_dir / 'params.txt'
+    params_file = this_doc_dir / 'params.txt'
     params_dict = {
         'seed': seed,
         'dpi': settings.dpi,
         'margin': settings.margin,
         'page_size': settings.page_size.name,
         'num_extra_fields': settings.num_extra_fields,
+        'min_count_to_keep_word': settings.min_count_to_keep_word,
     }
     utils.save_json(params_file, params_dict)
 
@@ -55,15 +58,17 @@ def make_and_ocr_docs(doc_ind, settings):
     ###################################
     # save html, pdf, words.csv files #
     ###################################
-    doc_html_file = output_dir / 'doc.html'
-    doc_pdf_file = output_dir / 'doc.pdf'
+    raw_dir = this_doc_dir / '0.raw'
+    utils.mkdir_if_not_exist(raw_dir)
+    doc_html_file = raw_dir / 'doc.html'
+    doc_pdf_file = raw_dir / 'doc.pdf'
     doc.save_html(doc_html_file)
     page_image_files = doc.save_pdf(
         doc_pdf_file,
         do_save_page_images_too=True,
         dpi=settings.dpi,
     )
-    words_df_file = output_dir / 'words.csv'
+    words_df_file = raw_dir / 'words.csv'
     words_df = df_saver.get_df()
     words_df.to_csv(words_df_file)
 
@@ -75,8 +80,10 @@ def make_and_ocr_docs(doc_ind, settings):
     ###################################
     # save colored html and pdf files #
     ###################################
-    colored_doc_html_file = output_dir / 'doc_colored.html'
-    colored_doc_pdf_file = output_dir / 'doc_colored.pdf'
+    colored_dir = this_doc_dir / '1.colored'
+    utils.mkdir_if_not_exist(colored_dir)
+    colored_doc_html_file = colored_dir / 'doc_colored.html'
+    colored_doc_pdf_file = colored_dir / 'doc_colored.pdf'
     doc.save_html(colored_doc_html_file)
     colored_page_image_files = doc.save_pdf(
         colored_doc_pdf_file,
@@ -88,80 +95,90 @@ def make_and_ocr_docs(doc_ind, settings):
     ########################################
     # ocr the non-colored page image files #
     ########################################
+    ocr_dir = this_doc_dir / '2.ocr'
+    utils.mkdir_if_not_exist(ocr_dir)
     ocr_df = ocr.TesseractOcrProvider().ocr(
         page_image_files=page_image_files,
-        save_raw_ocr_output_location=output_dir / 'ocr_raw.csv',
+        save_raw_ocr_output_location=ocr_dir / 'ocr_raw.csv',
     )
-    ocr_df_file = output_dir / 'ocr.csv'
+    ocr_df_file = ocr_dir / 'ocr.csv'
     ocr_df.to_csv(ocr_df_file)
 
-    return doc_ind, ocr_df, ocr_df_file, words_df, colored_page_image_files, output_dir
+    return doc_ind, ocr_df, ocr_df_file, words_df, colored_page_image_files, this_doc_dir
 
 
-def _split_df_by_cols(df: pd.DataFrame, col_sets: List[List[str]], do_output_leftovers_df=True):
-    if do_output_leftovers_df:
-        # flat list
-        used_cols = [col_name for col_set in col_sets for col_name in col_set]
-        leftover_cols = [col_name for col_name in df.columns if col_name not in used_cols]
-        col_sets.append(leftover_cols)
-
-    return [df[col_set].copy() for col_set in col_sets]
-
-
-def create_and_save_xy_csvs(ocr_df, ocr_df_file, words_df, colored_page_image_files, output_dir):
+def create_and_save_xy_csvs(
+        ocr_df,
+        ocr_df_file,
+        words_df,
+        colored_page_image_files,
+        this_doc_dir,
+        min_count_to_keep_word=2,
+):
     ##########################################
     # match ocr words to true words by color #
     ##########################################
+    joined_dir = this_doc_dir / '3.joined'
+    utils.mkdir_if_not_exist(joined_dir)
     joined_df = color_matcher.WordColorMatcher.get_joined_df(ocr_df, words_df, colored_page_image_files)
-    joined_df.to_csv(output_dir / 'joined.csv')
+    joined_df.to_csv(joined_dir / 'joined.csv')
     # ocr_df gets the join word_id columns added in WordColorMatcher.get_joined_df
     ocr_df.to_csv(ocr_df_file)
     # Tokenizer change the number of rows of the DF if there are any rows with multi-word text
+
+    vocabulizer = df_modifiers.Vocabulizer()
+    rare_word_eliminator = df_modifiers.RareWordEliminator(vocabulizer=vocabulizer, min_count=min_count_to_keep_word)
+
     joined_df = df_modifiers.DfModifierStack([
         df_modifiers.Tokenizer(),
         vocabulizer,
+        rare_word_eliminator,
         df_modifiers.CharCounter(),
         df_modifiers.DetailedOtherCharCounter(),
     ])(joined_df)
-    x_cols = [
-        ocr.OcrDfFactory.LEFT,
-        ocr.OcrDfFactory.RIGHT,
-        ocr.OcrDfFactory.TOP,
-        ocr.OcrDfFactory.BOTTOM,
-        ocr.OcrDfFactory.CONFIDENCE,
+
+    x_base_cols = [
+        TesseractOcrProvider.PAGE_NUM_COL_NAME,
+        ocr.OcrDfNames.LEFT,
+        ocr.OcrDfNames.RIGHT,
+        ocr.OcrDfNames.TOP,
+        ocr.OcrDfNames.BOTTOM,
+        ocr.OcrDfNames.CONFIDENCE,
+        color_matcher.WordColorMatcher.PAGE_HEIGHT_COL_NAME,
+        color_matcher.WordColorMatcher.PAGE_WIDTH_COL_NAME,
+        color_matcher.WordColorMatcher.NUM_PAGES_COL_NAME,
+        df_modifiers.RareWordEliminator.WORD_WAS_ELIMINATED_COL_NAME,
     ]
-    x_cols += [c for c in joined_df.columns if c.startswith(df_modifiers.CharCounter.PREFIX)]
-    x_vocab_cols = [df_modifiers.Vocabulizer.VOCAB_NAME]
-    # y_do_include_key_value_cols = True
-    # y_do_include_field_id_cols = True
+    x_base_cols += [c for c in joined_df.columns if c.startswith(df_modifiers.CharCounter.PREFIX)]
+
+    x_vocab_cols = [df_modifiers.RareWordEliminator.VOCAB_ID_COL_NAME]
+
     y_korv_cols = [
         etree_modifiers.SetIsKeyOnWordsModifier.KEY_NAME,
         etree_modifiers.SetIsValueOnWordsModifier.KEY_NAME
     ]
-    is_kv_prefix = etree_modifiers.ConvertParentClassNamesToWordAttribsModifier.TAG_PREFIX
-    y_which_kv_cols = [c for c in joined_df.columns if c.startswith(is_kv_prefix)]
+    which_kv_prefix = etree_modifiers.ConvertParentClassNamesToWordAttribsModifier.TAG_PREFIX
+    y_which_kv_cols = [c for c in joined_df.columns if c.startswith(which_kv_prefix)]
 
-    x_df, x_vocab_df, y_korv_df, y_which_kv_df, meta_df = _split_df_by_cols(
+    final_data_dir = this_doc_dir / '4.data'
+    utils.mkdir_if_not_exist(final_data_dir)
+
+    data_dfs = utils.split_df_by_cols(
         joined_df,
-        [x_cols, x_vocab_cols, y_korv_cols, y_which_kv_cols],
+        [x_base_cols, x_vocab_cols, y_korv_cols, y_which_kv_cols],
         do_output_leftovers_df=True,
+        names=['x_base', 'x_vocab', 'y_korv', 'y_which_kv', 'meta'],
     )
-    x_df.to_csv(output_dir / 'x.csv', index=False)
-    x_vocab_df.to_csv(output_dir / 'x_vocab.csv', index=False)
-    y_korv_df.to_csv(output_dir / 'y_korv.csv', index=False)
-    y_which_kv_df.to_csv(output_dir / 'y_which_kv.csv', index=False)
-    meta_df.to_csv(output_dir / 'meta.csv', index=False)
+    Y_PREFIX = 'y_'
+    for name, df in data_dfs.items():
+        if name.startswith(Y_PREFIX):
+            utils.one_hot_to_categorical(df, name).to_csv(final_data_dir / f'{name}.csv', index=False)
+            short_name = name[len(Y_PREFIX):]
+            df.to_csv(final_data_dir / f'{short_name}_onehot.csv', index=False)
+        else:
+            df.to_csv(final_data_dir / f'{name}.csv', index=False)
 
-    # torch.cross_entropy expects ys to be 1 dim categorical
-    y_korv_vect = np.argmax(y_korv_df.values, axis=-1).astype(np.int)
-    y_korv_vect = pd.DataFrame(y_korv_vect, columns=['y_korv'])
-    y_korv_vect.to_csv(output_dir / 'y_korv_vect.csv', index=False)
-
-    y_which_kv_vect = np.argmax(y_which_kv_df.values, axis=-1).astype(np.int)
-    y_which_kv_vect = pd.DataFrame(y_which_kv_vect, columns=['y_which_kv'])
-    y_which_kv_vect.to_csv(output_dir / 'y_which_kv_vect.csv', index=False)
-
-    return len(y_korv_cols), len(y_which_kv_cols)
+    return len(y_korv_cols), len(y_which_kv_cols), vocabulizer, rare_word_eliminator
 
 
 if __name__ == '__main__':
@@ -176,13 +193,18 @@ if __name__ == '__main__':
         margin = '1in'
         page_size = hc.PageSize.LETTER
 
+        min_count_to_keep_word = 2
+
         window_width_px = dpi * page_size.width
         window_height_px = dpi * page_size.height
 
-        num_docs = 30
-        num_extra_fields = 20
+        num_docs = 1000
+        num_extra_fields = 0
+        do_randomize_field_order = True
 
         docs_dir = constants.DOCS_DIR
+
+    do_regen_docs = True
 
     doc_settings = DocSettings()
 
@@ -190,22 +212,35 @@ if __name__ == '__main__':
     if fast_test:
         doc_settings.dpi = 100
         doc_settings.num_extra_fields = 2
-        doc_settings.num_docs = 4
+        doc_settings.num_docs = 10
+
+    doc_settings.docs_dir /= f'num={doc_settings.num_docs}_extra={doc_settings.num_extra_fields}'
+    print(f'Saving to {str(doc_settings.docs_dir)}')
 
     ocr_func = lambda doc_ind: make_and_ocr_docs(doc_ind, doc_settings)
     ocr_outputs = Parallel(n_jobs=num_jobs)(delayed(ocr_func)(doc_ind) for doc_ind in range(doc_settings.num_docs))
 
     # run the rest serially so vocabulizer is consistent across docs
-    vocabulizer = df_modifiers.Vocabulizer()
     num_korv_classes, num_which_kv_classes = None, None
+    vocabulizer = None
+    rare_word_eliminator = None
     for ocr_output in ocr_outputs:
-        doc_ind, ocr_df, ocr_df_file, words_df, colored_page_image_files, output_dir = ocr_output
+        doc_ind, ocr_df, ocr_df_file, words_df, colored_page_image_files, this_doc_dir = ocr_output
         print(f'Starting to postproc doc {doc_ind}')
-        num_korv_classes, num_which_kv_classes = \
-            create_and_save_xy_csvs(ocr_df, ocr_df_file, words_df, colored_page_image_files, output_dir)
+        num_korv_classes, num_which_kv_classes, vocabulizer, rare_word_eliminator = \
+            create_and_save_xy_csvs(
+                ocr_df,
+                ocr_df_file,
+                words_df,
+                colored_page_image_files,
+                this_doc_dir,
+                doc_settings.min_count_to_keep_word,
+            )
 
-    utils.save_json(doc_settings.docs_dir / 'word_to_id.json', vocabulizer.word_to_id)
-    utils.save_json(doc_settings.docs_dir / 'word_to_count.json', vocabulizer.word_to_count)
+    utils.save_json(doc_settings.docs_dir / 'word_to_id_pre_elimination.json', vocabulizer.word_to_id)
+    utils.save_json(doc_settings.docs_dir / 'word_to_count_pre_elimination.json', vocabulizer.word_to_count)
+    utils.save_json(doc_settings.docs_dir / 'word_to_count.json', rare_word_eliminator.word_to_count)
+    utils.save_json(doc_settings.docs_dir / 'word_to_id.json', rare_word_eliminator.word_to_id)
 
     utils.save_json(
         doc_settings.docs_dir / 'num_y_classes.json',
@@ -215,3 +250,5 @@ if __name__ == '__main__':
         },
     )
 
+    print()
+    print(f'Saved to {str(doc_settings.docs_dir)}')

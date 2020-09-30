@@ -32,13 +32,19 @@ class WordAccuracy(TensorMetric):
         return is_correct.float().mean()
 
 
-class TrapezoidConv1Module(pl.LightningModule):
+class RectTransformerModule(pl.LightningModule):
     LOSS_NAMES = ['korv', 'which_kv']
     # LOSS_NAMES = ['which_kv']
     LOSS_VAL_NAME = 'loss'
     WORD_ACC_VAL_NAME = 'acc'
 
     # todo: really i need to split the datapoints first and then calculate the vocab
+    # todo: remove rare words
+    # todo: use some kind of pretrained embeddings
+    """ 
+    If using pretrained embeddings then don't need to think about vocab and data splitting
+    Just need something in the tokenizer to handle out of vocab words
+    """
 
     @staticmethod
     def _recalc_vocab_size(ds: data.XYCsvDataset):
@@ -87,49 +93,55 @@ class TrapezoidConv1Module(pl.LightningModule):
 
         self.train_dataset, self.valid_dataset, self.test_dataset = None, None, None
 
-        # self.net = nn.Linear(self.hp.num_x_dims[0], self.num_y_classes['korv'])
+        #############
+        # expand embedding_dim so that embedding_dim + meta_dim is divisible by hp.num_trans_heads
+        print(f'hp.num_x_dims[0], {hp.num_x_dims[0]}')
+        print(f'hp.num_embedding_dim, {hp.num_embedding_dim}')
+        trans_input_dim = hp.num_x_dims[0]
+        if hp.do_include_embeddings:
+            trans_input_dim += hp.num_embedding_dim
+
+        print(f'trans_input_dim, {trans_input_dim}')
+        print(f'hp.num_trans_heads, {hp.num_trans_heads}')
+
+        remainder = trans_input_dim % hp.num_trans_heads
+        if remainder:
+            self.hp.num_extra_embedding_dim = hp.num_trans_heads - remainder
+            self.hp.num_total_embedding_dim = self.hp.num_embedding_dim + self.hp.num_extra_embedding_dim
+            trans_input_dim += self.hp.num_extra_embedding_dim
+        self.hp.num_input_plus_total_embed_dim = trans_input_dim
+
+        print(f'remainder, {remainder}')
+
+        print(f'hp.num_extra_embedding_dims, {self.hp.num_extra_embedding_dim}')
+        print(f'hp.num_total_embedding_dims, {self.hp.num_total_embedding_dim}')
 
         #############
         # emb
         if hp.do_include_embeddings:
-            self.embedder = nn.Embedding(self.num_vocab, self.hp.num_embedding_dim)
+            self.embedder = nn.Embedding(self.num_vocab, self.hp.num_total_embedding_dim)
 
         #############
-        # conv
-        #  alright, so the logspace makes it really more of a funnel than a trapezoid
-        num_conv_filters = np.logspace(
-            start=hp.log2num_filters_start,
-            stop=hp.log2num_filters_end,
-            num=hp.num_conv_layers,
-            base=2,
-        ).astype(np.int32)
+        # trans
 
-        conv_layers = []
-        prev_num_filters = hp.num_x_dims[0]
-        if hp.do_include_embeddings:
-            prev_num_filters += hp.num_embedding_dim
+        self.pre_enc_linear = nn.Conv1d(self.hp.num_input_plus_total_embed_dim, self.hp.pre_trans_linear_dim, 1)
 
-        for conv_ind, num_filters in enumerate(num_conv_filters):
-            conv_layers.append(
-                nn.Conv1d(prev_num_filters, num_filters, hp.kernel_size, padding=int(hp.kernel_size/2)))
-
-            if self.hp.do_include_batch_norm:
-                conv_layers.append(nn.BatchNorm1d(num_filters))
-
-            conv_layers.append(nn.LeakyReLU())
-            prev_num_filters = num_filters
-
-            # if not conv_ind % hp.num_conv_layers_per_pool:
-            #     conv_layers.append(nn.MaxPool1d(hp.pool_size))
-
-        # so torch can find your parameters
-        self.conv_layers = nn.ModuleList(conv_layers)
+        enc_layer = nn.TransformerEncoderLayer(
+            d_model=self.hp.pre_trans_linear_dim,
+            nhead=self.hp.num_trans_heads,
+            dim_feedforward=self.hp.num_trans_fc_units,
+            activation='gelu'
+        )
+        self.encoder = nn.TransformerEncoder(
+            encoder_layer=enc_layer,
+            num_layers=hp.num_trans_enc_layers,
+        )
 
         #############
         # fc
         fc_layers = []
 
-        prev_num_neurons = prev_num_filters
+        prev_num_neurons = self.hp.pre_trans_linear_dim
         num_fc_neurons = np.logspace(
             start=hp.log2num_neurons_start,
             stop=hp.log2num_neurons_end,
@@ -165,20 +177,19 @@ class TrapezoidConv1Module(pl.LightningModule):
 
             x = torch.cat([x_base, emb], dim=-1)
         else:
-            x = x_base.float()
+            x = x_base
 
-        # batch x word x feature --> batch x feature x word
-        x = x.permute([0, 2, 1])
+        x = x.permute(0, 2, 1)
+        x = self.pre_enc_linear(x)
+        x = x.permute(0, 2, 1)
 
-        for layer in self.conv_layers:
-            x = layer(x)
+        x = self.encoder(x)
+        x = x.permute(0, 2, 1)
 
         for layer in self.fc_layers:
             x = layer(x)
 
-        y_hats = [layer(x).permute([0, 2, 1]) for layer in self.heads]
-
-        # y_hats = self.net(x_base)
+        y_hats = [layer(x).permute(0, 2, 1) for layer in self.heads]
 
         return y_hats
 
@@ -341,12 +352,12 @@ if __name__ == '__main__':
 
     hp = MyHyperparams()
     trainer = pl.Trainer(
-        logger=pl_loggers.TensorBoardLogger('tensorboard_logs/', name="conv1d_trial"),
+        logger=pl_loggers.TensorBoardLogger('tensorboard_logs/', name="trans1d_trial"),
         max_epochs=hp.num_epochs,
         weights_summary='full',
         fast_dev_run=False,
     )
-    net = TrapezoidConv1Module(hp, constants.DOCS_DIR / dataset_name)
+    net = RectTransformerModule(hp, constants.DOCS_DIR / dataset_name)
 
     print("HP:")
     utils.print_dict(hp.to_dict())

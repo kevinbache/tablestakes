@@ -10,6 +10,10 @@ import pandas as pd
 class WordColorMatcher:
     """Matches ocr words to true words via parallel color lookup images"""
 
+    PAGE_WIDTH_COL_NAME = 'page_width'
+    PAGE_HEIGHT_COL_NAME = 'page_height'
+    NUM_PAGES_COL_NAME = 'num_pages'
+
     @classmethod
     def get_colors_under_word(cls, colored_page_image_arrays: List[np.ndarray], row: pd.Series):
         """row from the ocr df (ocr.csv) representing a word and including fields for page_num, LRTB"""
@@ -31,10 +35,8 @@ class WordColorMatcher:
     def _get_color_block_stats_under_ocr_words(
             cls,
             ocr_df: pd.DataFrame,
-            colored_page_image_files: List[Union[Path, str]],
+            colored_page_image_arrays: List[np.array],
     ):
-        colored_page_image_arrays = utils.load_image_files_to_arrays(colored_page_image_files)
-
         color_stats_of_ocr_boxes = [
             cls.get_colors_under_word(colored_page_image_arrays, row)
             for _, row in ocr_df.iterrows()
@@ -77,37 +79,37 @@ class WordColorMatcher:
             colored_page_image_files: List[Union[Path, str]],
     ) -> pd.DataFrame:
         """DOES modify dataframes"""
-        color_stats_of_ocr_boxes = cls._get_color_block_stats_under_ocr_words(ocr_df, colored_page_image_files)
+
+        colored_page_image_arrays = utils.load_image_files_to_arrays(colored_page_image_files)
+
+        color_stats_of_ocr_boxes = cls._get_color_block_stats_under_ocr_words(ocr_df, colored_page_image_arrays)
         word_ids, dists = cls._identify_ocr_words_by_color(words_df, color_stats_of_ocr_boxes)
 
         # col names
         CLOSEST_WORD_ID = 'closest_color_word_id'
         CLOSEST_DIST = 'closest_color_dist'
 
-        WORD_ID_NAME = etree_modifiers.WordWrapper.WORD_ID_ATTRIB_NAME
+        WORD_ID_COL_NAME = etree_modifiers.WordWrapper.WORD_ID_ATTRIB_NAME
 
         ocr_df[CLOSEST_WORD_ID] = word_ids
         ocr_df[CLOSEST_DIST] = dists
+
+        PAGE_NUM_COL_NAME = ocr.TesseractOcrProvider.PAGE_NUM_COL_NAME
+        for page_num, page_array in enumerate(colored_page_image_arrays):
+            this_page_rows_selector = ocr_df[PAGE_NUM_COL_NAME] == page_num
+            ocr_df.loc[this_page_rows_selector, [cls.PAGE_HEIGHT_COL_NAME, cls.PAGE_WIDTH_COL_NAME]] = \
+                int(page_array.shape[0]), int(page_array.shape[1])
+
+        ocr_df[cls.NUM_PAGES_COL_NAME] = len(colored_page_image_arrays)
 
         joined_df = pd.merge(
             ocr_df,
             words_df,
             how='outer',
             left_on=CLOSEST_WORD_ID,
-            right_on=WORD_ID_NAME,
+            right_on=WORD_ID_COL_NAME,
         )
 
         # todo: more formal error checking for unmatched rows.  this will fail if there are any.
-        # try:
-        #     joined_df['text_lev_distance'] = \
-        #         joined_df.apply(
-        #             lambda row: utils.levenshtein(
-        #                 row[f'{TEXT_NAME}{cls.OCR_SUFFIX}'].lower(),
-        #                 row[f'{TEXT_NAME}{cls.WORDS_SUFFIX}'].lower()
-        #             ),
-        #             axis=1,
-        #         )
-        # except BaseException as e:
-        #     raise e
 
         return joined_df

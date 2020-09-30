@@ -97,6 +97,9 @@ class KvGroup(hc.StyledHtmlTag, abc.ABC):
     def set_font_style(self, value: Optional[str] = 'italics', selector_type=SelectorType.KEY):
         self.set_css_property('font-style', value, selector_type)
 
+    def set_font_size(self, value: Optional[str] = '1em', selector_type=SelectorType.KEY):
+        self.set_css_property('font-size', value, selector_type)
+
     def set_font_weight(self, value: Optional[str] = 'bold', selector_type=SelectorType.KEY):
         self.set_css_property('font-weight', value, selector_type)
 

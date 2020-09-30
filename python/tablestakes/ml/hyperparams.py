@@ -7,26 +7,27 @@ from chillpill import params
 class MyHyperparams(params.ParameterSet):
     ##############
     # model
-    #  conv
-    num_conv_layers = 6
-    log2num_filters_start = 5
-    log2num_filters_end = 4
+    #  embedder
+    num_embedding_dim = 15
+    do_include_embeddings = True
 
-    kernel_size = 7
+    #  transformer
+    pre_trans_linear_dim = 16
 
-    num_conv_layers_per_pool = 2
-    pool_size = 2
+    num_trans_enc_layers = 2
+    num_trans_heads = 8
+    num_trans_fc_units = 2048
 
-    #  fc
+    do_include_batch_norm = True
+
+    #  fully connected
     num_fc_hidden_layers = 3
-    log2num_neurons_start = 6
+    log2num_neurons_start = 5
     log2num_neurons_end = 5
 
-    num_fc_layers_per_dropout = 2
+    num_fc_layers_per_dropout = 1
+    # prob of drop, not prob of keep
     dropout_p = 0.5
-
-    num_embedding_dim = 32
-    do_include_embeddings = True
 
     ##############
     # optimization
@@ -36,9 +37,10 @@ class MyHyperparams(params.ParameterSet):
     limit_num_data = None
 
     # korv, which_kv
-    loss_weights = np.array([1.0, 0.0])
+    loss_weights = np.array([0.0, 1.0])
+    # loss_weights = np.array([1.0, 0.0])
 
-    num_epochs = 10
+    num_epochs = 50
 
     ##############
     # data

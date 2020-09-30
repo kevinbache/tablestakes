@@ -1,7 +1,9 @@
+import random
+
 from tablestakes import creators, kv_styles, html_css as hc, utils
 
 
-def make_doc(seed: int, num_extra_fields=50):
+def make_doc(seed: int, num_extra_fields=50, do_randomize_field_order=True):
     utils.set_seed(seed)
 
     # create the complex creators up here so they'll use consistent formatting throughout.
@@ -89,6 +91,9 @@ def make_doc(seed: int, num_extra_fields=50):
     group.set_padding('4px')
     group.set_font_family('Verdana, Arial, Helvetica, sans-serif;', hc.SelectorType.GROUP)
     group.set_text_transform()
+
+    if do_randomize_field_order:
+        random.shuffle(kv_creators)
 
     for kvc in kv_creators:
         group.add_both(*kvc())

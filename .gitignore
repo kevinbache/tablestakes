@@ -6,9 +6,10 @@ data/images
 python/tablestakes/ml/lightning_logs/
 *.pdf
 
-python/tablestakes/scripts/generate_ocrd_doc_2/docs_extra=20/
-python/tablestakes/scripts/generate_ocrd_doc_2/docs/
+python/tablestakes/ml/tensorboard_logs/
+python/tablestakes/ml/logs/
 
+data/docs
 
 **/node_modules
 **/form-api

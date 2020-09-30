@@ -6,6 +6,10 @@ import time
 from typing import Dict, Union, Any, List, Optional
 import xml.dom.minidom
 
+import numpy
+import pandas
+from Cython.Includes import numpy
+
 from lxml import etree
 from PIL import Image
 from matplotlib.image import imread
@@ -205,6 +209,18 @@ def generate_unique_color_strings(num_colors: int) -> List[str]:
     return ['rgb({r}, {g}, {b})'.format(r=e[0], g=e[1], b=e[2]) for e in datapoint_by_color]
 
 
+def split_df_by_cols(df: pd.DataFrame, col_sets: List[List[str]], names=List[str], do_output_leftovers_df=True):
+    if do_output_leftovers_df:
+        # flat list
+        used_cols = [col_name for col_set in col_sets for col_name in col_set]
+        leftover_cols = [col_name for col_name in df.columns if col_name not in used_cols]
+        col_sets.append(leftover_cols)
+
+    return {name: df[col_set].copy() for name, col_set in zip(names, col_sets)}
+
+
+
+
 if __name__ == '__main__':
     assert levenshtein('', '') == 0
     assert levenshtein('asdf', '') == 4
@@ -213,3 +229,7 @@ if __name__ == '__main__':
     assert levenshtein('asxf', 'asdf') == 1
     assert levenshtein('asf', 'asdf') == 1
     assert levenshtein('asdf', 'asf') == 1
+
+
+def one_hot_to_categorical(df: pd.DataFrame, col_name) -> pd.DataFrame:
+    return pd.DataFrame(np.argmax(df.values, axis=-1).astype(np.int), columns=[col_name])

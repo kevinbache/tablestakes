@@ -565,6 +565,7 @@ class Document:
             'disable-smart-shrinking': None,
             # TODO: evaluate me
             'dpi': dpi,
+            'quiet': None,
         }
         for side in ('top', 'bottom', 'left', 'right'):
             options[f'margin-{side}'] = margin

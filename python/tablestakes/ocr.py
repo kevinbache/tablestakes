@@ -55,6 +55,7 @@ class TesseractOcrProvider(OcrProvider):
     def _ocr_page_image(self, image: Image) -> pd.DataFrame:
         return pytesseract.image_to_data(
             image=image,
+            # neither lang nor config gives a huge speedup.  8.5 --> 7.5 sec/full page
             lang='eng',
             config=r'-c tessedit_do_invert=0',
             output_type=pytesseract.Output.DATAFRAME,
@@ -73,7 +74,6 @@ class TesseractOcrProvider(OcrProvider):
 
     def _ocr_output_2_ocr_df(self, ocr_output: pd.DataFrame) -> pd.DataFrame:
         return TesseractOcrDfFactory.from_tesseract_df(ocr_output)
-
 
 # class TesseractDocumentFactory:
 #     BLOCK_TYPE_TEXT_STR = 'TEXT'
@@ -125,7 +125,7 @@ class TesseractOcrProvider(OcrProvider):
 #
 #         return document
 
-class OcrDfFactory:
+class OcrDfNames:
     LEFT = 'left'
     RIGHT = 'right'
     TOP = 'top'
@@ -134,7 +134,7 @@ class OcrDfFactory:
     TEXT = 'text'
 
 
-class TesseractOcrDfFactory(OcrDfFactory):
+class TesseractOcrDfFactory(OcrDfNames):
     """
     example Tesseract DataFrame:
 
