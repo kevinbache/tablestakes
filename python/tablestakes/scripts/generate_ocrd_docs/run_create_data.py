@@ -1,39 +1,34 @@
 import multiprocessing
 import os
 
+from joblib import Parallel, delayed
 from tablestakes.constants import Y_KORV_NAME, Y_WHICH_KV_NAME, X_BASIC_NAME, X_VOCAB_NAME
+from tablestakes.ml import hyperparams
 
-num_jobs = multiprocessing.cpu_count() - 1
-print(f'num_jobs: {num_jobs}')
 
 # https://tesseract-ocr.github.io/tessdoc/FAQ#can-i-increase-speed-of-ocr
 # doesn't do much since we're already doing process parallelizations
 # 7.5 sec / page -> 6.5 sec / page
+num_jobs = multiprocessing.cpu_count()
+
 os.environ["OMP_THREAD_LIMIT"] = f'{num_jobs}'
 
-from joblib import Parallel, delayed
-
-from tablestakes import utils, html_css as hc, etree_modifiers, ocr, color_matcher, df_modifiers, constants
+from tablestakes import utils, etree_modifiers, ocr, color_matcher, df_modifiers
 from tablestakes.scripts.generate_ocrd_docs import basic
 
 
-def make_and_ocr_docs(doc_ind, settings):
+def make_and_ocr_docs(doc_ind, doc_set_params: hyperparams.DocSetParams):
     print(f"STARTING TO CREATE DOC {doc_ind}")
-    seed = settings.seed_start + doc_ind
-    doc = basic.make_doc(seed, settings.num_extra_fields, do_randomize_field_order=settings.do_randomize_field_order)
-    this_doc_dir = settings.docs_dir / f'doc_{doc_ind:02d}'
+    doc_gen_params = doc_set_params.doc_gen_params.sample()
+
+    doc = basic.make_doc(
+        seed=doc_set_params.seed_start + doc_ind,
+        doc_config=doc_gen_params,
+    )
+    this_doc_dir = doc_gen_params.docs_dir / f'doc_{doc_ind:02d}'
     utils.mkdir_if_not_exist(this_doc_dir)
 
-    params_file = this_doc_dir / 'params.txt'
-    params_dict = {
-        'seed': seed,
-        'dpi': settings.dpi,
-        'margin': settings.margin,
-        'page_size': settings.page_size.name,
-        'num_extra_fields': settings.num_extra_fields,
-        'min_count_to_keep_word': settings.min_count_to_keep_word,
-    }
-    utils.save_json(params_file, params_dict)
+    utils.save_json(this_doc_dir / 'params.txt', doc_gen_params.to_dict())
 
     ########################################
     # postproc doc to add word_ids, labels #
@@ -63,7 +58,7 @@ def make_and_ocr_docs(doc_ind, settings):
     page_image_files = doc.save_pdf(
         doc_pdf_file,
         do_save_page_images_too=True,
-        dpi=settings.dpi,
+        dpi=doc_gen_params.dpi,
     )
     words_df_file = raw_dir / 'words.csv'
     words_df = df_saver.get_df()
@@ -85,7 +80,7 @@ def make_and_ocr_docs(doc_ind, settings):
     colored_page_image_files = doc.save_pdf(
         colored_doc_pdf_file,
         do_save_page_images_too=True,
-        dpi=settings.dpi,
+        dpi=doc_gen_params.dpi,
         pages_dirname='pages_colored',
     )
 
@@ -186,37 +181,22 @@ if __name__ == '__main__':
     ##############
     # Parameters #
     ##############
-    class DocSettings:
-        seed_start = 42
-        dpi = 500
-        margin = '1in'
-        page_size = hc.PageSize.LETTER
-
-        min_count_to_keep_word = 2
-
-        window_width_px = dpi * page_size.width
-        window_height_px = dpi * page_size.height
-
-        num_docs = 100
-        num_extra_fields = 0
-        do_randomize_field_order = True
-
-        docs_dir = constants.DOCS_DIR
-
     do_regen_docs = True
 
-    doc_settings = DocSettings()
+    doc_settings = hyperparams.DocSetParams(
+        doc_gen_params=hyperparams.DocGenParams(),
+        doc_prep_params=hyperparams.DocPrepParams(),
+    )
 
-    fast_test = False
+    fast_test = True
     if fast_test:
         doc_settings.dpi = 100
-        doc_settings.num_extra_fields = 2
+        doc_settings.num_extra_fields = 1
         doc_settings.num_docs = 10
 
-    doc_settings.docs_dir /= f'num={doc_settings.num_docs}_extra={doc_settings.num_extra_fields}'
-    print(f'Saving to {str(doc_settings.docs_dir)}')
+    doc_settings.set_docs_dir()
 
-    ocr_func = lambda doc_ind: make_and_ocr_docs(doc_ind, doc_settings)
+    print(f'Saving to {str(doc_settings.docs_dir)}')
     ocr_outputs = Parallel(n_jobs=num_jobs)(delayed(ocr_func)(doc_ind) for doc_ind in range(doc_settings.num_docs))
 
     # run the rest serially so vocabulizer is consistent across docs
@@ -224,6 +204,7 @@ if __name__ == '__main__':
     vocabulizer = df_modifiers.Vocabulizer()
     rare_word_eliminator = \
         df_modifiers.RareWordEliminator(vocabulizer=vocabulizer, min_count=doc_settings.min_count_to_keep_word)
+
     for ocr_output in ocr_outputs:
         doc_ind, ocr_df, ocr_df_file, words_df, colored_page_image_files, this_doc_dir = ocr_output
         print(f'Starting to postproc doc {doc_ind}')
@@ -253,3 +234,4 @@ if __name__ == '__main__':
 
     print()
     print(f'Saved to {str(doc_settings.docs_dir)}')
+

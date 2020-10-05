@@ -10,3 +10,5 @@ Y_KORV_NAME = 'y_korv'
 Y_WHICH_KV_NAME = 'y_which_kv'
 X_BASIC_NAME = 'x_basic'
 X_VOCAB_NAME = 'x_vocab'
+
+LOGS_DIR = THIS_DIR / 'tensorboard_logs/'

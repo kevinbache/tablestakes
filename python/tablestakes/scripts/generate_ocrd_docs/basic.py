@@ -1,10 +1,18 @@
 import random
 
+import numpy as np
+
 from tablestakes import creators, kv_styles, html_css as hc, utils
+from tablestakes.ml.hyperparams import DocGenParams
 
 
-def make_doc(seed: int, num_extra_fields=50, do_randomize_field_order=True):
+def make_doc(
+        seed: int,
+        doc_config: DocGenParams,
+) -> hc.Document:
     utils.set_seed(seed)
+
+    doc_config = doc_config.sample()
 
     # create the complex creators up here so they'll use consistent formatting throughout.
     date_creator = creators.DateCreator()
@@ -73,7 +81,7 @@ def make_doc(seed: int, num_extra_fields=50, do_randomize_field_order=True):
             value_contents_creator=phone_creator,
         ),
     ]
-    for ind in range(num_extra_fields):
+    for ind in range(doc_config.num_extra_fields):
         kv_creators.append(
             creators.KvCreator(
                 name=f'field_{ind}',
@@ -83,16 +91,40 @@ def make_doc(seed: int, num_extra_fields=50, do_randomize_field_order=True):
         )
 
     group = kv_styles.LTableKvGroup('ltable_group')
-    group.set_invisible_border()
-    group.set_font_weight()
-    # group.do_add_colon_to_keys()
-    group.set_kv_horz_alignment(kv_styles.KvAlign.LL)
-    group.set_kv_vert_alignment(kv_styles.KvAlign.TT)
-    group.set_padding('4px')
+    if doc_config.do_set_invisible_border:
+        group.set_invisible_border()
+    else:
+        group.set_border_width(value='1px', selector_type=hc.SelectorType.GROUP)
+
+    font_size = doc_config.font_size_px
+    group.set_font_size(f'{font_size}px', selector_type=hc.SelectorType.KEY)
+    if random.random() < doc_config.do_regen_font_val_size:
+        font_size = np.random.randint(*doc_config.font_size_px)
+    group.set_font_size(f'{font_size}px', selector_type=hc.SelectorType.VALUE)
+
+    if doc_config.do_bold_keys:
+        group.set_font_weight('bold', selector_type=hc.SelectorType.KEY)
+
+    if doc_config.do_add_colon_to_keys:
+        group.do_add_colon_to_keys()
+
+    group.set_kv_horz_alignment(doc_config.hor)
+    group.set_kv_vert_alignment(doc_config.vert)
+
+    padding = np.random.randint(*doc_config.table_cell_padding_px)
+    group.set_padding(f'{padding}px', selector_type=hc.SelectorType.TDS_IN_GROUP)
+
     group.set_font_family('Verdana, Arial, Helvetica, sans-serif;', hc.SelectorType.GROUP)
     group.set_text_transform()
 
-    if do_randomize_field_order:
+    random_offset_max_px = doc_config.random_offset_max_in * 72
+    if random_offset_max_px > 0:
+        offset = np.random.randint(0, random_offset_max_px)
+        group.set_position('relative')
+        group.set_left(f'{offset}px')
+        group.set_top(f'{offset}px')
+
+    if doc_config.do_randomize_field_order:
         random.shuffle(kv_creators)
 
     for kvc in kv_creators:
@@ -102,3 +134,11 @@ def make_doc(seed: int, num_extra_fields=50, do_randomize_field_order=True):
     doc.add_styled_html(group)
 
     return doc
+
+
+if __name__ == '__main__':
+    seed = 42
+    doc_config = DocGenParams()
+    for i in range(10):
+        doc = make_doc(seed + i, doc_config)
+        doc.save_pdf(f'blah_{i}.pdf')

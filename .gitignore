@@ -7,6 +7,7 @@ python/tablestakes/ml/lightning_logs/
 *.pdf
 
 python/tablestakes/ml/tensorboard_logs/
+python/tablestakes/tensorboard_logs/
 python/tablestakes/ml/logs/
 
 data/docs

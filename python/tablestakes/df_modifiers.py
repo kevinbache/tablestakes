@@ -86,7 +86,10 @@ class Tokenizer(DfModifier):
         self.tokenizer = WordPunctTokenizer()
 
     def _tokenize(self, s: str) -> List[str]:
-        return self.tokenizer.tokenize(s)
+        out = self.tokenizer.tokenize(s)
+
+        return out
+
 
     @staticmethod
     def _break_up_bounding_box(bbox, tokens):
@@ -121,6 +124,9 @@ class Tokenizer(DfModifier):
 
         tokenized_rows = []
         for index, row in df.iterrows():
+            original_text = row[self.ORIGINAL_TEXT_COL_NAME]
+            if isinstance(original_text, float) and np.isnan(original_text):
+                continue
             tokens = self._tokenize(row[self.ORIGINAL_TEXT_COL_NAME])
             bbox = tuple(n for n in row[bbox_names])
             bboxes = self._break_up_bounding_box(bbox, tokens)

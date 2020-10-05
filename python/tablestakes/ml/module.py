@@ -16,7 +16,7 @@ from pytorch_lightning import loggers as pl_loggers
 
 from tablestakes import constants, utils
 from tablestakes.ml import data
-from tablestakes.ml.hyperparams import MyHyperparams
+from tablestakes.ml.hyperparams import LearningParams
 
 
 class WordAccuracy(TensorMetric):
@@ -46,7 +46,7 @@ class TrapezoidConv1Module(pl.LightningModule):
 
     def __init__(
             self,
-            hp: MyHyperparams,
+            hp: LearningParams,
             data_dir: Union[Path, str],
     ):
         super().__init__()
@@ -133,7 +133,7 @@ class TrapezoidConv1Module(pl.LightningModule):
         num_fc_neurons = np.logspace(
             start=hp.log2num_neurons_start,
             stop=hp.log2num_neurons_end,
-            num=hp.num_fc_hidden_layers,
+            num=hp.num_fc_blocks,
             base=2,
         ).astype(np.int32)
         for fc_ind, num_neurons in enumerate(num_fc_neurons):
@@ -339,7 +339,7 @@ if __name__ == '__main__':
 
     dataset_name = 'num=1000_extra=0'
 
-    hp = MyHyperparams()
+    hp = LearningParams()
     trainer = pl.Trainer(
         logger=pl_loggers.TensorBoardLogger('tensorboard_logs/', name="conv1d_trial"),
         max_epochs=hp.num_epochs,

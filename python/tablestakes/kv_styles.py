@@ -13,6 +13,7 @@ class KvAlign(enum.Enum):
     RL = ('right', 'left')
     CC = ('center', 'center')
     CL = ('center', 'left')
+    LC = ('left', 'center')
     TB = ('flex-start', 'flex-end')
     BB = ('flex-end', 'flex-end')
     TT = ('flex-start', 'flex-start')
@@ -75,12 +76,11 @@ class KvGroup(hc.StyledHtmlTag, abc.ABC):
         ]))
 
     def do_add_colon_to_keys(self):
-        raise ValueError("Doesn't work")
-        # self.css.add_style(
-        #     hc.CssChunk(f'{self.get_selector(SelectorType.KEY).to_selector_str()}:after', {
-        #         'content': "':'",
-        #     }),
-        # )
+        self.css.add_style(
+            hc.CssChunk(f'{self.get_selector(SelectorType.KEY).to_selector_str()}:after', {
+                'content': "':'",
+            }),
+        )
 
     def set_css_property(self, property: str, value: Optional[str], selector_type=SelectorType.KEY):
         if value is None:
@@ -114,6 +114,15 @@ class KvGroup(hc.StyledHtmlTag, abc.ABC):
 
     def set_padding(self, value: Optional[str] = '1px', selector_type: SelectorType = SelectorType.TDS_IN_GROUP):
         self.set_css_property('padding', value, selector_type)
+
+    def set_position(self, value: Optional[str] = 'relative', selector_type: SelectorType = SelectorType.GROUP):
+        self.set_css_property('position', value, selector_type)
+
+    def set_left(self, value: Optional[str] = '30px', selector_type: SelectorType = SelectorType.GROUP):
+        self.set_css_property('left', value, selector_type)
+
+    def set_top(self, value: Optional[str] = '30px', selector_type: SelectorType = SelectorType.GROUP):
+        self.set_css_property('top', value, selector_type)
 
 
 class LColonKvGroup(KvGroup):
@@ -182,6 +191,12 @@ class TableKvGroup(KvGroup, abc.ABC):
 
     def set_border_width(self, value: Optional[str] = '1px', selector_type=SelectorType.TDS_IN_GROUP):
         self.set_css_property('border-style', value, selector_type)
+
+    def set_width(self, value: Optional[str] = '4in', selector_type=SelectorType.GROUP):
+        self.set_css_property('width', value, selector_type)
+
+    def set_height(self, value: Optional[str] = '7in', selector_type=SelectorType.GROUP):
+        self.set_css_property('height', value, selector_type)
 
     def set_invisible_border(self):
         self.set_border_style('none', selector_type=SelectorType.TDS_IN_GROUP)

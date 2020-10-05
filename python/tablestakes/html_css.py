@@ -1,5 +1,6 @@
 import abc
 import enum
+import time
 from pathlib import Path
 import re
 import tempfile
@@ -390,6 +391,12 @@ class StyledHtmlTag:
     def get_css(self) -> Css:
         return self.css
 
+    def __getstate__(self):
+        return self.__dict__.copy()
+
+    def __setstate__(self, state):
+        self.__dict = state
+
 
 class Grid(StyledHtmlTag):
     def __init__(
@@ -539,7 +546,6 @@ class Document:
             url = 'file://' + f.name
             f.write(str(self))
             webbrowser.open(url)
-            f.close()
 
     def save_pdf(
             self,

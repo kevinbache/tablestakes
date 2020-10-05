@@ -219,8 +219,6 @@ def split_df_by_cols(df: pd.DataFrame, col_sets: List[List[str]], names=List[str
     return {name: df[col_set].copy() for name, col_set in zip(names, col_sets)}
 
 
-
-
 if __name__ == '__main__':
     assert levenshtein('', '') == 0
     assert levenshtein('asdf', '') == 4
