@@ -197,6 +197,7 @@ if __name__ == '__main__':
     doc_settings.set_docs_dir()
 
     print(f'Saving to {str(doc_settings.docs_dir)}')
+    ocr_func = lambda doc_ind: make_and_ocr_docs(doc_ind, doc_settings)
     ocr_outputs = Parallel(n_jobs=num_jobs)(delayed(ocr_func)(doc_ind) for doc_ind in range(doc_settings.num_docs))
 
     # run the rest serially so vocabulizer is consistent across docs

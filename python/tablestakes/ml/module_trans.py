@@ -200,11 +200,51 @@ class RectTransformerModule(pl.LightningModule):
         else:
             num_trans_input_dims = self.hp.num_basic_plus_embed_dims
 
-        class MultiheadAttention(nn.MultiheadAttention):
 
+
+        class MultiheadAttention(nn.MultiheadAttention):
+            def __init__(self, embed_dim, num_heads, dropout=0., bias=True, add_bias_kv=False, add_zero_attn=False,
+                         kdim=None, vdim=None):
+                super(MultiheadAttention, self).__init__()
+                self.embed_dim = embed_dim
+                self.kdim = kdim if kdim is not None else embed_dim
+                self.vdim = vdim if vdim is not None else embed_dim
+                self._qkv_same_embed_dim = self.kdim == embed_dim and self.vdim == embed_dim
+
+                self.num_heads = num_heads
+                self.dropout = dropout
+                self.head_dim = embed_dim // num_heads
+                assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
+
+                if self._qkv_same_embed_dim is False:
+                    self.q_proj_weight = nn.modules.activation.Parameter(torch.Tensor(embed_dim, embed_dim))
+                    self.k_proj_weight = nn.modules.activation.Parameter(torch.Tensor(embed_dim, self.kdim))
+                    self.v_proj_weight = nn.modules.activation.Parameter(torch.Tensor(embed_dim, self.vdim))
+                    self.register_parameter('in_proj_weight', None)
+                else:
+                    self.in_proj_weight = nn.modules.activation.Parameter(torch.empty(3 * embed_dim, embed_dim))
+                    self.register_parameter('q_proj_weight', None)
+                    self.register_parameter('k_proj_weight', None)
+                    self.register_parameter('v_proj_weight', None)
+
+                if bias:
+                    self.in_proj_bias = nn.modules.activation.Parameter(torch.empty(3 * embed_dim))
+                else:
+                    self.register_parameter('in_proj_bias', None)
+                self.out_proj = nn.modules.activation._LinearWithBias(embed_dim, embed_dim)
+
+                if add_bias_kv:
+                    self.bias_k = nn.modules.activation.Parameter(torch.empty(1, 1, embed_dim))
+                    self.bias_v = nn.modules.activation.Parameter(torch.empty(1, 1, embed_dim))
+                else:
+                    self.bias_k = self.bias_v = None
+
+                self.add_zero_attn = add_zero_attn
+
+                self._reset_parameters()
 
         class TransformerEncoderAblationLayer(nn.TransformerEncoderLayer):
-            """Just a version of the TransformerEncoderLayer which can write out the """
+            """Just a version of the TransformerEncoderLayer which can ignore the key or query dict"""
             def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1, activation="relu"):
                 super().super().__init__()
                 self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
