@@ -1,7 +1,5 @@
 import random
 
-import numpy as np
-
 from tablestakes import creators, kv_styles, html_css as hc, utils
 from tablestakes.ml.hyperparams import DocGenParams
 

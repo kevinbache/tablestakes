@@ -31,8 +31,6 @@ def make_and_ocr_docs(doc_ind, doc_set_params: hyperparams.DocSetParams):
     this_doc_dir = doc_set_params.docs_dir / f'doc_{doc_ind:02d}'
     utils.mkdir_if_not_exist(this_doc_dir)
 
-    from chillpill import params
-    print(params.__file__)
     utils.save_json(this_doc_dir / 'params.txt', doc_gen_params.to_dict())
 
     ########################################
@@ -104,6 +102,7 @@ def make_and_ocr_docs(doc_ind, doc_set_params: hyperparams.DocSetParams):
     return doc_ind, ocr_df, ocr_df_file, words_df, colored_page_image_files, this_doc_dir
 
 
+@ray.remote
 def create_and_save_xy_csvs(
         ocr_df,
         ocr_df_file,
@@ -135,6 +134,7 @@ def create_and_save_xy_csvs(
     joined_df = df_modifiers.DfModifierStack([
         rare_word_eliminator,
     ])(joined_df)
+    joined_df = ray.get(joined_df)
 
     x_base_cols = [
         ocr.TesseractOcrProvider.PAGE_NUM_COL_NAME,
@@ -198,8 +198,8 @@ if __name__ == '__main__':
         doc_prep_params=doc_prep_params,
     )
     doc_settings.dpi = 400
-    doc_settings.num_extra_fields = 1
-    doc_settings.num_docs = 1000
+    doc_settings.num_extra_fields = 0
+    doc_settings.num_docs = 30
 
     fast_test = False
     if fast_test:
@@ -218,9 +218,9 @@ if __name__ == '__main__':
 
     # run the rest serially so vocabulizer is consistent across docs
     num_korv_classes, num_which_kv_classes = None, None
-    vocabulizer = df_modifiers.Vocabulizer()
+    vocabulizer = df_modifiers.Vocabulizer.remote()
     rare_word_eliminator = \
-        df_modifiers.RareWordEliminator(
+        df_modifiers.RareWordEliminator.remote(
             vocabulizer=vocabulizer,
             min_count=doc_settings.doc_prep_params.min_count_to_keep_word,
         )
@@ -228,21 +228,34 @@ if __name__ == '__main__':
     for ocr_output in ocr_outputs:
         doc_ind, ocr_df, ocr_df_file, words_df, colored_page_image_files, this_doc_dir = ray.get(ocr_output)
         print(f'Starting to postproc doc {doc_ind}')
-        num_korv_classes, num_which_kv_classes, vocabulizer, rare_word_eliminator = \
-            create_and_save_xy_csvs(
-                ocr_df,
-                ocr_df_file,
-                words_df,
-                colored_page_image_files,
-                this_doc_dir,
-                vocabulizer,
-                rare_word_eliminator,
-            )
+        create_and_save_output = create_and_save_xy_csvs.remote(
+            ocr_df,
+            ocr_df_file,
+            words_df,
+            colored_page_image_files,
+            this_doc_dir,
+            vocabulizer,
+            rare_word_eliminator,
+        )
 
-    utils.save_json(doc_settings.docs_dir / 'word_to_id_pre_elimination.json', vocabulizer.word_to_id)
-    utils.save_json(doc_settings.docs_dir / 'word_to_count_pre_elimination.json', vocabulizer.word_to_count)
-    utils.save_json(doc_settings.docs_dir / 'word_to_count.json', rare_word_eliminator.word_to_count)
-    utils.save_json(doc_settings.docs_dir / 'word_to_id.json', rare_word_eliminator.word_to_id)
+    num_korv_classes, num_which_kv_classes, vocabulizer, rare_word_eliminator = ray.get(create_and_save_output)
+
+    utils.save_json(
+        doc_settings.docs_dir / 'word_to_id_pre_elimination.json',
+        ray.get(vocabulizer.get_word_to_id.remote())
+    )
+    utils.save_json(
+        doc_settings.docs_dir / 'word_to_count_pre_elimination.json',
+        ray.get(vocabulizer.get_word_to_count.remote())
+    )
+    utils.save_json(
+        doc_settings.docs_dir / 'word_to_count.json',
+        ray.get(rare_word_eliminator.get_word_to_count.remote())
+    )
+    utils.save_json(
+        doc_settings.docs_dir / 'word_to_id.json',
+        ray.get(rare_word_eliminator.get_word_to_count.remote())
+    )
 
     utils.save_json(
         doc_settings.docs_dir / 'num_y_classes.json',
@@ -254,4 +267,3 @@ if __name__ == '__main__':
 
     print()
     print(f'Saved to {str(doc_settings.docs_dir)}')
-

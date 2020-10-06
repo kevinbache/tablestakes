@@ -1,10 +1,13 @@
 import abc
+import collections
 from typing import List
 import re
 
 import numpy as np
 import pandas as pd
 from nltk.tokenize import WordPunctTokenizer
+
+import ray
 
 from tablestakes import ocr, utils
 
@@ -24,9 +27,15 @@ class DfModifierStack:
         for mod in self.modifiers:
             if self.do_use_timers:
                 with utils.Timer(f'Df Modifier {mod.__class__.__name__}'):
-                    df = mod(df)
+                    if isinstance(mod, ray.actor.ActorHandle):
+                        df = mod.__call__.remote(df)
+                    else:
+                        df = mod(df)
             else:
-                df = mod(df)
+                if isinstance(mod, ray.actor.ActorHandle):
+                    df = mod.__call__.remote(df)
+                else:
+                    df = mod(df)
 
         return df
 
@@ -155,30 +164,38 @@ class TokenPostProcessor(DfModifier):
         return df
 
 
+@ray.remote
 class Vocabulizer(DfModifier):
     """Convert tokens to vocab ids."""
     TOKEN_COL_NAME = TokenPostProcessor.TOKEN_COL_NAME
     VOCAB_ID_PRE_ELIMINATION_COL_NAME = 'vocab_id_pre_elimination'
 
     def __init__(self):
-        self.word_to_id = {}
-        self.word_to_count = {}
+        self._word_to_id = {}
+        self._word_to_count = {}
 
     def __call__(self, df: pd.DataFrame) -> pd.DataFrame:
         for token in df[self.TOKEN_COL_NAME]:
-            if token not in self.word_to_id:
-                self.word_to_id[token] = len(self.word_to_id)
-                self.word_to_count[token] = 0
-            self.word_to_count[token] += 1
+            if token not in self._word_to_id:
+                self._word_to_id[token] = len(self._word_to_id)
+                self._word_to_count[token] = 0
+            self._word_to_count[token] += 1
         df[self.VOCAB_ID_PRE_ELIMINATION_COL_NAME] = \
-            df[self.TOKEN_COL_NAME].apply(lambda token: self.word_to_id[token])
+            df[self.TOKEN_COL_NAME].apply(lambda token: self._word_to_id[token])
 
         return df
 
     def get_vocab_size(self):
-        return len(self.word_to_id)
+        return len(self._word_to_id)
+
+    def get_word_to_count(self):
+        return self._word_to_count
+
+    def get_word_to_id(self):
+        return self._word_to_id
 
 
+@ray.remote
 class RareWordEliminator(DfModifier):
     UNKNOWN_TOKEN = '<UNKNOWN>'
     WORD_WAS_ELIMINATED_COL_NAME = 'was_removed_rare_token'
@@ -192,26 +209,35 @@ class RareWordEliminator(DfModifier):
         TOKEN_COL_NAME = TokenPostProcessor.TOKEN_COL_NAME
         VOCAB_COL_NAME = self.VOCAB_ID_COL_NAME
 
-        counts = self.vocabulizer.word_to_count
-        self.word_to_count = {k: v for k, v in sorted(counts.items()) if v >= self.min_count}
-        self.word_to_id = {
+        if isinstance(self.vocabulizer, ray.actor.ActorHandle):
+            counts = ray.get(self.vocabulizer.get_word_to_count.remote())
+        else:
+            counts = self.vocabulizer.get_word_to_count()
+
+        self._word_to_count = {k: v for k, v in sorted(counts.items()) if v >= self.min_count}
+        self._word_to_id = {
             k: index
-            for index, k, in enumerate(self.word_to_count.keys())
-            if k in self.word_to_count
+            for index, k, in enumerate(self._word_to_count.keys())
+            if k in self._word_to_count
         }
 
-        unknown_id = len(self.word_to_id)
-        self.word_to_id[self.UNKNOWN_TOKEN] = unknown_id
-        self.word_to_count[self.UNKNOWN_TOKEN] = \
-            sum([v for v in self.vocabulizer.word_to_count.values() if v >= self.min_count])
+        unknown_id = len(self._word_to_id)
+        self._word_to_id[self.UNKNOWN_TOKEN] = unknown_id
+        self._word_to_count[self.UNKNOWN_TOKEN] = sum([v for v in counts.values() if v >= self.min_count])
 
         df[VOCAB_COL_NAME] = df[TOKEN_COL_NAME].apply(
-            lambda token: self.word_to_id[token] if token in self.word_to_id else unknown_id,
+            lambda token: self._word_to_id[token] if token in self._word_to_id else unknown_id,
         )
 
         df[self.WORD_WAS_ELIMINATED_COL_NAME] = (df[VOCAB_COL_NAME] == unknown_id).astype(np.int)
 
         return df
+
+    def get_word_to_count(self):
+        return self._word_to_count
+
+    def get_word_to_id(self):
+        return self._word_to_id
 
 
 if __name__ == '__main__':
