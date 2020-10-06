@@ -1,7 +1,6 @@
 import multiprocessing
 import os
 
-from joblib import Parallel, delayed
 from tablestakes.constants import Y_KORV_NAME, Y_WHICH_KV_NAME, X_BASIC_NAME, X_VOCAB_NAME
 from tablestakes.ml import hyperparams
 
@@ -16,7 +15,7 @@ num_jobs = multiprocessing.cpu_count()
 os.environ["OMP_THREAD_LIMIT"] = f'{num_jobs}'
 
 from tablestakes import utils, etree_modifiers, ocr, color_matcher, df_modifiers
-from tablestakes.scripts.generate_ocrd_docs import basic
+from tablestakes.create_fake_data import basic
 
 
 @ray.remote
@@ -32,13 +31,8 @@ def make_and_ocr_docs(doc_ind, doc_set_params: hyperparams.DocSetParams):
     this_doc_dir = doc_set_params.docs_dir / f'doc_{doc_ind:02d}'
     utils.mkdir_if_not_exist(this_doc_dir)
 
-    import pprint
     from chillpill import params
     print(params.__file__)
-    # pprint.pprint(doc_gen_params.to_dict())
-    # print()
-    # for k, v in doc_gen_params.__dict__.items():
-    #     print(type(k), type(v), k, v)
     utils.save_json(this_doc_dir / 'params.txt', doc_gen_params.to_dict())
 
     ########################################
@@ -194,12 +188,20 @@ if __name__ == '__main__':
     ##############
     do_regen_docs = True
 
-    doc_settings = hyperparams.DocSetParams(
-        doc_gen_params=hyperparams.DocGenParams(),
-        doc_prep_params=hyperparams.DocPrepParams(),
-    )
+    doc_gen_params = hyperparams.DocGenParams()
 
-    fast_test = True
+    doc_prep_params = hyperparams.DocPrepParams()
+    doc_prep_params.min_count_to_keep_word = 2
+
+    doc_settings = hyperparams.DocSetParams(
+        doc_gen_params=doc_gen_params,
+        doc_prep_params=doc_prep_params,
+    )
+    doc_settings.dpi = 400
+    doc_settings.num_extra_fields = 1
+    doc_settings.num_docs = 1000
+
+    fast_test = False
     if fast_test:
         doc_settings.dpi = 100
         doc_settings.num_extra_fields = 1
