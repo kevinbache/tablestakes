@@ -50,7 +50,12 @@ def load_json(filename: str):
 
 def save_json(filename: str, json_obj: Any):
     with open(filename, mode='w') as f:
-        return json.dump(json_obj, f)
+        try:
+            return json.dump(json_obj, f)
+        except BaseException as e:
+            print("JSON OBJ:")
+            print(json_obj)
+            raise e
 
 
 def load_txt(filename: str):

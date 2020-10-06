@@ -74,16 +74,17 @@ class DocGenParams(params.ParameterSet):
         1: 1,
     })
     font_size_px = params.Integer(8, 18)
-    table_cell_padding_px = params.Integer(1, 7)
+    val_font_size_px = params.Integer(8, 18)
     do_regen_font_val_size = params.Boolean(0.5)
+    table_cell_padding_px = params.Integer(1, 7)
     do_bold_keys = params.Boolean(p_true=0.2)
     do_add_colon_to_keys = params.Boolean(p_true=0.2)
-    vert_align_probs = params.Categorical.from_prob_dict({
+    vert_alignment = params.Categorical.from_prob_dict({
         kv_styles.KvAlign.TT: 2,
         kv_styles.KvAlign.BB: 1,
         kv_styles.KvAlign.TB: 1,
     })
-    horz_align_probs = params.Categorical.from_prob_dict({
+    horz_alignment = params.Categorical.from_prob_dict({
         kv_styles.KvAlign.LL: 2,
         kv_styles.KvAlign.RL: 1,
         kv_styles.KvAlign.LR: 1,
@@ -126,7 +127,7 @@ class DocSetParams(params.ParameterSet):
     def set_docs_dir(self):
         self.docs_dir = self.docs_root_dir / f'num={self.num_docs}_{self._get_short_hash()}'
 
-    def __setstate__(self, d):
-        self.__dict__ = d
-        self.doc_gen_params = DocGenParams.from_dict(self.doc_gen_params)
-        self.doc_prep_params = DocPrepParams.from_dict(self.doc_prep_params)
+    # def __setstate__(self, d):
+    #     self.__dict__ = d
+    #     self.doc_gen_params = DocGenParams.from_dict(self.doc_gen_params)
+    #     self.doc_prep_params = DocPrepParams.from_dict(self.doc_prep_params)

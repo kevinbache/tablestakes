@@ -13,6 +13,7 @@ def make_doc(
     utils.set_seed(seed)
 
     doc_config = doc_config.sample()
+    assert isinstance(doc_config, DocGenParams) # for pycharm autocomplete
 
     # create the complex creators up here so they'll use consistent formatting throughout.
     date_creator = creators.DateCreator()
@@ -99,7 +100,7 @@ def make_doc(
     font_size = doc_config.font_size_px
     group.set_font_size(f'{font_size}px', selector_type=hc.SelectorType.KEY)
     if random.random() < doc_config.do_regen_font_val_size:
-        font_size = np.random.randint(*doc_config.font_size_px)
+        font_size = doc_config.val_font_size_px
     group.set_font_size(f'{font_size}px', selector_type=hc.SelectorType.VALUE)
 
     if doc_config.do_bold_keys:
@@ -108,18 +109,16 @@ def make_doc(
     if doc_config.do_add_colon_to_keys:
         group.do_add_colon_to_keys()
 
-    group.set_kv_horz_alignment(doc_config.hor)
-    group.set_kv_vert_alignment(doc_config.vert)
+    group.set_kv_horz_alignment(doc_config.horz_alignment)
+    group.set_kv_vert_alignment(doc_config.vert_alignment)
 
-    padding = np.random.randint(*doc_config.table_cell_padding_px)
-    group.set_padding(f'{padding}px', selector_type=hc.SelectorType.TDS_IN_GROUP)
+    group.set_padding(f'{doc_config.table_cell_padding_px}px', selector_type=hc.SelectorType.TDS_IN_GROUP)
 
     group.set_font_family('Verdana, Arial, Helvetica, sans-serif;', hc.SelectorType.GROUP)
     group.set_text_transform()
 
-    random_offset_max_px = doc_config.random_offset_max_in * 72
-    if random_offset_max_px > 0:
-        offset = np.random.randint(0, random_offset_max_px)
+    if doc_config.group_offset_in > 0:
+        offset = doc_config.group_offset_in * 72
         group.set_position('relative')
         group.set_left(f'{offset}px')
         group.set_top(f'{offset}px')

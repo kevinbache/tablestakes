@@ -5,6 +5,8 @@ from joblib import Parallel, delayed
 from tablestakes.constants import Y_KORV_NAME, Y_WHICH_KV_NAME, X_BASIC_NAME, X_VOCAB_NAME
 from tablestakes.ml import hyperparams
 
+import ray
+ray.init(ignore_reinit_error=True)
 
 # https://tesseract-ocr.github.io/tessdoc/FAQ#can-i-increase-speed-of-ocr
 # doesn't do much since we're already doing process parallelizations
@@ -17,17 +19,26 @@ from tablestakes import utils, etree_modifiers, ocr, color_matcher, df_modifiers
 from tablestakes.scripts.generate_ocrd_docs import basic
 
 
+@ray.remote
 def make_and_ocr_docs(doc_ind, doc_set_params: hyperparams.DocSetParams):
     print(f"STARTING TO CREATE DOC {doc_ind}")
     doc_gen_params = doc_set_params.doc_gen_params.sample()
+    assert isinstance(doc_gen_params, hyperparams.DocGenParams)  # for pycharm autocomplete
 
     doc = basic.make_doc(
         seed=doc_set_params.seed_start + doc_ind,
         doc_config=doc_gen_params,
     )
-    this_doc_dir = doc_gen_params.docs_dir / f'doc_{doc_ind:02d}'
+    this_doc_dir = doc_set_params.docs_dir / f'doc_{doc_ind:02d}'
     utils.mkdir_if_not_exist(this_doc_dir)
 
+    import pprint
+    from chillpill import params
+    print(params.__file__)
+    # pprint.pprint(doc_gen_params.to_dict())
+    # print()
+    # for k, v in doc_gen_params.__dict__.items():
+    #     print(type(k), type(v), k, v)
     utils.save_json(this_doc_dir / 'params.txt', doc_gen_params.to_dict())
 
     ########################################
@@ -197,17 +208,23 @@ if __name__ == '__main__':
     doc_settings.set_docs_dir()
 
     print(f'Saving to {str(doc_settings.docs_dir)}')
-    ocr_func = lambda doc_ind: make_and_ocr_docs(doc_ind, doc_settings)
-    ocr_outputs = Parallel(n_jobs=num_jobs)(delayed(ocr_func)(doc_ind) for doc_ind in range(doc_settings.num_docs))
+    # ocr_func = lambda doc_ind: make_and_ocr_docs(doc_ind, doc_settings)
+    # ocr_outputs = Parallel(n_jobs=num_jobs)(delayed(ocr_func)(doc_ind) for doc_ind in range(doc_settings.num_docs))
+    ocr_outputs = []
+    for doc_ind in range(doc_settings.num_docs):
+        ocr_outputs.append(make_and_ocr_docs.remote(doc_ind, doc_settings))
 
     # run the rest serially so vocabulizer is consistent across docs
     num_korv_classes, num_which_kv_classes = None, None
     vocabulizer = df_modifiers.Vocabulizer()
     rare_word_eliminator = \
-        df_modifiers.RareWordEliminator(vocabulizer=vocabulizer, min_count=doc_settings.min_count_to_keep_word)
+        df_modifiers.RareWordEliminator(
+            vocabulizer=vocabulizer,
+            min_count=doc_settings.doc_prep_params.min_count_to_keep_word,
+        )
 
     for ocr_output in ocr_outputs:
-        doc_ind, ocr_df, ocr_df_file, words_df, colored_page_image_files, this_doc_dir = ocr_output
+        doc_ind, ocr_df, ocr_df_file, words_df, colored_page_image_files, this_doc_dir = ray.get(ocr_output)
         print(f'Starting to postproc doc {doc_ind}')
         num_korv_classes, num_which_kv_classes, vocabulizer, rare_word_eliminator = \
             create_and_save_xy_csvs(
