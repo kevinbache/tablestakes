@@ -18,10 +18,11 @@ class OcrProvider(abc.ABC):
             self,
             page_image_files: List[str],
             save_raw_ocr_output_location: Union[Path, str],
+            do_print_timings=False,
     ) -> pd.DataFrame:
         ocr_page_outputs = []
         for page_ind, page_image_file in enumerate(page_image_files):
-            with utils.Timer(f"OCRing page {page_ind} of {len(page_image_files)}"):
+            with utils.Timer(f"OCRing page {page_ind} of {len(page_image_files)}", do_print_outputs=do_print_timings):
                 page_image = Image.open(page_image_file)
                 ocr_page_outputs.append(self._ocr_page_image(page_image))
         ocrd_pages_combined = self._combine_ocr_output(ocr_page_outputs)
@@ -39,10 +40,6 @@ class OcrProvider(abc.ABC):
     @abc.abstractmethod
     def _save_ocr_output(self, ocr_output: pd.DataFrame, save_raw_ocr_output_location: Union[str, Path]):
         pass
-
-    # @abc.abstractmethod
-    # def _ocr_output_2_doc(self, ocr_output: Any) -> doc.Document:
-    #     pass
 
     @abc.abstractmethod
     def _ocr_output_2_ocr_df(self, ocr_output: Any) -> pd.DataFrame:

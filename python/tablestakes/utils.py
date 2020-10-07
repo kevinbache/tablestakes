@@ -95,17 +95,20 @@ def print_tree(root: etree._Element):
 class Timer:
     TIME_FORMAT = '%H:%M:%S'
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, do_print_outputs=True):
         self.name = name
         self.name_str = '' if not self.name else f' "{self.name}"'
+        self.do_print_outputs = do_print_outputs
 
     def __enter__(self):
         self.t = time.time()
         time_str = time.strftime(self.TIME_FORMAT, time.localtime(self.t))
-        print(f'Starting timer{self.name_str} at time {time_str}.', end=" ")
+        if self.do_print_outputs:
+            print(f'Starting timer{self.name_str} at time {time_str}.', end=" ")
 
     def __exit__(self, *args):
-        print(f'Timer{self.name_str} took {time.time() - self.t:2.3g} secs.')
+        if self.do_print_outputs:
+           print(f'Timer{self.name_str} took {time.time() - self.t:2.3g} secs.')
 
 
 def levenshtein(a: str, b: str):

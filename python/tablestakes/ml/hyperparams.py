@@ -1,3 +1,5 @@
+import hashlib
+
 import numpy as np
 
 from chillpill import params
@@ -122,12 +124,10 @@ class DocSetParams(params.ParameterSet):
     docs_dir = None
 
     def _get_short_hash(self, num_chars=4):
-        return str(hex(hash(str(self.to_dict()))))[-num_chars:]
+        d = self.to_dict()
+        h = hashlib.sha1(str(d).encode('utf-8'))
+        return h.hexdigest()[-num_chars:]
 
     def set_docs_dir(self):
-        self.docs_dir = self.docs_root_dir / f'num={self.num_docs}_{self._get_short_hash()}'
-
-    # def __setstate__(self, d):
-    #     self.__dict__ = d
-    #     self.doc_gen_params = DocGenParams.from_dict(self.doc_gen_params)
-    #     self.doc_prep_params = DocPrepParams.from_dict(self.doc_prep_params)
+        self.docs_dir = \
+            self.docs_root_dir / f'num={self.num_docs}_{self._get_short_hash()}'

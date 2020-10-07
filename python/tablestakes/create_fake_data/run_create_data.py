@@ -10,7 +10,7 @@ ray.init(ignore_reinit_error=True)
 # https://tesseract-ocr.github.io/tessdoc/FAQ#can-i-increase-speed-of-ocr
 # doesn't do much since we're already doing process parallelizations
 # 7.5 sec / page -> 6.5 sec / page
-num_jobs = multiprocessing.cpu_count()
+num_jobs = multiprocessing.cpu_count() - 1
 
 os.environ["OMP_THREAD_LIMIT"] = f'{num_jobs}'
 
@@ -20,7 +20,7 @@ from tablestakes.create_fake_data import basic
 
 @ray.remote
 def make_and_ocr_docs(doc_ind, doc_set_params: hyperparams.DocSetParams):
-    print(f"STARTING TO CREATE DOC {doc_ind}")
+    print(f"Starting to create doc {doc_ind}")
     doc_gen_params = doc_set_params.doc_gen_params.sample()
     assert isinstance(doc_gen_params, hyperparams.DocGenParams)  # for pycharm autocomplete
 
@@ -47,6 +47,7 @@ def make_and_ocr_docs(doc_ind, doc_set_params: hyperparams.DocSetParams):
             etree_modifiers.WordColorizer(),
             df_saver,
         ],
+        do_use_timers=False,
     )
     doc = post_proc_stack(doc)
 
@@ -70,7 +71,7 @@ def make_and_ocr_docs(doc_ind, doc_set_params: hyperparams.DocSetParams):
     ############################################
     # paint all words with solid colored boxes #
     ############################################
-    doc = etree_modifiers.WordColorDocCssAdder(doc)(doc)
+    doc = etree_modifiers.WordColorDocCssAdder(doc)(doc, do_use_timers=False)
 
     ###################################
     # save colored html and pdf files #
@@ -103,15 +104,17 @@ def make_and_ocr_docs(doc_ind, doc_set_params: hyperparams.DocSetParams):
 
 
 @ray.remote
-def create_and_save_xy_csvs(
+def join_and_create_vocab(
         ocr_df,
         ocr_df_file,
         words_df,
         colored_page_image_files,
         this_doc_dir,
         vocabulizer: df_modifiers.Vocabulizer,
-        rare_word_eliminator: df_modifiers.RareWordEliminator,
+        # rare_word_eliminator: df_modifiers.RareWordEliminator,
 ):
+    print(f'Starting join_and_create_vocab on {this_doc_dir}')
+
     ##########################################
     # match ocr words to true words by color #
     ##########################################
@@ -123,17 +126,23 @@ def create_and_save_xy_csvs(
     ocr_df.to_csv(ocr_df_file)
     # Tokenizer changes the number of rows of the DF if there are any rows with multi-word text
 
-    joined_df = df_modifiers.DfModifierStack([
-        df_modifiers.Tokenizer(),
-        df_modifiers.CharCounter(),
-        df_modifiers.DetailedOtherCharCounter(),
-        df_modifiers.TokenPostProcessor(),
-        vocabulizer,
-    ])(joined_df)
+    joined_df = df_modifiers.DfModifierStack(
+        modifiers=[
+            df_modifiers.Tokenizer(),
+            df_modifiers.CharCounter(),
+            df_modifiers.DetailedOtherCharCounter(),
+            df_modifiers.TokenPostProcessor(),
+            vocabulizer,
+        ],
+        do_use_timers=False,
+    )(joined_df)
 
-    joined_df = df_modifiers.DfModifierStack([
-        rare_word_eliminator,
-    ])(joined_df)
+    return joined_df
+
+
+@ray.remote
+def eliminate_rare_words_and_save_dfs(joined_df, this_doc_dir, rare_word_eliminator):
+    joined_df = rare_word_eliminator.__call__.remote(joined_df)
     joined_df = ray.get(joined_df)
 
     x_base_cols = [
@@ -177,7 +186,7 @@ def create_and_save_xy_csvs(
         else:
             df.to_csv(final_data_dir / f'{name}.csv', index=False)
 
-    return len(y_korv_cols), len(y_which_kv_cols), vocabulizer, rare_word_eliminator
+    return len(y_korv_cols), len(y_which_kv_cols)
 
 
 if __name__ == '__main__':
@@ -197,21 +206,18 @@ if __name__ == '__main__':
         doc_gen_params=doc_gen_params,
         doc_prep_params=doc_prep_params,
     )
-    doc_settings.dpi = 400
-    doc_settings.num_extra_fields = 0
-    doc_settings.num_docs = 30
+    doc_settings.num_docs = 10000
+    doc_settings.doc_gen_params.dpi = 400
 
     fast_test = False
     if fast_test:
-        doc_settings.dpi = 100
-        doc_settings.num_extra_fields = 1
-        doc_settings.num_docs = 10
+        doc_settings.num_docs = 100
+        doc_settings.doc_gen_params.dpi = 100
+        doc_settings.doc_gen_params.num_extra_fields = 1
 
     doc_settings.set_docs_dir()
 
     print(f'Saving to {str(doc_settings.docs_dir)}')
-    # ocr_func = lambda doc_ind: make_and_ocr_docs(doc_ind, doc_settings)
-    # ocr_outputs = Parallel(n_jobs=num_jobs)(delayed(ocr_func)(doc_ind) for doc_ind in range(doc_settings.num_docs))
     ocr_outputs = []
     for doc_ind in range(doc_settings.num_docs):
         ocr_outputs.append(make_and_ocr_docs.remote(doc_ind, doc_settings))
@@ -219,33 +225,39 @@ if __name__ == '__main__':
     # run the rest serially so vocabulizer is consistent across docs
     num_korv_classes, num_which_kv_classes = None, None
     vocabulizer = df_modifiers.Vocabulizer.remote()
-    rare_word_eliminator = \
-        df_modifiers.RareWordEliminator.remote(
-            vocabulizer=vocabulizer,
-            min_count=doc_settings.doc_prep_params.min_count_to_keep_word,
-        )
 
+    joined_dfs = []
     for ocr_output in ocr_outputs:
         doc_ind, ocr_df, ocr_df_file, words_df, colored_page_image_files, this_doc_dir = ray.get(ocr_output)
-        print(f'Starting to postproc doc {doc_ind}')
-        create_and_save_output = create_and_save_xy_csvs.remote(
+        joined_df = join_and_create_vocab.remote(
             ocr_df,
             ocr_df_file,
             words_df,
             colored_page_image_files,
             this_doc_dir,
             vocabulizer,
-            rare_word_eliminator,
         )
+        joined_dfs.append(joined_df)
 
-    num_korv_classes, num_which_kv_classes, vocabulizer, rare_word_eliminator = ray.get(create_and_save_output)
+    # block until done
+    joined_dfs = ray.get(joined_dfs)
+
+    rare_word_eliminator = df_modifiers.RareWordEliminator.remote(
+        word_to_count=ray.get(vocabulizer.get_word_to_count.remote()),
+        min_count=doc_settings.doc_prep_params.min_count_to_keep_word,
+    )
+
+    for joined_dfs in joined_dfs:
+        save_dfs_output = eliminate_rare_words_and_save_dfs.remote(joined_df, this_doc_dir, rare_word_eliminator)
+
+    num_korv_classes, num_which_kv_classes = ray.get(save_dfs_output)
 
     utils.save_json(
-        doc_settings.docs_dir / 'word_to_id_pre_elimination.json',
-        ray.get(vocabulizer.get_word_to_id.remote())
+        doc_settings.docs_dir / 'pre_elimination_all_words.json',
+        ray.get(vocabulizer.get_all_words.remote())
     )
     utils.save_json(
-        doc_settings.docs_dir / 'word_to_count_pre_elimination.json',
+        doc_settings.docs_dir / 'pre_eliminiation_word_to_count.json',
         ray.get(vocabulizer.get_word_to_count.remote())
     )
     utils.save_json(
@@ -254,7 +266,7 @@ if __name__ == '__main__':
     )
     utils.save_json(
         doc_settings.docs_dir / 'word_to_id.json',
-        ray.get(rare_word_eliminator.get_word_to_count.remote())
+        ray.get(rare_word_eliminator.get_word_to_id.remote())
     )
 
     utils.save_json(
@@ -265,5 +277,8 @@ if __name__ == '__main__':
         },
     )
 
+    import time
+    time.sleep(3)
     print()
     print(f'Saved to {str(doc_settings.docs_dir)}')
+

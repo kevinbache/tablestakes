@@ -14,7 +14,7 @@ from tablestakes import html_css as hc, utils
 
 
 class EtreeModifier(abc.ABC):
-    def __call__(self, root_or_doc: Union[etree._Element, hc.Document]) -> Optional[hc.Document]:
+    def __call__(self, root_or_doc: Union[etree._Element, hc.Document], do_use_timers=True) -> Optional[hc.Document]:
         """If called on a document, wrap yourself in a Stack which does etree wrapping / unwrapping.
 
         This lets you write
@@ -22,7 +22,7 @@ class EtreeModifier(abc.ABC):
         which looks funny but works.
         """
         if isinstance(root_or_doc, hc.Document):
-            stack = EtreeModifierStack([self])
+            stack = EtreeModifierStack(modifiers=[self], do_use_timers=do_use_timers)
             return stack(root_or_doc)
         else:
             self._call_inner(root_or_doc)

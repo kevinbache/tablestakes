@@ -1,6 +1,6 @@
 import abc
 import collections
-from typing import List
+from typing import List, Dict
 import re
 
 import numpy as np
@@ -171,19 +171,18 @@ class Vocabulizer(DfModifier):
     VOCAB_ID_PRE_ELIMINATION_COL_NAME = 'vocab_id_pre_elimination'
 
     def __init__(self):
-        self._word_to_id = {}
-        self._word_to_count = {}
+        self._all_words = set()
+        self._word_to_count = collections.defaultdict(int)
 
     def __call__(self, df: pd.DataFrame) -> pd.DataFrame:
         for token in df[self.TOKEN_COL_NAME]:
-            if token not in self._word_to_id:
-                self._word_to_id[token] = len(self._word_to_id)
-                self._word_to_count[token] = 0
-            self._word_to_count[token] += 1
-        df[self.VOCAB_ID_PRE_ELIMINATION_COL_NAME] = \
-            df[self.TOKEN_COL_NAME].apply(lambda token: self._word_to_id[token])
+            self._inc_count(token)
 
         return df
+
+    def _inc_count(self, token):
+        self._all_words.add(token)
+        self._word_to_count[token] += 1
 
     def get_vocab_size(self):
         return len(self._word_to_id)
@@ -191,8 +190,8 @@ class Vocabulizer(DfModifier):
     def get_word_to_count(self):
         return self._word_to_count
 
-    def get_word_to_id(self):
-        return self._word_to_id
+    def get_all_words(self):
+        return sorted(self._all_words)
 
 
 @ray.remote
@@ -201,35 +200,35 @@ class RareWordEliminator(DfModifier):
     WORD_WAS_ELIMINATED_COL_NAME = 'was_removed_rare_token'
     VOCAB_ID_COL_NAME = 'vocab_id'
 
-    def __init__(self, vocabulizer: Vocabulizer, min_count=2):
+    def __init__(self, word_to_count: Dict[str, int], min_count: int = 2):
+        """Call after the Vocabulizer has been run."""
         self.min_count = min_count
-        self.vocabulizer = vocabulizer
+        self._word_to_count = None
+        self._word_to_id = None
+        self._counts = None
+        self.UNKNOWN_ID = None
+
+        self._counts = word_to_count
+
+        self._word_to_count = {k: v for k, v in sorted(self._counts.items()) if v >= self.min_count}
+        self._word_to_id = {
+            k: index
+            for index, k, in enumerate(self._word_to_count.keys())
+        }
+
+        self.UNKNOWN_ID = len(self._word_to_id)
+        self._word_to_id[self.UNKNOWN_TOKEN] = self.UNKNOWN_ID
+        self._word_to_count[self.UNKNOWN_TOKEN] = sum([v for v in self._counts.values() if v >= self.min_count])
 
     def __call__(self, df: pd.DataFrame) -> pd.DataFrame:
         TOKEN_COL_NAME = TokenPostProcessor.TOKEN_COL_NAME
         VOCAB_COL_NAME = self.VOCAB_ID_COL_NAME
 
-        if isinstance(self.vocabulizer, ray.actor.ActorHandle):
-            counts = ray.get(self.vocabulizer.get_word_to_count.remote())
-        else:
-            counts = self.vocabulizer.get_word_to_count()
-
-        self._word_to_count = {k: v for k, v in sorted(counts.items()) if v >= self.min_count}
-        self._word_to_id = {
-            k: index
-            for index, k, in enumerate(self._word_to_count.keys())
-            if k in self._word_to_count
-        }
-
-        unknown_id = len(self._word_to_id)
-        self._word_to_id[self.UNKNOWN_TOKEN] = unknown_id
-        self._word_to_count[self.UNKNOWN_TOKEN] = sum([v for v in counts.values() if v >= self.min_count])
-
         df[VOCAB_COL_NAME] = df[TOKEN_COL_NAME].apply(
-            lambda token: self._word_to_id[token] if token in self._word_to_id else unknown_id,
+            lambda token: self._word_to_id[token] if token in self._word_to_id else self.UNKNOWN_ID,
         )
 
-        df[self.WORD_WAS_ELIMINATED_COL_NAME] = (df[VOCAB_COL_NAME] == unknown_id).astype(np.int)
+        df[self.WORD_WAS_ELIMINATED_COL_NAME] = (df[VOCAB_COL_NAME] == self.UNKNOWN_ID).astype(np.int)
 
         return df
 
