@@ -111,7 +111,6 @@ def join_and_create_vocab(
         colored_page_image_files,
         this_doc_dir,
         vocabulizer: df_modifiers.Vocabulizer,
-        # rare_word_eliminator: df_modifiers.RareWordEliminator,
 ):
     print(f'Starting join_and_create_vocab on {this_doc_dir}')
 
@@ -124,8 +123,8 @@ def join_and_create_vocab(
     joined_df.to_csv(joined_dir / 'joined.csv')
     # ocr_df gets the join word_id columns added in WordColorMatcher.get_joined_df
     ocr_df.to_csv(ocr_df_file)
-    # Tokenizer changes the number of rows of the DF if there are any rows with multi-word text
 
+    # Tokenizer changes the number of rows of the DF if there are any rows with multi-word text
     joined_df = df_modifiers.DfModifierStack(
         modifiers=[
             df_modifiers.Tokenizer(),
