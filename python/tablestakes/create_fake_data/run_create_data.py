@@ -1,9 +1,6 @@
 import multiprocessing
 import os
 
-from tablestakes.constants import Y_KORV_NAME, Y_WHICH_KV_NAME, X_BASIC_NAME, X_VOCAB_NAME
-from tablestakes.ml import hyperparams
-
 import ray
 ray.init(ignore_reinit_error=True)
 
@@ -14,8 +11,9 @@ num_jobs = multiprocessing.cpu_count() - 1
 
 os.environ["OMP_THREAD_LIMIT"] = f'{num_jobs}'
 
-from tablestakes import utils, etree_modifiers, ocr, color_matcher, df_modifiers
+from tablestakes import utils, etree_modifiers, ocr, color_matcher, df_modifiers, constants
 from tablestakes.create_fake_data import basic
+from tablestakes.ml import hyperparams
 
 
 @ray.remote
@@ -174,7 +172,13 @@ def eliminate_rare_words_and_save_dfs(joined_df, this_doc_dir, rare_word_elimina
         joined_df,
         [x_base_cols, x_vocab_cols, y_korv_cols, y_which_kv_cols],
         do_output_leftovers_df=True,
-        names=[X_BASIC_NAME, X_VOCAB_NAME, Y_KORV_NAME, Y_WHICH_KV_NAME, 'meta'],
+        names=[
+            constants.X_BASIC_NAME,
+            constants.X_VOCAB_NAME,
+            constants.Y_KORV_NAME,
+            constants.Y_WHICH_KV_NAME,
+            'meta',
+        ],
     )
     Y_PREFIX = 'y_'
     for name, df in data_dfs.items():
