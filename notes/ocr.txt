@@ -1,6 +1,0 @@
-
-https://nanonets.com/blog/ocr-with-tesseract/
-
-https://source.opennews.org/articles/so-many-ocr-options/
-https://github.com/factful/ocr_testing
-https://github.com/emedvedev/attention-ocr

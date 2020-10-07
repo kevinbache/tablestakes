@@ -1,5 +1,0 @@
-associative embeddings
-https://scholar.google.com/scholar?cites=17872365231417177678&as_sdt=4005&sciodt=0,6&hl=en
-    https://papers.nips.cc/paper/6822-associative-embedding-end-to-end-learning-for-joint-detection-and-grouping.pdf
-    http://openaccess.thecvf.com/content_ECCV_2018/papers/Hei_Law_CornerNet_Detecting_Objects_ECCV_2018_paper.pdf
-    https://arxiv.org/pdf/1812.08008.pdf

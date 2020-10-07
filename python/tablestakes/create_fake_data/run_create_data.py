@@ -276,8 +276,6 @@ if __name__ == '__main__':
         },
     )
 
-    import time
-    time.sleep(3)
     print()
     print(f'Saved to {str(doc_settings.docs_dir)}')
 
