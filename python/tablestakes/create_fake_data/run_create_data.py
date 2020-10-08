@@ -1,15 +1,17 @@
 import multiprocessing
 import os
-
-import ray
-ray.init(ignore_reinit_error=True)
+import pandas as pd
 
 # https://tesseract-ocr.github.io/tessdoc/FAQ#can-i-increase-speed-of-ocr
 # doesn't do much since we're already doing process parallelizations
 # 7.5 sec / page -> 6.5 sec / page
-num_jobs = multiprocessing.cpu_count() - 1
+num_jobs = multiprocessing.cpu_count() - 2
 
 os.environ["OMP_THREAD_LIMIT"] = f'{num_jobs}'
+
+
+import ray
+ray.init(ignore_reinit_error=True)
 
 from tablestakes import utils, etree_modifiers, ocr, color_matcher, df_modifiers, constants
 from tablestakes.create_fake_data import basic
@@ -203,14 +205,15 @@ if __name__ == '__main__':
     doc_gen_params = hyperparams.DocGenParams()
 
     doc_prep_params = hyperparams.DocPrepParams()
-    doc_prep_params.min_count_to_keep_word = 2
+    doc_prep_params.min_count_to_keep_word = 4
 
     doc_settings = hyperparams.DocSetParams(
         doc_gen_params=doc_gen_params,
         doc_prep_params=doc_prep_params,
     )
-    doc_settings.num_docs = 10000
-    doc_settings.doc_gen_params.dpi = 400
+    doc_settings.num_docs = 1001
+    doc_settings.doc_gen_params.dpi = 300
+    doc_settings.doc_gen_params.num_extra_fields = 0
 
     fast_test = False
     if fast_test:
@@ -230,6 +233,7 @@ if __name__ == '__main__':
     vocabulizer = df_modifiers.Vocabulizer.remote()
 
     joined_dfs = []
+    doc_dirs = []
     for ocr_output in ocr_outputs:
         doc_ind, ocr_df, ocr_df_file, words_df, colored_page_image_files, this_doc_dir = ray.get(ocr_output)
         joined_df = join_and_create_vocab.remote(
@@ -241,17 +245,21 @@ if __name__ == '__main__':
             vocabulizer,
         )
         joined_dfs.append(joined_df)
+        doc_dirs.append(this_doc_dir)
 
     # block until done
     joined_dfs = ray.get(joined_dfs)
+    joined_dfs = [ray.get(df) for df in joined_dfs]
 
     rare_word_eliminator = df_modifiers.RareWordEliminator.remote(
         word_to_count=ray.get(vocabulizer.get_word_to_count.remote()),
         min_count=doc_settings.doc_prep_params.min_count_to_keep_word,
     )
 
-    for joined_dfs in joined_dfs:
-        save_dfs_output = eliminate_rare_words_and_save_dfs.remote(joined_df, this_doc_dir, rare_word_eliminator)
+    for doc_dir, joined_df in zip(doc_dirs, joined_dfs):
+        assert isinstance(joined_df, pd.DataFrame), \
+            f"joined_df isn't a df!  Did you ray.get right?  type(joined_df)={type(joined_df)}"
+        save_dfs_output = eliminate_rare_words_and_save_dfs.remote(joined_df, doc_dir, rare_word_eliminator)
 
     num_korv_classes, num_which_kv_classes = ray.get(save_dfs_output)
 

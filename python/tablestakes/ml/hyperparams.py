@@ -20,12 +20,12 @@ class LearningParams(params.ParameterSet):
 
     num_trans_enc_layers = 4
     num_trans_heads = 8
-    num_trans_fc_units = 1024
+    num_trans_fc_dim_mult = 4
 
     do_cat_x_base_before_fc = True
 
     #  fully connected
-    num_fc_blocks = 5
+    num_fc_blocks = 4
     log2num_neurons_start = 5
     log2num_neurons_end = 5
     num_fc_blocks_per_resid = 2
@@ -41,22 +41,22 @@ class LearningParams(params.ParameterSet):
     # korv, which_kv
     loss_weights = np.array([0.5, 1.0])
 
-    num_epochs = 2
+    num_epochs = 4
 
     ##############
     # data
     # batch size must be 1
-    batch_size_log2 = 5
+    batch_size_log2 = 4
     p_valid = 0.1
     p_test = 0.1
     data_dir = constants.DOCS_DIR
 
     # for data loading
-    num_workers = 2
+    num_workers = 4
 
     ##############
     # extra
-    num_steps_per_histogram_log = 100
+    num_steps_per_histogram_log = 50
 
 
 class DocGenParams(params.ParameterSet):

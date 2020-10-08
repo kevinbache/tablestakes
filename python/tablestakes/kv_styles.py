@@ -22,6 +22,9 @@ class KvAlign(enum.Enum):
         self.key_alignment = key_alignment
         self.value_alignment = value_alignment
 
+    def __repr__(self):
+        return f'{self.__class__.__name__}({self.key_alignment}, {self.value_alignment})'
+
 
 class KvGroup(hc.StyledHtmlTag, abc.ABC):
     def __init__(self, klass: Union[hc.HtmlClass, str]):

@@ -141,8 +141,8 @@ class TrapezoidConv1Module(pl.LightningModule):
             fc_layers.append(nn.LeakyReLU())
             prev_num_neurons = num_neurons
 
-            if not fc_ind % hp.num_fc_layers_per_dropout:
-                fc_layers.append(nn.Dropout(p=hp.dropout_p))
+            # if not fc_ind % hp.num_fc_layers_per_dropout:
+            #     fc_layers.append(nn.Dropout(p=hp.dropout_p))
 
         self.fc_layers = nn.ModuleList(fc_layers)
 

@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
+from torch.nn.modules import activation
 from torch.utils.data import DataLoader
 
 import pytorch_lightning as pl
@@ -15,7 +16,7 @@ from pytorch_lightning.metrics import TensorMetric, Metric
 from pytorch_lightning import loggers as pl_loggers
 
 from tablestakes import constants, utils
-from tablestakes.ml import data
+from tablestakes.ml import data, hyperparams, ablation
 from tablestakes.ml.hyperparams import LearningParams
 
 
@@ -106,25 +107,72 @@ class FullyConv1Resnet(nn.Module):
 
 
 class ReachAroundTransformer(nn.Module):
+    """x_base and x_vocab are inputs to the transformer and a raw x_base is also appended to the output"""
     def __init__(self, blah):
         super().__init__()
-        # self.
+
+
+def get_fast_linear_attention_encoder(hp: hyperparams.LearningParams, num_trans_input_dims: int):
+    """https://github.com/idiap/fast-transformers"""
+    from fast_transformers.builders import TransformerEncoderBuilder
+
+    # Create the builder for our transformers
+    builder = TransformerEncoderBuilder.from_kwargs(
+        n_layers=hp.num_trans_enc_layers,
+        n_heads=hp.num_trans_heads,
+        query_dimensions=num_trans_input_dims // hp.num_trans_heads,
+        value_dimensions=num_trans_input_dims // hp.num_trans_heads,
+        feed_forward_dimensions=num_trans_input_dims * hp.num_trans_fc_dim_mult,
+        attention_type='linear',
+        activation='gelu',
+    )
+
+    # Build a transformer with linear attention
+    return builder.get()
+
+
+def get_performer_encoder(hp: hyperparams.LearningParams, num_trans_input_dims: int):
+    """https://github.com/lucidrains/performer-pytorch"""
+    from performer_pytorch import Performer
+    return Performer(
+        dim=num_trans_input_dims,
+        depth=hp.num_trans_enc_layers,
+        heads=hp.num_trans_heads,
+        ff_mult=hp.num_trans_fc_dim_mult,
+    )
+
+
+def get_pytorch_transformer_encoder(hp: hyperparams.LearningParams, num_trans_input_dims: int):
+    enc_layer = nn.TransformerEncoderLayer(
+        d_model=num_trans_input_dims,
+        nhead=hp.num_trans_heads,
+        dim_feedforward=hp.num_trans_fc_dim_mult * num_trans_input_dims,
+        activation='gelu'
+    )
+
+    return nn.TransformerEncoder(
+        encoder_layer=enc_layer,
+        num_layers=hp.num_trans_enc_layers,
+    )
+
+
+def get_simple_ablatable_transformer_encoder(
+        hp: hyperparams.LearningParams,
+        num_trans_input_dims: int,
+        do_drop_k=True,
+):
+    return ablation.Encoder(
+        d_model=num_trans_input_dims,
+        num_layers=hp.num_trans_enc_layers,
+        num_heads=hp.num_trans_heads,
+        d_ff_mult=hp.num_trans_fc_dim_mult,
+        do_drop_k=do_drop_k,
+    )
 
 
 class RectTransformerModule(pl.LightningModule):
     LOSS_VAL_NAME = 'loss'
     WORD_ACC_VAL_NAME = 'acc'
-
-    # todo: really i need to split the datapoints first and then calculate the vocab
-    # todo: remove rare words
-    # todo: use some kind of pretrained embeddings
-    """ 
-    If using pretrained embeddings then don't need to think about vocab and data splitting
-    Just need something in the tokenizer to handle out of vocab words
-    """
-    # @staticmethod
-    # def _recalc_vocab_size(ds: data.XYCsvDataset):
-    #     return torch.stack([xs[1].max() for xs in ds._xs]).max().item()
 
     def __init__(
             self,
@@ -141,7 +189,6 @@ class RectTransformerModule(pl.LightningModule):
         self.num_y_classes = utils.load_json(data_dir / constants.NUM_Y_CLASSES_FILENAME)
         self.word_to_id = utils.load_json(data_dir / constants.WORD_ID_FILENAME)
         self.word_to_count = utils.load_json(data_dir / constants.WORD_COUNT_FILENAME)
-
 
         self.ds = data.XYCsvDataset(self.data_dir)
 
@@ -200,78 +247,16 @@ class RectTransformerModule(pl.LightningModule):
         else:
             num_trans_input_dims = self.hp.num_basic_plus_embed_dims
 
+        self.encoder = get_pytorch_transformer_encoder(self.hp, num_trans_input_dims)
+        # self.encoder = get_simple_ablatable_transformer_encoder(
+        #     self.hp,
+        #     num_trans_input_dims,
+        #     do_drop_k=False,
+        # )
 
-
-        class MultiheadAttention(nn.MultiheadAttention):
-            def __init__(self, embed_dim, num_heads, dropout=0., bias=True, add_bias_kv=False, add_zero_attn=False,
-                         kdim=None, vdim=None):
-                super(MultiheadAttention, self).__init__()
-                self.embed_dim = embed_dim
-                self.kdim = kdim if kdim is not None else embed_dim
-                self.vdim = vdim if vdim is not None else embed_dim
-                self._qkv_same_embed_dim = self.kdim == embed_dim and self.vdim == embed_dim
-
-                self.num_heads = num_heads
-                self.dropout = dropout
-                self.head_dim = embed_dim // num_heads
-                assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
-
-                if self._qkv_same_embed_dim is False:
-                    self.q_proj_weight = nn.modules.activation.Parameter(torch.Tensor(embed_dim, embed_dim))
-                    self.k_proj_weight = nn.modules.activation.Parameter(torch.Tensor(embed_dim, self.kdim))
-                    self.v_proj_weight = nn.modules.activation.Parameter(torch.Tensor(embed_dim, self.vdim))
-                    self.register_parameter('in_proj_weight', None)
-                else:
-                    self.in_proj_weight = nn.modules.activation.Parameter(torch.empty(3 * embed_dim, embed_dim))
-                    self.register_parameter('q_proj_weight', None)
-                    self.register_parameter('k_proj_weight', None)
-                    self.register_parameter('v_proj_weight', None)
-
-                if bias:
-                    self.in_proj_bias = nn.modules.activation.Parameter(torch.empty(3 * embed_dim))
-                else:
-                    self.register_parameter('in_proj_bias', None)
-                self.out_proj = nn.modules.activation._LinearWithBias(embed_dim, embed_dim)
-
-                if add_bias_kv:
-                    self.bias_k = nn.modules.activation.Parameter(torch.empty(1, 1, embed_dim))
-                    self.bias_v = nn.modules.activation.Parameter(torch.empty(1, 1, embed_dim))
-                else:
-                    self.bias_k = self.bias_v = None
-
-                self.add_zero_attn = add_zero_attn
-
-                self._reset_parameters()
-
-        class TransformerEncoderAblationLayer(nn.TransformerEncoderLayer):
-            """Just a version of the TransformerEncoderLayer which can ignore the key or query dict"""
-            def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1, activation="relu"):
-                super().super().__init__()
-                self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
-                # Implementation of Feedforward model
-                self.linear1 = nn.Linear(d_model, dim_feedforward)
-                self.dropout = nn.Dropout(dropout)
-                self.linear2 = nn.Linear(dim_feedforward, d_model)
-
-                self.norm1 = nn.LayerNorm(d_model)
-                self.norm2 = nn.LayerNorm(d_model)
-                self.dropout1 = nn.Dropout(dropout)
-                self.dropout2 = nn.Dropout(dropout)
-
-                self.activation = torch.nn.modules.transformer._get_activation_fn(activation)
-
-        enc_layer = nn.TransformerEncoderLayer(
-            d_model=num_trans_input_dims,
-            nhead=self.hp.num_trans_heads,
-            dim_feedforward=self.hp.num_trans_fc_units,
-            activation='gelu'
-        )
-
-        self.encoder = nn.TransformerEncoder(
-            encoder_layer=enc_layer,
-            num_layers=hp.num_trans_enc_layers,
-        )
-
+        ######################################################################
+        ### CAT
+        ######################################################################
         if self.hp.do_cat_x_base_before_fc:
             self.hp.num_fc_inputs = num_trans_input_dims + num_x_basic_dims
         else:
@@ -322,7 +307,9 @@ class RectTransformerModule(pl.LightningModule):
             x = x.permute(0, 2, 1)
 
         ##########
+        # x = x.permute(0, 2, 1)
         x = self.encoder(x)
+        # x = x.permute(0, 2, 1)
 
         if self.hp.do_cat_x_base_before_fc:
             x = torch.cat([x, x_basic], dim=-1)
@@ -330,7 +317,10 @@ class RectTransformerModule(pl.LightningModule):
         x = x.permute(0, 2, 1)
         x = self.fc_module(x)
 
-        y_hats = {name: layer(x).permute(0, 2, 1) for name, layer in zip(self.num_y_classes.keys(), self.heads)}
+        y_hats = {
+            name: layer(x).permute(0, 2, 1)
+            for name, layer in zip(self.num_y_classes.keys(), self.heads)
+        }
         return y_hats
 
     def _inner_forward_step(self, batch):
@@ -456,9 +446,9 @@ class RectTransformerModule(pl.LightningModule):
     # ---------------------
     def configure_optimizers(self):
         optimizer = optim.AdamW(self.parameters(), lr=self.hp.lr)
-        return [optimizer]
-        # scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5)
-        # return [optimizer], [scheduler]
+        # return [optimizer]
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5)
+        return [optimizer], [scheduler]
 
     def prepare_data(self):
         # called on one gpu
@@ -480,13 +470,13 @@ class RectTransformerModule(pl.LightningModule):
         pass
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=1, num_workers=self.hp.num_workers)
+        return DataLoader(self.train_dataset, batch_size=1, shuffle=True, num_workers=self.hp.num_workers)
 
     def val_dataloader(self):
-        return DataLoader(self.valid_dataset, batch_size=1, num_workers=self.hp.num_workers)
+        return DataLoader(self.valid_dataset, batch_size=1, shuffle=False, num_workers=self.hp.num_workers)
 
     def test_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=1, num_workers=self.hp.num_workers)
+        return DataLoader(self.test_dataset, batch_size=1, shuffle=False, num_workers=self.hp.num_workers)
 
 
 if __name__ == '__main__':
@@ -494,11 +484,12 @@ if __name__ == '__main__':
     # from torchnlp.encoders.text import WhitespaceEncoder
     # from torchnlp.word_to_vector import GloVe
 
-    dataset_name = 'num=100_nextra=1_maxoffin=3'
+    # dataset_name = 'num=100_60d9'
+    dataset_name = 'num=1000_4475'
 
     hp = LearningParams()
     trainer = pl.Trainer(
-        logger=pl_loggers.TensorBoardLogger(constants.LOGS_DIR, name="trans1d_trial"),
+        logger=pl_loggers.TensorBoardLogger(constants.LOGS_DIR, name="trans1d_trial2"),
         max_epochs=hp.num_epochs,
         weights_summary='full',
         fast_dev_run=False,
