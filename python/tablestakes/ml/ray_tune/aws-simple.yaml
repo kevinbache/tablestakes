@@ -1,4 +1,4 @@
-cluster_name: aws-h=m4-w=g4dn-1
+cluster_name: aws-h=m4-w=g4dn-2
 
 provider:
     type: aws

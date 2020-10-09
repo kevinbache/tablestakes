@@ -2,8 +2,6 @@ import argparse
 from pathlib import Path
 from typing import *
 
-import numpy as np
-
 import pytorch_lightning as pl
 from pytorch_lightning import loggers as pl_loggers
 
@@ -22,10 +20,19 @@ class ParamCounterCallback(pl.Callback):
     PARAM_COUNT_NAME = 'param_count'
 
     def on_train_start(self, trainer, pl_module):
-        d = {
-            self.PARAM_COUNT_NAME: sum(p.numel() for p in pl_module.parameters() if p.requires_grad),
-        }
+        d = {self.PARAM_COUNT_NAME: sum(p.numel() for p in pl_module.parameters() if p.requires_grad)}
         tune.report(**d)
+
+
+class LogCopierCallback(pl.Callback):
+    def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, **kwargs):
+        trainer.callback_metrics.update(trainer.logged_metrics)
+
+    def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule):
+        trainer.callback_metrics.update(trainer.logged_metrics)
+
+    def on_test_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule):
+        trainer.callback_metrics.update(trainer.logged_metrics)
 
 
 def train_fn(config: Dict):
@@ -42,6 +49,7 @@ def train_fn(config: Dict):
 
     callbacks = [
         ParamCounterCallback(),
+        LogCopierCallback(),
         tune_pl.TuneReportCallback(
             metrics=phase_metric_names[model_transformer.RectTransformerModule.TRAIN_PHASE_NAME],
             on='train_end',
@@ -59,8 +67,9 @@ def train_fn(config: Dict):
 
     trainer = pl.Trainer(
         callbacks=callbacks,
-        logger=pl_loggers.TensorBoardLogger(constants.LOGS_DIR, name=hp.project_name),
+        logger=pl_loggers.TensorBoardLogger(save_dir=tune.get_trial_dir(), name=hp.project_name, version="."),
         max_epochs=hp.num_epochs,
+        gpus=hp.num_gpus,
         weights_summary='full',
         accumulate_grad_batches=utils.pow2int(hp.log2_batch_size),
         profiler=True,
@@ -72,72 +81,75 @@ def train_fn(config: Dict):
 
 
 if __name__ == '__main__':
-    search_params = hyperparams.LearningParams(
-        ##############
-        # model
-        #  embedder
-        num_embedding_dim=params.Discrete([20, 20+16, 20+32]),
-        do_include_embeddings=params.Boolean(p_true=0.9),
+    search_params = hyperparams.LearningParams()
 
-        #  transformer
-        pre_trans_linear_dim=None,
+    ##############
+    # model
+    #  embedder
+    search_params.num_embedding_dim = params.Discrete([20, 20+16, 20+32])
+    search_params.do_include_embeddings = params.Boolean(p_true=0.9)
 
-        num_trans_enc_layers=params.Discrete([4, 6, 8, 12, 16]),
-        num_trans_heads=params.Discrete([2, 4, 8, 16]),
-        num_trans_fc_dim_mult=params.Discrete([2, 3, 4, 6]),
+    #  transformer
+    search_params.pre_trans_linear_dim = None
 
-        do_cat_x_base_before_fc=params.Boolean(p_true=0.9),
+    search_params.num_trans_enc_layers = params.Discrete([4, 6, 8, 12, 16])
+    search_params.num_trans_heads = params.Discrete([2, 4, 8, 16])
+    search_params.num_trans_fc_dim_mult = params.Discrete([2, 3, 4, 6])
 
-        #  fully connected
-        num_fc_blocks=params.Discrete([4, 6, 8, 12, 16]),
-        log2num_neurons_start=params.Integer(3, 10),
-        log2num_neurons_end=params.Integer(3, 10),
-        num_fc_blocks_per_resid=params.Integer(1, 4),
+    search_params.do_cat_x_base_before_fc = params.Boolean(p_true=0.9)
 
-        num_fc_layers_per_dropout=params.Discrete([1, 2, 4, 8]),
-        # prob of dropping each unit
-        dropout_p=params.Float(0.1, 0.7),
+    #  fully connected
+    search_params.num_fc_blocks = params.Discrete([4, 6, 8, 12, 16])
+    search_params.log2num_neurons_start = params.Integer(3, 10)
+    search_params.log2num_neurons_end = params.Integer(3, 10)
+    search_params.num_fc_blocks_per_resid = params.Integer(1, 4)
 
-        ##############
-        # optimization
-        lr=params.Discrete([1e-4, 3e-4, 1e-3, 3e-3, 1e-2]),
+    search_params.num_fc_layers_per_dropout = params.Discrete([1, 2, 4, 8])
+    # prob of dropping each unit
+    search_params.dropout_p = params.Float(0.1, 0.7)
 
-        # korv, which_kv
-        korv_loss_weight=params.Discrete([0.1, 0.5, 1.0]),
+    ##############
+    # optimization
+    search_params.lr = params.Discrete([1e-4, 3e-4, 1e-3, 3e-3, 1e-2])
 
-        num_epochs=1000,
+    # korv, which_kv
+    search_params.korv_loss_weight = params.Discrete([0.1, 0.5, 1.0])
 
-        ##############
-        # hp search
-        num_hp_samples=100,
-        search_metric=model_transformer.RectTransformerModule.get_valid_metric_name('acc', 'which_kv'),
-        search_mode='max',
-        asha_grace_period=4,
-        asha_reduction_factor=4,
+    search_params.num_epochs = 1000
 
-        ##############
-        # data
-        # batch size must be 1
-        batch_size_log2=params.Integer(0, 12),
-        p_valid=0.1,
-        p_test=0.1,
-        data_dir=constants.DOCS_DIR / 'num=1000_4475',
+    ##############
+    # hp search
+    search_params.num_hp_samples = 100
+    search_params.search_metric = model_transformer.RectTransformerModule.get_valid_metric_name('acc', 'which_kv')
+    search_params.search_mode = 'max'
+    search_params.asha_grace_period = 4
+    search_params.asha_reduction_factor = 4
 
-        # for data loading
-        num_workers=4,
+    ##############
+    # data
+    # batch size must be 1
+    search_params.batch_size_log2 = params.Integer(0, 12)
+    search_params.p_valid = 0.1
+    search_params.p_test = 0.1
+    search_params.data_dir = constants.DOCS_DIR / 'num=1000_4475'
 
-        ##############
-        # extra
-        num_steps_per_histogram_log=50,
+    # for data loading
+    search_params.num_workers = 4
 
-        upload_dir='s3://kb-tester-2020-10-08',
-        project_name='tablestakes_trans1d_tests',
+    ##############
+    # extra
+    search_params.num_steps_per_histogram_log = 50
+    search_params.upload_dir = 's3://kb-tester-2020-10-08'
+    search_params.project_name = 'tablestakes_trans1d_tests'
+    search_params.num_gpus = 1
+    search_params.seed = 4
 
-        seed=42,
-    )
 
     import socket
-    do_fast_test = socket.gethostname().endswith('.local')
+    hostname = socket.gethostname()
+    do_fast_test = hostname.endswith('.local')
+
+
 
     if do_fast_test:
         search_params.num_epochs = 10
@@ -200,7 +212,7 @@ if __name__ == '__main__':
         # name=None,
         stop={"training_iteration": search_params.num_epochs},
         config=search_dict,
-        resources_per_trial={"cpu": 1, "gpu": 0},
+        resources_per_trial={"cpu": 2, "gpu": search_params.num_gpus},
         num_samples=search_params.num_hp_samples,
         # local_dir=None,
         # upload_dir=search_params.upload_dir,

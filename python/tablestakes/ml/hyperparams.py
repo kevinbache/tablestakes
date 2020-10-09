@@ -69,6 +69,8 @@ class LearningParams(params.ParameterSet):
     upload_dir = 's3://kb-tester-2020-10-08'
     project_name = 'tablestakes_trans1d_tests'
 
+    num_gpus = 1
+
     seed = 42
 
 
