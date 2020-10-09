@@ -111,7 +111,7 @@ class RectTransformerModule(pl.LightningModule):
         )
 
         # TODO: requires grad = false? buffer?
-        self.loss_weights = self.register_buffer(
+        self.register_buffer(
             'loss_weights',
             torch.tensor([self.hp.korv_loss_weight, 1.0], dtype=torch.float),
         )
@@ -165,7 +165,6 @@ class RectTransformerModule(pl.LightningModule):
             F.cross_entropy(y_hat.squeeze(0), y.view(-1))
             for y, y_hat in zip(ys_dict.values(), y_hats_dict.values())
         ])
-        self.loss_weights
         losses = torch.mul(losses, self.loss_weights)
         loss = losses.sum()
 
@@ -276,13 +275,31 @@ class RectTransformerModule(pl.LightningModule):
         pass
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=1, shuffle=True, num_workers=self.hp.num_workers)
+        return DataLoader(
+            self.train_dataset,
+            batch_size=1,
+            shuffle=True,
+            num_workers=self.hp.num_workers,
+            pin_memory=self.hp.num_gpus > 0,
+        )
 
     def val_dataloader(self):
-        return DataLoader(self.valid_dataset, batch_size=1, shuffle=False, num_workers=self.hp.num_workers)
+        return DataLoader(
+            self.valid_dataset,
+            batch_size=1,
+            shuffle=True,
+            num_workers=self.hp.num_workers,
+            pin_memory=self.hp.num_gpus > 0,
+        )
 
     def test_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=1, shuffle=False, num_workers=self.hp.num_workers)
+        return DataLoader(
+            self.test_dataset,
+            batch_size=1,
+            shuffle=True,
+            num_workers=self.hp.num_workers,
+            pin_memory=self.hp.num_gpus > 0,
+        )
 
 
 if __name__ == '__main__':

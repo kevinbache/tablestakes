@@ -78,8 +78,8 @@ class DocGenParams(params.ParameterSet):
     margin = '0.5in'
     page_size = hc.PageSize.LETTER
     dpi = params.Discrete.from_prob_dict({
-        400: 1,
-        500: 1,
+        300: 1,
+        250: 1,
     })
 
     do_randomize_field_order = True
@@ -90,9 +90,9 @@ class DocGenParams(params.ParameterSet):
         0: 1,
         1: 1,
     })
-    font_size_px = params.Integer(8, 18)
-    val_font_size_px = params.Integer(8, 18)
-    do_regen_font_val_size = params.Boolean(0.5)
+    font_size_px = params.Integer(8, 19)
+    val_font_size_px = params.Integer(8, 19)
+    do_regen_font_val_size = params.Boolean(0.4)
     table_cell_padding_px = params.Integer(1, 7)
     do_bold_keys = params.Boolean(p_true=0.2)
     do_add_colon_to_keys = params.Boolean(p_true=0.2)
