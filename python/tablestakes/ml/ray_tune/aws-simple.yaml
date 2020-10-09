@@ -22,18 +22,20 @@ head_node:
     InstanceType: m4.large
     ImageId: latest_dlami
 
-`worker_nodes:
+worker_nodes:
     InstanceType: g4dn.xlarge
     ImageId: latest_dlami
     InstanceMarketOptions:
         MarketType: spot
         SpotOptions:
             MaxPrice: "0.30"
-`
+
 # Remote -> Local
 file_mounts: {
 #    ~/projects/ray: ~/projects/ray,
     ~/.wandb_api_key: ~/.wandb_api_key,
+    "/tmp/tablestakes_current_branch_sha": "~/projects/tablestakes/.git/refs/heads/master",
+    "/tmp/chillpill_current_branch_sha": "~/projects/chillpill/.git/refs/heads/master",
 }
 
 setup_commands:
@@ -46,13 +48,22 @@ setup_commands:
 
     # i don't need these cause i'm using my local copy
     - pip install ray ray[tune] ray[rllib] ray[dashboard]
-#    - git clone https://github.com/ray-project/ray.git ~/projects/ray
-    - python ~/projects/ray/python/ray/setup-dev.py --yes
+##    - git clone https://github.com/ray-project/ray.git ~/projects/ray
+#    - python ~/projects/ray/python/ray/setup-dev.py --yes
 
     # for https://docs.ray.io/en/stable/webui.html
     - jupyter nbextension enable --py --sys-prefix widgetsnbextension
 #    - echo "************** about to install boto3>=1.10.44 **************"
 #    - pip install boto3>=1.10.44
+
+    - test -e chillpill || git clone https://github.com/kevinbache/chillpill.git
+    - cd chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
+    - pip install --editable ~/chillpill/
+
+    - test -e tablestakes || git clone https://github.com/kevinbache/tablestakes.git
+    - cd tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
+    - pip install --editable ~/tablestakes/python/
+
     - echo "************** done **************"
 
 
