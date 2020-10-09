@@ -144,19 +144,16 @@ if __name__ == '__main__':
     search_params.num_gpus = 1
     search_params.seed = 4
 
-
     import socket
     hostname = socket.gethostname()
     do_fast_test = hostname.endswith('.local')
-
-
 
     if do_fast_test:
         search_params.num_epochs = 10
         search_params.num_hp_samples = 10
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--address", default='localhost:6379')
+    parser.add_argument("--address", default='auto')
     args = parser.parse_args()
 
     ray.init(

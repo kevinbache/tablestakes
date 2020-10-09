@@ -111,7 +111,10 @@ class RectTransformerModule(pl.LightningModule):
         )
 
         # TODO: requires grad = false? buffer?
-        self.loss_weights = torch.tensor([self.hp.korv_loss_weight, 1.0], dtype=torch.float, device=self.device)
+        self.loss_weights = self.register_buffer(
+            'loss_weights',
+            torch.tensor([self.hp.korv_loss_weight, 1.0], dtype=torch.float),
+        )
 
         # output
         self.heads = nn.ModuleList([
@@ -162,6 +165,7 @@ class RectTransformerModule(pl.LightningModule):
             F.cross_entropy(y_hat.squeeze(0), y.view(-1))
             for y, y_hat in zip(ys_dict.values(), y_hats_dict.values())
         ])
+        self.loss_weights
         losses = torch.mul(losses, self.loss_weights)
         loss = losses.sum()
 
