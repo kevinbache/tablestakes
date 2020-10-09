@@ -39,14 +39,22 @@ class LearningParams(params.ParameterSet):
     lr = 0.001
 
     # korv, which_kv
-    loss_weights = np.array([0.5, 1.0])
+    korv_loss_weight = 0.5
 
     num_epochs = 4
 
     ##############
+    # hp search
+    num_hp_samples = 100
+    search_metric = 'valid_acc_which_kv'
+    search_mode = 'max'
+    asha_grace_period = 4
+    asha_reduction_factor = 4
+
+    ##############
     # data
     # batch size must be 1
-    batch_size_log2 = 4
+    log2_batch_size = 5
     p_valid = 0.1
     p_test = 0.1
     data_dir = constants.DOCS_DIR
@@ -56,7 +64,12 @@ class LearningParams(params.ParameterSet):
 
     ##############
     # extra
-    num_steps_per_histogram_log = 50
+    num_steps_per_histogram_log = 100
+
+    upload_dir = 's3://kb-tester-2020-10-08'
+    project_name = 'tablestakes_trans1d_tests'
+
+    seed = 42
 
 
 class DocGenParams(params.ParameterSet):
@@ -69,7 +82,7 @@ class DocGenParams(params.ParameterSet):
 
     do_randomize_field_order = True
 
-    group_offset_in = params.Double(0.0, 3.0)
+    group_offset_in = params.Float(0.0, 3.0)
     do_set_invisible_border = params.Boolean(p_true=0.9)
     num_extra_fields = params.Discrete.from_prob_dict({
         0: 1,

@@ -78,8 +78,8 @@ class TrapezoidConv1Module(pl.LightningModule):
         self.hp.num_y_dims = self.ds.num_y_dims
 
         # or implement only in gradient averaging
-        assert self.hp.batch_size_log2 == 0
-        self.hp.batch_size = int(math.pow(2, self.hp.batch_size_log2))
+        assert self.hp.log2_batch_size == 0
+        self.hp.batch_size = int(math.pow(2, self.hp.log2_batch_size))
 
         # save all variables in __init__ signature to self.hparams
         self.hparams = self.hp.to_dict()

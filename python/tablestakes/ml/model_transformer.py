@@ -1,6 +1,6 @@
 import math
 from pathlib import Path
-from typing import Any, Optional, List, Dict, Union
+from typing import Optional, List, Dict, Union
 
 import numpy as np
 
@@ -8,189 +8,32 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
-from torch.nn.modules import activation
 from torch.utils.data import DataLoader
 
 import pytorch_lightning as pl
-from pytorch_lightning.metrics import TensorMetric, Metric
+from pytorch_lightning.metrics import Metric
 from pytorch_lightning import loggers as pl_loggers
 
 from tablestakes import constants, utils
-from tablestakes.ml import data, hyperparams, ablation
-from tablestakes.ml.hyperparams import LearningParams
-
-
-class WordAccuracy(TensorMetric):
-    def __init__(
-            self,
-            reduce_group: Any = None,
-    ):
-        super().__init__('acc', reduce_group)
-
-    def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-        is_correct = target.view(-1) == torch.argmax(pred, dim=-1).view(-1)
-        return is_correct.float().mean()
-
-
-class SizedSequential(nn.Sequential):
-    def __init__(self, *args, num_output_features):
-        super().__init__(*args)
-
-        self._num_output_features = num_output_features
-
-    def get_num_output_features(self):
-        return self._num_output_features
-
-
-def resnet_conv1_block(
-        num_input_features: int,
-        num_hidden_features: int,
-        activation=nn.LeakyReLU,
-):
-    return SizedSequential(
-        nn.BatchNorm1d(num_input_features),
-        activation(),
-        nn.Conv1d(num_input_features, num_hidden_features, 1),
-        num_output_features=num_hidden_features,
-    )
-
-
-class FullyConv1Resnet(nn.Module):
-    """
-    Would be a normal resnet but I don't want to fix the size.
-
-    https://towardsdatascience.com/an-overview-of-resnet-and-its-variants-5281e2f56035
-    """
-    def __init__(
-            self,
-            num_input_features: int,
-            neuron_counts: List[int],
-            num_blocks_per_residual=2,
-            activation=nn.LeakyReLU,
-    ):
-        super().__init__()
-        self.neuron_counts = neuron_counts
-        self.num_blocks_per_residual = num_blocks_per_residual
-        self.activation = activation
-
-        all_counts = [num_input_features] + neuron_counts
-        self._num_output_features = all_counts[-1]
-
-        self.blocks = nn.ModuleList([
-            resnet_conv1_block(num_in, num_hidden, self.activation)
-            for num_in, num_hidden in zip(all_counts, all_counts[1:])
-        ])
-
-        resizers = []
-        prev_size = all_counts[0]
-        for block_ind, block in enumerate(self.blocks):
-            if block_ind and block_ind % self.num_blocks_per_residual == 0:
-                new_size = block.get_num_output_features()
-                resizers.append(nn.Conv1d(prev_size, new_size, 1))
-                prev_size = new_size
-            else:
-                resizers.append(None)
-
-        self.resizers = nn.ModuleList(resizers)
-
-    def forward(self, x):
-        old_x = x
-        for block_index, (block, resizer) in enumerate(zip(self.blocks, self.resizers)):
-            x = block(x)
-            if block_index and block_index % self.num_blocks_per_residual == 0:
-                x += resizer(old_x)
-                old_x = x
-        return x
-
-    def get_num_outputs(self):
-        return self._num_output_features
-
-
-class ReachAroundTransformer(nn.Module):
-    """x_base and x_vocab are inputs to the transformer and a raw x_base is also appended to the output"""
-    def __init__(self, blah):
-        super().__init__()
-
-
-def get_fast_linear_attention_encoder(hp: hyperparams.LearningParams, num_trans_input_dims: int):
-    """https://github.com/idiap/fast-transformers"""
-    from fast_transformers.builders import TransformerEncoderBuilder
-
-    # Create the builder for our transformers
-    builder = TransformerEncoderBuilder.from_kwargs(
-        n_layers=hp.num_trans_enc_layers,
-        n_heads=hp.num_trans_heads,
-        query_dimensions=num_trans_input_dims // hp.num_trans_heads,
-        value_dimensions=num_trans_input_dims // hp.num_trans_heads,
-        feed_forward_dimensions=num_trans_input_dims * hp.num_trans_fc_dim_mult,
-        attention_type='linear',
-        activation='gelu',
-    )
-
-    # Build a transformer with linear attention
-    return builder.get()
-
-
-def get_performer_encoder(hp: hyperparams.LearningParams, num_trans_input_dims: int):
-    """https://github.com/lucidrains/performer-pytorch"""
-    from performer_pytorch import Performer
-    return Performer(
-        dim=num_trans_input_dims,
-        depth=hp.num_trans_enc_layers,
-        heads=hp.num_trans_heads,
-        ff_mult=hp.num_trans_fc_dim_mult,
-    )
-
-
-def get_pytorch_transformer_encoder(hp: hyperparams.LearningParams, num_trans_input_dims: int):
-    enc_layer = nn.TransformerEncoderLayer(
-        d_model=num_trans_input_dims,
-        nhead=hp.num_trans_heads,
-        dim_feedforward=hp.num_trans_fc_dim_mult * num_trans_input_dims,
-        activation='gelu'
-    )
-
-    return nn.TransformerEncoder(
-        encoder_layer=enc_layer,
-        num_layers=hp.num_trans_enc_layers,
-    )
-
-
-def get_simple_ablatable_transformer_encoder(
-        hp: hyperparams.LearningParams,
-        num_trans_input_dims: int,
-        do_drop_k=True,
-):
-    return ablation.Encoder(
-        d_model=num_trans_input_dims,
-        num_layers=hp.num_trans_enc_layers,
-        num_heads=hp.num_trans_heads,
-        d_ff_mult=hp.num_trans_fc_dim_mult,
-        do_drop_k=do_drop_k,
-    )
+from tablestakes.ml import data, torch_helpers, hyperparams
 
 
 class RectTransformerModule(pl.LightningModule):
     LOSS_VAL_NAME = 'loss'
-    WORD_ACC_VAL_NAME = 'acc'
+    TOTAL_NAME = 'total'
 
-    def __init__(
-            self,
-            hp: LearningParams,
-            data_dir: Union[Path, str],
-    ):
+    METRICS = [torch_helpers.WordAccuracy()]
+
+    def __init__(self, hp: hyperparams.LearningParams):
         super().__init__()
 
         self.hp = hp
-        self.data_dir = data_dir
 
-        self.metrics = [WordAccuracy()]
+        self.num_y_classes = utils.load_json(self.hp.data_dir / constants.NUM_Y_CLASSES_FILENAME)
+        self.word_to_id = utils.load_json(self.hp.data_dir / constants.WORD_ID_FILENAME)
+        self.word_to_count = utils.load_json(self.hp.data_dir / constants.WORD_COUNT_FILENAME)
 
-        self.num_y_classes = utils.load_json(data_dir / constants.NUM_Y_CLASSES_FILENAME)
-        self.word_to_id = utils.load_json(data_dir / constants.WORD_ID_FILENAME)
-        self.word_to_count = utils.load_json(data_dir / constants.WORD_COUNT_FILENAME)
-
-        self.ds = data.XYCsvDataset(self.data_dir)
+        self.ds = data.XYCsvDataset(self.hp.data_dir)
 
         self.num_vocab = len(self.word_to_id)
 
@@ -227,13 +70,6 @@ class RectTransformerModule(pl.LightningModule):
         num_basic_plus_embed_dims += self.hp.num_extra_embedding_dim
         self.hp.num_basic_plus_embed_dims = num_basic_plus_embed_dims
 
-        print(f'self.hp.num_embedding_dim: {self.hp.num_embedding_dim}')
-        print(f'self.hp.num_extra_embedding_dim: {self.hp.num_extra_embedding_dim}')
-        print(f'self.hp.num_total_embedding_dim: {self.hp.num_total_embedding_dim}')
-        print()
-        print(f'num_x_basic_dims: {num_x_basic_dims}')
-        print(f'self.hp.num_basic_plus_embed_dims: {self.hp.num_basic_plus_embed_dims}')
-
         #############
         # emb
         if hp.do_include_embeddings:
@@ -247,7 +83,7 @@ class RectTransformerModule(pl.LightningModule):
         else:
             num_trans_input_dims = self.hp.num_basic_plus_embed_dims
 
-        self.encoder = get_pytorch_transformer_encoder(self.hp, num_trans_input_dims)
+        self.encoder = torch_helpers.get_pytorch_transformer_encoder(self.hp, num_trans_input_dims)
         # self.encoder = get_simple_ablatable_transformer_encoder(
         #     self.hp,
         #     num_trans_input_dims,
@@ -268,14 +104,14 @@ class RectTransformerModule(pl.LightningModule):
             num=hp.num_fc_blocks,
             base=2,
         ).astype(np.int32))
-        self.fc_module = FullyConv1Resnet(
+        self.fc_module = torch_helpers.FullyConv1Resnet(
             num_input_features=self.hp.num_fc_inputs,
             neuron_counts=num_fc_neurons,
             num_blocks_per_residual=self.hp.num_fc_blocks_per_resid,
         )
 
         # TODO: requires grad = false? buffer?
-        self.loss_weights = torch.tensor(self.hp.loss_weights, dtype=torch.float)
+        self.loss_weights = torch.tensor([self.hp.korv_loss_weight, 1.0], dtype=torch.float)
 
         # output
         self.heads = nn.ModuleList([
@@ -293,7 +129,7 @@ class RectTransformerModule(pl.LightningModule):
         # print(f'x_basic.shape after cat: {x_basic.shape}')
         # print(f'x_vocab.shape after cat: {x_vocab.shape}')
 
-        if hp.do_include_embeddings:
+        if self.hp.do_include_embeddings:
             x = self.embedder(x_vocab)
             # squeeze out the "time" dimension we expect for language models
             x = x.squeeze(2)
@@ -340,12 +176,39 @@ class RectTransformerModule(pl.LightningModule):
     VALID_PHASE_NAME = 'valid'
     TEST_PHASE_NAME = 'test'
 
+    PHASE_NAMES = [
+        TRAIN_PHASE_NAME,
+        VALID_PHASE_NAME,
+        TEST_PHASE_NAME,
+    ]
+
     @staticmethod
-    def _make_phase_name(phase_name: str, metric_name: str, loss_name: Optional[str] = None):
+    def _get_phase_name(phase_name: str, metric_name: str, output_name: Optional[str] = None):
         out = f'{phase_name}'
-        out += f'/{metric_name}'
-        if loss_name is not None:
-            out += f'/{loss_name}'
+        out += f'_{metric_name}'
+        if output_name is not None:
+            out += f'_{output_name}'
+        return out
+
+    @classmethod
+    def get_valid_metric_name(cls, metric_name: str, output_name: Optional[str] = None):
+        return cls._get_phase_name(cls.VALID_PHASE_NAME, metric_name, output_name)
+
+    @classmethod
+    def get_train_metric_name(cls, metric_name: str, output_name: Optional[str] = None):
+        return cls._get_phase_name(cls.TRAIN_PHASE_NAME, metric_name, output_name)
+
+    @classmethod
+    def get_all_metric_names_for_phase(cls, phase_name: str):
+        metrics_names = [m.name for m in cls.METRICS] + [cls.LOSS_VAL_NAME]
+        output_names = constants.Y_BASE_NAMES
+
+        out = []
+        for metric_name in metrics_names:
+            for output_name in output_names:
+                out.append(cls._get_phase_name(phase_name, metric_name, output_name))
+        out.append(cls._get_phase_name(phase_name, cls.LOSS_VAL_NAME, cls.TOTAL_NAME))
+
         return out
 
     @classmethod
@@ -357,9 +220,9 @@ class RectTransformerModule(pl.LightningModule):
             phase_name: str,
     ):
         out = {}
-        loss_names = list(ys.keys())
-        for y, y_hat, loss_name in zip(ys.values(), y_hats.values(), loss_names):
-            out.update(cls._make_metrics_dict_one_loss(y, y_hat, loss_name, metrics, phase_name))
+        output_names = [y.replace(constants.Y_PREFIX, '') for y in ys.keys()]
+        for y, y_hat, output_name in zip(ys.values(), y_hats.values(), output_names):
+            out.update(cls._make_metrics_dict_one_loss(y, y_hat, output_name, metrics, phase_name))
         return out
 
     @classmethod
@@ -372,15 +235,15 @@ class RectTransformerModule(pl.LightningModule):
             phase_name: str,
     ):
         return {
-            cls._make_phase_name(phase_name, metric.name, loss_name): metric(y_hat, y)
+            cls._get_phase_name(phase_name, metric.name, loss_name): metric(y_hat, y)
             for metric in metrics
         }
 
     @classmethod
-    def _make_losses_dict(cls, losses, loss_names, phase_name):
+    def _make_outputs_dict(cls, losses, output_names, phase_name):
         return {
-            cls._make_phase_name(phase_name, cls.LOSS_VAL_NAME, loss_name): loss
-            for loss, loss_name in zip(losses, loss_names)
+            cls._get_phase_name(phase_name, cls.LOSS_VAL_NAME, loss_name): loss
+            for loss, loss_name in zip(losses, output_names)
         }
 
     @classmethod
@@ -394,8 +257,8 @@ class RectTransformerModule(pl.LightningModule):
             phase_name: str,
     ):
         out = cls._make_metrics_dict(ys_dict, y_hats_dict, metrics, phase_name)
-        out.update(cls._make_losses_dict(losses, list(y_hats_dict.keys()), phase_name))
-        out[cls._make_phase_name(phase_name, cls.LOSS_VAL_NAME, 'total')] = loss
+        out.update(cls._make_outputs_dict(losses, list(y_hats_dict.keys()), phase_name))
+        out[cls._get_phase_name(phase_name, cls.LOSS_VAL_NAME, cls.TOTAL_NAME)] = loss
         return out
 
     @staticmethod
@@ -413,7 +276,7 @@ class RectTransformerModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         xs_dict, ys_dict, y_hats_dict, losses, loss = self._inner_forward_step(batch)
-        logs = self._make_log_dict(ys_dict, y_hats_dict, losses, loss, self.metrics, self.TRAIN_PHASE_NAME)
+        logs = self._make_log_dict(ys_dict, y_hats_dict, losses, loss, self.METRICS, self.TRAIN_PHASE_NAME)
         return {'loss': loss, **logs}
 
     def training_epoch_end(self, outputs):
@@ -427,7 +290,7 @@ class RectTransformerModule(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         xs_dict, ys_dict, y_hats_dict, losses, loss = self._inner_forward_step(batch)
-        logs = self._make_log_dict(ys_dict, y_hats_dict, losses, loss, self.metrics, self.VALID_PHASE_NAME)
+        logs = self._make_log_dict(ys_dict, y_hats_dict, losses, loss, self.METRICS, self.VALID_PHASE_NAME)
         return logs
 
     def validation_epoch_end(self, outputs):
@@ -435,7 +298,7 @@ class RectTransformerModule(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
         xs_dict, ys_dict, y_hats_dict, losses, loss = self._inner_forward_step(batch)
-        logs = self._make_log_dict(ys_dict, y_hats_dict, losses, loss, self.metrics, self.VALID_PHASE_NAME)
+        logs = self._make_log_dict(ys_dict, y_hats_dict, losses, loss, self.METRICS, self.VALID_PHASE_NAME)
         return logs
 
     def test_step_end(self, outputs):
@@ -487,16 +350,18 @@ if __name__ == '__main__':
     # dataset_name = 'num=100_60d9'
     dataset_name = 'num=1000_4475'
 
-    hp = LearningParams()
+    hp = hyperparams.LearningParams()
+    hp.data_dir = constants.DOCS_DIR / dataset_name
+
     trainer = pl.Trainer(
         logger=pl_loggers.TensorBoardLogger(constants.LOGS_DIR, name="trans1d_trial2"),
         max_epochs=hp.num_epochs,
         weights_summary='full',
         fast_dev_run=False,
-        accumulate_grad_batches=int(math.pow(2, hp.batch_size_log2)),
+        accumulate_grad_batches=utils.pow2int(hp.log2_batch_size),
         profiler=True,
     )
-    net = RectTransformerModule(hp, constants.DOCS_DIR / dataset_name)
+    net = RectTransformerModule(hp)
 
     print("HP:")
     utils.print_dict(hp.to_dict())

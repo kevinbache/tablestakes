@@ -1,3 +1,4 @@
+import pickle
 from collections.abc import Iterable
 import json
 import os
@@ -61,6 +62,26 @@ def load_txt(filename: str):
 def save_txt(filename: str, txt: str):
     with open(filename, mode='w') as f:
         return f.write(txt)
+
+
+def load_pickle(filename: str):
+    with open(filename, mode='rb') as f:
+        return pickle.load(f)
+
+
+def save_pickle(filename: str, obj: Any):
+    with open(filename, mode='wb') as f:
+        pickle.dump(obj, f)
+
+
+def set_seeds(seed: int):
+    import random
+    import numpy as np
+    import torch
+
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
 
 
 def hprint(s: str, sep_char='=', do_include_pre_break_line=True):
@@ -222,6 +243,10 @@ def split_df_by_cols(df: pd.DataFrame, col_sets: List[List[str]], names=List[str
     return {name: df[col_set].copy() for name, col_set in zip(names, col_sets)}
 
 
+def pow2int(num):
+    return int(np.power(2, num))
+
+{}
 if __name__ == '__main__':
     assert levenshtein('', '') == 0
     assert levenshtein('asdf', '') == 4
