@@ -9,8 +9,8 @@ import torch
 from tablestakes import constants
 from torch.utils.data import Dataset, DataLoader
 
-X_PREFIX = 'x_'
-Y_PREFIX = 'y_'
+X_PREFIX = constants.X_PREFIX
+Y_PREFIX = constants.Y_PREFIX
 
 
 class XYCsvDataset(Dataset):
@@ -65,8 +65,8 @@ class XYCsvDataset(Dataset):
         return out
 
     @staticmethod
-    def _read_csvs_from_dict(d: dict):
-        return {k: pd.read_csv(v) for k, v in d.items()}
+    def _read_csvs_from_dict(d: dict, remove_from_k: str):
+        return {k.replace(remove_from_k, ''): pd.read_csv(v) for k, v in d.items()}
 
     @staticmethod
     def _convert_dict_of_dfs_to_tensors(d: dict):
@@ -88,12 +88,9 @@ class XYCsvDataset(Dataset):
         self._df_dicts = []
         for x_filename_dict, y_filename_dict in zip(self._x_filename_dicts, self._y_filename_dicts):
             self._df_dicts.append((
-                self._read_csvs_from_dict(x_filename_dict),
-                self._read_csvs_from_dict(y_filename_dict),
+                self._read_csvs_from_dict(x_filename_dict, remove_from_k=X_PREFIX),
+                self._read_csvs_from_dict(y_filename_dict, remove_from_k=Y_PREFIX),
             ))
-
-        self.num_x_dims = {k: df.shape[1] for k, df in self._df_dicts[0][0].items()}
-        self.num_y_dims = {k: df.shape[1] for k, df in self._df_dicts[0][1].items()}
 
         self._datapoints = []
         for x_dict, y_dict in self._df_dicts:
@@ -102,8 +99,11 @@ class XYCsvDataset(Dataset):
                 self._convert_dict_of_dfs_to_tensors(y_dict),
             ))
 
-        self.x_names = self._datapoints[0][0].keys()
-        self.y_names = self._datapoints[0][1].keys()
+        self.num_x_dims = {k: df.shape[1] for k, df in self._df_dicts[0][0].items()}
+        self.num_y_dims = {k: df.shape[1] for k, df in self._df_dicts[0][1].items()}
+
+        self.x_names = [k for k in self._datapoints[0][0].keys()]
+        self.y_names = [k for k in self._datapoints[0][1].keys()]
 
     def __len__(self):
         return len(self._datapoints)

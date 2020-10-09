@@ -1,21 +1,7 @@
-from typing import Any, List
+from typing import List
 
-import torch
-from pytorch_lightning.metrics import TensorMetric
 from tablestakes.ml import hyperparams, ablation
 from torch import nn as nn
-
-
-class WordAccuracy(TensorMetric):
-    def __init__(
-            self,
-            reduce_group: Any = None,
-    ):
-        super().__init__('acc', reduce_group)
-
-    def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-        is_correct = target.view(-1) == torch.argmax(pred, dim=-1).view(-1)
-        return is_correct.float().mean()
 
 
 class SizedSequential(nn.Sequential):

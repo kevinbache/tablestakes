@@ -1,6 +1,4 @@
-import math
-from pathlib import Path
-from typing import Optional, List, Dict, Union
+from typing import Optional, List, Dict
 
 import numpy as np
 
@@ -11,7 +9,6 @@ from torch import optim
 from torch.utils.data import DataLoader
 
 import pytorch_lightning as pl
-from pytorch_lightning.metrics import Metric
 from pytorch_lightning import loggers as pl_loggers
 
 from tablestakes import constants, utils
@@ -22,7 +19,9 @@ class RectTransformerModule(pl.LightningModule):
     LOSS_VAL_NAME = 'loss'
     TOTAL_NAME = 'total'
 
-    METRICS = [torch_helpers.WordAccuracy()]
+    METRICS = {
+        'acc': pl.metrics.Accuracy(),
+    }
 
     def __init__(self, hp: hyperparams.LearningParams):
         super().__init__()
@@ -40,11 +39,12 @@ class RectTransformerModule(pl.LightningModule):
         self.hp.num_vocab = self.num_vocab
 
         num_example_words = 200
-        num_x_basic_dims = self.ds.num_x_dims[constants.X_BASIC_NAME]
-        num_x_vocab_dims = self.ds.num_x_dims[constants.X_VOCAB_NAME]
+        num_x_basic_dims = self.ds.num_x_dims[constants.X_BASIC_BASE_NAME]
+        num_x_vocab_dims = self.ds.num_x_dims[constants.X_VOCAB_BASE_NAME]
+
         self.example_input_array = {
-            constants.X_BASIC_NAME: torch.tensor(np.random.rand(1, num_example_words, num_x_basic_dims)).float(),
-            constants.X_VOCAB_NAME: torch.tensor(np.random.rand(1, num_example_words, num_x_vocab_dims)).long(),
+            constants.X_BASIC_BASE_NAME: torch.tensor(np.random.rand(1, num_example_words, num_x_basic_dims)).float(),
+            constants.X_VOCAB_BASE_NAME: torch.tensor(np.random.rand(1, num_example_words, num_x_vocab_dims)).long(),
         }
 
         self.hp.num_x_dims = self.ds.num_x_dims
@@ -55,7 +55,7 @@ class RectTransformerModule(pl.LightningModule):
         #############
         # expand embedding_dim so that embedding_dim + meta_dim is divisible by hp.num_trans_heads
         # (attention requirement)
-        num_x_basic_dims = self.hp.num_x_dims[constants.X_BASIC_NAME]
+        num_x_basic_dims = self.hp.num_x_dims[constants.X_BASIC_BASE_NAME]
 
         num_basic_plus_embed_dims = num_x_basic_dims
         if hp.do_include_embeddings:
@@ -122,20 +122,17 @@ class RectTransformerModule(pl.LightningModule):
         # save all variables in __init__ signature to self.hparams
         self.save_hyperparameters(self.hp.to_dict())
 
-    def forward(self, x_basic: torch.Tensor, x_vocab: torch.Tensor):
-        x_basic = x_basic.float()
-        x_vocab = x_vocab.long()
-
-        # print(f'x_basic.shape after cat: {x_basic.shape}')
-        # print(f'x_vocab.shape after cat: {x_vocab.shape}')
+    def forward(self, basic: torch.Tensor, vocab: torch.Tensor):
+        basic = basic.float()
+        vocab = vocab.long()
 
         if self.hp.do_include_embeddings:
-            x = self.embedder(x_vocab)
+            x = self.embedder(vocab)
             # squeeze out the "time" dimension we expect for language models
             x = x.squeeze(2)
-            x = torch.cat([x_basic, x], dim=-1)
+            x = torch.cat([basic, x], dim=-1)
         else:
-            x = x_basic
+            x = basic
 
         if self.hp.pre_trans_linear_dim is not None:
             x = x.permute(0, 2, 1)
@@ -143,12 +140,10 @@ class RectTransformerModule(pl.LightningModule):
             x = x.permute(0, 2, 1)
 
         ##########
-        # x = x.permute(0, 2, 1)
         x = self.encoder(x)
-        # x = x.permute(0, 2, 1)
 
         if self.hp.do_cat_x_base_before_fc:
-            x = torch.cat([x, x_basic], dim=-1)
+            x = torch.cat([x, basic], dim=-1)
 
         x = x.permute(0, 2, 1)
         x = self.fc_module(x)
@@ -200,7 +195,7 @@ class RectTransformerModule(pl.LightningModule):
 
     @classmethod
     def get_all_metric_names_for_phase(cls, phase_name: str):
-        metrics_names = [m.name for m in cls.METRICS] + [cls.LOSS_VAL_NAME]
+        metrics_names = [m for m in cls.METRICS.keys()] + [cls.LOSS_VAL_NAME]
         output_names = constants.Y_BASE_NAMES
 
         out = []
@@ -211,98 +206,42 @@ class RectTransformerModule(pl.LightningModule):
 
         return out
 
-    @classmethod
-    def _make_metrics_dict(
-            cls,
-            ys: Dict[str, torch.Tensor],
-            y_hats: Dict[str, torch.Tensor],
-            metrics: List[Metric],
-            phase_name: str,
-    ):
-        out = {}
-        output_names = [y.replace(constants.Y_PREFIX, '') for y in ys.keys()]
-        for y, y_hat, output_name in zip(ys.values(), y_hats.values(), output_names):
-            out.update(cls._make_metrics_dict_one_loss(y, y_hat, output_name, metrics, phase_name))
-        return out
+    def _log_losses_and_metrics(self, phase_name, loss, losses, y_hats_dict, ys_dict, prog_bar=False):
+        output_names = ys_dict.keys()
 
-    @classmethod
-    def _make_metrics_dict_one_loss(
-            cls,
-            y: torch.Tensor,
-            y_hat: torch.Tensor,
-            loss_name: str,
-            metrics: List[Metric],
-            phase_name: str,
-    ):
-        return {
-            cls._get_phase_name(phase_name, metric.name, loss_name): metric(y_hat, y)
-            for metric in metrics
-        }
+        on_epoch = None
 
-    @classmethod
-    def _make_outputs_dict(cls, losses, output_names, phase_name):
-        return {
-            cls._get_phase_name(phase_name, cls.LOSS_VAL_NAME, loss_name): loss
-            for loss, loss_name in zip(losses, output_names)
-        }
+        self.log(self._get_phase_name(phase_name, 'loss', 'total'), loss, prog_bar=prog_bar, on_epoch=on_epoch)
+        for output_name, current_loss in zip(output_names, losses):
+            full_metric_name = self._get_phase_name(phase_name, 'loss', output_name)
+            self.log(full_metric_name, current_loss, prog_bar=False, on_epoch=on_epoch)
 
-    @classmethod
-    def _make_log_dict(
-            cls,
-            ys_dict: Dict[str, torch.Tensor],
-            y_hats_dict: Dict[str, torch.Tensor],
-            losses: torch.Tensor,
-            loss: torch.Tensor,
-            metrics: List[Metric],
-            phase_name: str,
-    ):
-        out = cls._make_metrics_dict(ys_dict, y_hats_dict, metrics, phase_name)
-        out.update(cls._make_outputs_dict(losses, list(y_hats_dict.keys()), phase_name))
-        out[cls._get_phase_name(phase_name, cls.LOSS_VAL_NAME, cls.TOTAL_NAME)] = loss
-        return out
-
-    @staticmethod
-    def _average_output_logs(outputs, do_include_progress_bar=True):
-        if not outputs:
-            return {}
-
-        logs = outputs
-        keys = logs[0].keys()
-        output_means = {k: torch.stack([log[k] for log in logs]).mean() for k in keys}
-        d = {'log': output_means}
-        if do_include_progress_bar:
-            d['progress_bar'] = output_means
-        return d
+        for metric_name, metric in self.METRICS.items():
+            for output_name in output_names:
+                y_hat = y_hats_dict[output_name].squeeze()
+                y = ys_dict[output_name].squeeze()
+                full_metric_name = self._get_phase_name(phase_name, metric_name, output_name)
+                metric_value = metric(y_hat, y)
+                self.log(full_metric_name, metric_value, prog_bar=False, on_epoch=on_epoch)
 
     def training_step(self, batch, batch_idx):
         xs_dict, ys_dict, y_hats_dict, losses, loss = self._inner_forward_step(batch)
-        logs = self._make_log_dict(ys_dict, y_hats_dict, losses, loss, self.METRICS, self.TRAIN_PHASE_NAME)
-        return {'loss': loss, **logs}
+        self._log_losses_and_metrics(self.TRAIN_PHASE_NAME, loss, losses, y_hats_dict, ys_dict, prog_bar=True)
+        return loss
 
-    def training_epoch_end(self, outputs):
-        return self._average_output_logs(outputs, do_include_progress_bar=False)
+    def validation_step(self, batch, batch_idx):
+        xs_dict, ys_dict, y_hats_dict, losses, loss = self._inner_forward_step(batch)
+        self._log_losses_and_metrics(self.VALID_PHASE_NAME, loss, losses, y_hats_dict, ys_dict)
+
+    def test_step(self, batch, batch_idx):
+        xs_dict, ys_dict, y_hats_dict, losses, loss = self._inner_forward_step(batch)
+        self._log_losses_and_metrics(self.TEST_PHASE_NAME, loss, losses, y_hats_dict, ys_dict)
 
     def on_after_backward(self):
         if self.hp.num_steps_per_histogram_log and not self.global_step % self.hp.num_steps_per_histogram_log:
             for name, param in self.named_parameters():
                 self.logger.experiment.add_histogram(f'weights/{name}', param, self.current_epoch)
                 self.logger.experiment.add_histogram(f'grads/{name}', param.grad, self.current_epoch)
-
-    def validation_step(self, batch, batch_idx):
-        xs_dict, ys_dict, y_hats_dict, losses, loss = self._inner_forward_step(batch)
-        logs = self._make_log_dict(ys_dict, y_hats_dict, losses, loss, self.METRICS, self.VALID_PHASE_NAME)
-        return logs
-
-    def validation_epoch_end(self, outputs):
-        return self._average_output_logs(outputs, do_include_progress_bar=False)
-
-    def test_step(self, batch, batch_idx):
-        xs_dict, ys_dict, y_hats_dict, losses, loss = self._inner_forward_step(batch)
-        logs = self._make_log_dict(ys_dict, y_hats_dict, losses, loss, self.METRICS, self.VALID_PHASE_NAME)
-        return logs
-
-    def test_step_end(self, outputs):
-        return self._average_output_logs(outputs, do_include_progress_bar=False)
 
     # ---------------------
     # TRAINING SETUP
@@ -343,10 +282,6 @@ class RectTransformerModule(pl.LightningModule):
 
 
 if __name__ == '__main__':
-    # from torchtext.data import Field, BucketIterator
-    # from torchnlp.encoders.text import WhitespaceEncoder
-    # from torchnlp.word_to_vector import GloVe
-
     # dataset_name = 'num=100_60d9'
     dataset_name = 'num=1000_4475'
 
