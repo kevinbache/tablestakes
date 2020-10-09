@@ -111,7 +111,7 @@ class RectTransformerModule(pl.LightningModule):
         )
 
         # TODO: requires grad = false? buffer?
-        self.loss_weights = torch.tensor([self.hp.korv_loss_weight, 1.0], dtype=torch.float)
+        self.loss_weights = torch.tensor([self.hp.korv_loss_weight, 1.0], dtype=torch.float, device=self.device)
 
         # output
         self.heads = nn.ModuleList([

@@ -8,14 +8,14 @@ auth:
     ssh_user: ubuntu
 
 min_workers: 2
-initial_workers: 2
+initial_workers: 12
 max_workers: 12
 
 autoscaling_mode: default
 target_utilization_fraction: 0.8
 idle_timeout_minutes: 20
 
-# m4.large $0.0342 per Hour
+    # m4.large $0.0342 per Hour
 # 2020.07.22: 'latest_dlami'. Using 'ami-09f2f73141c83d4fe', which is the default AWS Deep Learning AMI (Ubuntu 18.04) V26.0 for your region (us-west-1).
 # todo: create AMI containing all needed packages for quick cluster startup
 head_node:
