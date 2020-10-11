@@ -1,4 +1,4 @@
-cluster_name: aws-h=m4-w=g4dn-2
+cluster_name: aws-h=m4-w=g4dn-1
 
 provider:
     type: aws
@@ -7,8 +7,8 @@ provider:
 auth:
     ssh_user: ubuntu
 
-min_workers: 2
-initial_workers: 12
+min_workers: 0
+initial_workers: 2
 max_workers: 12
 
 autoscaling_mode: default

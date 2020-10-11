@@ -211,7 +211,7 @@ if __name__ == '__main__':
         doc_gen_params=doc_gen_params,
         doc_prep_params=doc_prep_params,
     )
-    doc_settings.num_docs = 2000
+    doc_settings.num_docs = 10000
     doc_settings.doc_gen_params.num_extra_fields = 1
 
     fast_test = False

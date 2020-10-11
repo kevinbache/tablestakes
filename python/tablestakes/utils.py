@@ -1,15 +1,14 @@
+import abc
 import pickle
-from collections.abc import Iterable
 import json
 import os
 from pathlib import Path
 import time
-from typing import Dict, Union, Any, List, Optional
+from typing import *
 import xml.dom.minidom
 
-import numpy
-import pandas
-from Cython.Includes import numpy
+import cloudpickle
+import torch
 
 from lxml import etree
 from PIL import Image
@@ -17,6 +16,7 @@ from matplotlib.image import imread
 import numpy as np
 import pandas as pd
 import pdf2image
+from torch.utils.data import Dataset
 
 StrDict = Dict[str, Union[str, int, float]]
 
@@ -72,6 +72,16 @@ def load_pickle(filename: str):
 def save_pickle(filename: str, obj: Any):
     with open(filename, mode='wb') as f:
         pickle.dump(obj, f)
+
+
+def load_cloudpickle(filename: str):
+    with open(filename, mode='rb') as f:
+        return cloudpickle.load(f)
+
+
+def save_cloudpickle(filename: str, obj: Any):
+    with open(filename, mode='wb') as f:
+        cloudpickle.dump(obj, f)
 
 
 def set_seeds(seed: int):
@@ -246,7 +256,7 @@ def split_df_by_cols(df: pd.DataFrame, col_sets: List[List[str]], names=List[str
 def pow2int(num):
     return int(np.power(2, num))
 
-{}
+
 if __name__ == '__main__':
     assert levenshtein('', '') == 0
     assert levenshtein('asdf', '') == 4

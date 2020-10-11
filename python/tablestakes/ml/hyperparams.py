@@ -57,7 +57,14 @@ class LearningParams(params.ParameterSet):
     log2_batch_size = 5
     p_valid = 0.1
     p_test = 0.1
-    data_dir = constants.DOCS_DIR
+    data_dir = constants.DOCS_DIR / 'num=2000_e4d0'
+    dataset_file = constants.DOCS_DIR / 'ds_num=2000_e4d0.cloudpickle'
+
+    # for transferring objects from tune process to worker processes
+    ds_ray_obj_id = None
+    num_y_classes_ray_obj_id = None
+    word_to_id_ray_obj_id = None
+    word_to_count_ray_obj_id = None
 
     # for data loading
     num_workers = 4

@@ -7,7 +7,7 @@ import pandas as pd
 
 import torch
 from tablestakes import constants
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 
 X_PREFIX = constants.X_PREFIX
 Y_PREFIX = constants.Y_PREFIX
@@ -42,10 +42,6 @@ class XYCsvDataset(Dataset):
     def _read_dfs(files):
         return [pd.read_csv(f) for f in files]
 
-    @staticmethod
-    def turn_inside_out(list_of_lists):
-        return list(zip(*list_of_lists))
-
     @classmethod
     def _find_files(cls, pattern):
         """get all files matching a glob search pattern group them into a list of dicts.
@@ -78,29 +74,29 @@ class XYCsvDataset(Dataset):
             x_pattern=Path('**') / f'{X_PREFIX}*.csv',
             y_pattern=Path('**') / f'{Y_PREFIX}*.csv',
     ):
-        self.data_dir = Path(data_dir)
+        self.data_dir = str(Path(data_dir))
         self.x_pattern = x_pattern
         self.y_pattern = y_pattern
 
         self._x_filename_dicts = self._find_files(self.data_dir / self.x_pattern)
         self._y_filename_dicts = self._find_files(self.data_dir / self.y_pattern)
 
-        self._df_dicts = []
+        df_dicts = []
         for x_filename_dict, y_filename_dict in zip(self._x_filename_dicts, self._y_filename_dicts):
-            self._df_dicts.append((
+            df_dicts.append((
                 self._read_csvs_from_dict(x_filename_dict, remove_from_k=X_PREFIX),
                 self._read_csvs_from_dict(y_filename_dict, remove_from_k=Y_PREFIX),
             ))
 
         self._datapoints = []
-        for x_dict, y_dict in self._df_dicts:
+        for x_dict, y_dict in df_dicts:
             self._datapoints.append((
                 self._convert_dict_of_dfs_to_tensors(x_dict),
                 self._convert_dict_of_dfs_to_tensors(y_dict),
             ))
 
-        self.num_x_dims = {k: df.shape[1] for k, df in self._df_dicts[0][0].items()}
-        self.num_y_dims = {k: df.shape[1] for k, df in self._df_dicts[0][1].items()}
+        self.num_x_dims = {k: df.shape[1] for k, df in df_dicts[0][0].items()}
+        self.num_y_dims = {k: df.shape[1] for k, df in df_dicts[0][1].items()}
 
         self.x_names = [k for k in self._datapoints[0][0].keys()]
         self.y_names = [k for k in self._datapoints[0][1].keys()]
@@ -111,14 +107,32 @@ class XYCsvDataset(Dataset):
     def __getitem__(self, item):
         return self._datapoints[item]
 
+    def __getstate__(self):
+        return {
+            'data_dir': self.data_dir,
+            'x_pattern': self.x_pattern,
+            'y_pattern': self.y_pattern,
+            '_datapoints': self._datapoints,
+            'num_x_dims': self.num_x_dims,
+            'num_y_dims': self.num_y_dims,
+            'x_names': self.x_names,
+            'y_names': self.y_names,
+        }
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+
 
 if __name__ == '__main__':
-    doc_set_name = 'num=1000_extra=0'
-    ds = XYCsvDataset(constants.DOCS_DIR / doc_set_name)
+    from tablestakes import utils
 
-    dl = DataLoader(
-        ds,
-        batch_size=1,
-        shuffle=False,
-        num_workers=0,
-    )
+    doc_set_name = 'num=2000_e4d0'
+    with utils.Timer('ds creation'):
+        ds = XYCsvDataset(constants.DOCS_DIR / doc_set_name)
+
+    ds_file = str(constants.DOCS_DIR / (doc_set_name + '_dataset.cloudpickle'))
+    with utils.Timer('ds save'):
+        utils.save_cloudpickle(ds_file, ds)
+
+    with utils.Timer('ds2 load'):
+        ds2 = utils.load_cloudpickle(ds_file)

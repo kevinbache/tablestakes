@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict
+from typing import *
 
 import numpy as np
 
@@ -11,8 +11,17 @@ from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from pytorch_lightning import loggers as pl_loggers
 
-from tablestakes import constants, utils
+from tablestakes import constants, utils, load_makers
 from tablestakes.ml import data, torch_helpers, hyperparams
+
+
+class BetterAccuracy(pl.metrics.Accuracy):
+    def update(self, preds: torch.Tensor, target: torch.Tensor):
+        preds, target = self._input_format(preds, target)
+        assert preds.shape == target.shape
+
+        self.correct = self.correct + torch.sum(preds == target)
+        self.total = self.total + target.numel()
 
 
 class RectTransformerModule(pl.LightningModule):
@@ -20,7 +29,7 @@ class RectTransformerModule(pl.LightningModule):
     TOTAL_NAME = 'total'
 
     METRICS = {
-        'acc': pl.metrics.Accuracy(),
+        'acc': BetterAccuracy(),
     }
 
     def __init__(self, hp: hyperparams.LearningParams):
@@ -28,15 +37,16 @@ class RectTransformerModule(pl.LightningModule):
 
         self.hp = hp
 
+        self.ds = load_makers.DatasetLoadMaker(
+            saved_dataset_file=self.hp.dataset_file,
+            input_docs_directory_for_maker=self.hp.data_dir,
+        ).loadmake()
+
         self.num_y_classes = utils.load_json(self.hp.data_dir / constants.NUM_Y_CLASSES_FILENAME)
         self.word_to_id = utils.load_json(self.hp.data_dir / constants.WORD_ID_FILENAME)
         self.word_to_count = utils.load_json(self.hp.data_dir / constants.WORD_COUNT_FILENAME)
 
-        self.ds = data.XYCsvDataset(self.hp.data_dir)
-
-        self.num_vocab = len(self.word_to_id)
-
-        self.hp.num_vocab = self.num_vocab
+        self.hp.num_vocab = len(self.word_to_id)
 
         num_example_words = 200
         num_x_basic_dims = self.ds.num_x_dims[constants.X_BASIC_BASE_NAME]
@@ -62,7 +72,7 @@ class RectTransformerModule(pl.LightningModule):
             num_basic_plus_embed_dims += hp.num_embedding_dim
 
         remainder = num_basic_plus_embed_dims % hp.num_trans_heads
-        if remainder and self.hp.pre_trans_linear_dim:
+        if remainder:
             self.hp.num_extra_embedding_dim = hp.num_trans_heads - remainder
         else:
             self.hp.num_extra_embedding_dim = 0
@@ -73,7 +83,7 @@ class RectTransformerModule(pl.LightningModule):
         #############
         # emb
         if hp.do_include_embeddings:
-            self.embedder = nn.Embedding(self.num_vocab, self.hp.num_total_embedding_dim)
+            self.embedder = nn.Embedding(self.hp.num_vocab, self.hp.num_total_embedding_dim)
 
         #############
         # trans
@@ -287,7 +297,7 @@ class RectTransformerModule(pl.LightningModule):
         return DataLoader(
             self.valid_dataset,
             batch_size=1,
-            shuffle=True,
+            shuffle=False,
             num_workers=self.hp.num_workers,
             pin_memory=self.hp.num_gpus > 0,
         )
@@ -296,7 +306,7 @@ class RectTransformerModule(pl.LightningModule):
         return DataLoader(
             self.test_dataset,
             batch_size=1,
-            shuffle=True,
+            shuffle=False,
             num_workers=self.hp.num_workers,
             pin_memory=self.hp.num_gpus > 0,
         )
@@ -308,6 +318,9 @@ if __name__ == '__main__':
 
     hp = hyperparams.LearningParams()
     hp.data_dir = constants.DOCS_DIR / dataset_name
+
+    ds = data.XYCsvDataset(hp.data_dir)
+
 
     trainer = pl.Trainer(
         logger=pl_loggers.TensorBoardLogger(constants.LOGS_DIR, name="trans1d_trial2"),

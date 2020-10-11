@@ -12,8 +12,8 @@ from ray.tune.integration import wandb as tune_wandb, pytorch_lightning as tune_
 
 from chillpill import params
 
-from tablestakes import constants, utils
-from tablestakes.ml import hyperparams, model_transformer
+from tablestakes import constants, utils, load_makers
+from tablestakes.ml import hyperparams, model_transformer, data
 
 
 class ParamCounterCallback(pl.Callback):
@@ -131,7 +131,8 @@ if __name__ == '__main__':
     search_params.batch_size_log2 = params.Integer(0, 12)
     search_params.p_valid = 0.1
     search_params.p_test = 0.1
-    search_params.data_dir = constants.DOCS_DIR / 'num=1000_4475'
+    search_params.data_dir = constants.DOCS_DIR / 'num=2000_e4d0'
+    search_params.dataset_file = constants.DOCS_DIR / 'ds_num=2000_e4d0.cloudpickle'
 
     # for data loading
     search_params.num_workers = 4
@@ -141,7 +142,7 @@ if __name__ == '__main__':
     search_params.num_steps_per_histogram_log = 50
     search_params.upload_dir = 's3://kb-tester-2020-10-08'
     search_params.project_name = 'tablestakes_trans1d_tests'
-    search_params.num_gpus = 1
+    search_params.num_gpus = 0
     search_params.seed = 4
 
     import socket
@@ -161,6 +162,7 @@ if __name__ == '__main__':
         ignore_reinit_error=True,
         include_dashboard=not do_fast_test,
         local_mode=do_fast_test,
+        num_cpus=12 if do_fast_test else None,
     )
 
     tune_scheduler = tune.schedulers.ASHAScheduler(
@@ -203,6 +205,43 @@ if __name__ == '__main__':
             "log_config": True,
         }
         loggers += [tune_wandb.WandbLogger]
+
+    num_y_classes = utils.load_json(search_params.data_dir / constants.NUM_Y_CLASSES_FILENAME)
+    word_to_id = utils.load_json(search_params.data_dir / constants.WORD_ID_FILENAME)
+    word_to_count = utils.load_json(search_params.data_dir / constants.WORD_COUNT_FILENAME)
+
+    # num_y_classes_ref = ray.put(num_y_classes)
+    # print('num_y_classes_ref:', num_y_classes_ref)
+    # search_params.num_y_classes_ray_obj_id = bytes(num_y_classes_ref)
+    # print('bytes:', bytes(num_y_classes_ref))
+    # num_y_classes_ref_2 = ray.ObjectRef(search_params.num_y_classes_ray_obj_id)
+    # print('num_y_classes_ref_2:', num_y_classes_ref_2)
+    #
+    # out = ray.get(num_y_classes_ref)
+    # print('out:', out)
+    #
+    # print('starting puts 2:', out)
+    # search_params.word_to_id_ray_obj_id = bytes(ray.put(word_to_id))
+    # search_params.word_to_count_ray_obj_id = bytes(ray.put(word_to_count))
+    # print('done with puts 2:', out)
+    #
+    # word_to_count_ray_obj_id_ref = ray.ObjectRef(search_params.word_to_count_ray_obj_id)
+    # print('word_to_count_ray_obj_id_ref:', word_to_count_ray_obj_id_ref)
+    # wtc = ray.get(word_to_count_ray_obj_id_ref)
+    # print('wtc:', wtc)
+
+    # blocks until done
+    print('loading or making data')
+    ds = load_makers.DatasetLoadMaker(
+        saved_dataset_file=search_params.dataset_file,
+        input_docs_directory_for_maker=search_params.data_dir,
+    )
+
+    # print('done loading_data')
+    # print('putting data')
+    # search_params.ds_ray_obj_id = bytes(ray.put(ds))
+    # print('done putting data')
+    # ray.get(ray.ObjectRef(search_params.ds_ray_obj_id))
 
     analysis = tune.run(
         run_or_experiment=train_fn,
@@ -249,3 +288,5 @@ if __name__ == '__main__':
     print("Best trial config: {}".format(best_trial.config))
     print("Best trial final validation loss: {}".format(best_trial.last_result[valid_loss_name]))
     print("Best trial final search_metric: {}".format(best_trial.last_result[search_params.search_metric]))
+
+# what am i doooooing
