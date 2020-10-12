@@ -236,10 +236,6 @@ if __name__ == '__main__':
         }
         loggers += [tune_wandb.WandbLogger]
 
-    # num_y_classes = utils.load_json(search_params.data_dir / constants.NUM_Y_CLASSES_FILENAME)
-    # word_to_id = utils.load_json(search_params.data_dir / constants.WORD_ID_FILENAME)
-    # word_to_count = utils.load_json(search_params.data_dir / constants.WORD_COUNT_FILENAME)
-
     # blocks until done
     print('loading or making data')
     ds = load_makers.DatasetLoadMaker(
@@ -252,10 +248,6 @@ if __name__ == '__main__':
     }
     if not do_fast_test:
         resources_per_trial['gpu'] = search_params.num_gpu
-    # resources_per_trial = {
-    #     "cpu": 2,
-    #     "gpu": search_params.num_gpu if not do_fast_test else 0,
-    # }
     analysis = tune.run(
         run_or_experiment=train_fn,
         # name=None,
