@@ -1,4 +1,4 @@
-cluster_name: aws-h=m4-w=g4dn-1
+cluster_name: aws-h=m4-w=g4dn-2
 
 provider:
     type: aws
@@ -56,6 +56,7 @@ setup_commands:
 
     - mkdir -p ~/projects
 
+    - pip install --upgrade cloudpickle>=1.6.0
     - test -e projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
     - cd projects/chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
     - pip install --editable ~/projects/chillpill/

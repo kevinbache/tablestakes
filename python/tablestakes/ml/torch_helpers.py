@@ -72,7 +72,8 @@ class FullyConv1Resnet(nn.Module):
         for block_index, (block, resizer) in enumerate(zip(self.blocks, self.resizers)):
             x = block(x)
             if block_index and block_index % self.num_blocks_per_residual == 0:
-                x += resizer(old_x)
+                if resizer is not None:
+                    x += resizer(old_x)
                 old_x = x
         return x
 

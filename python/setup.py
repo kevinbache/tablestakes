@@ -56,6 +56,7 @@ setup(
         'torch',
         'torchnlp',
         'pytorch-lightning',
+        'cloudpickle>=1.6.0',
     ],
 
     classifiers=[

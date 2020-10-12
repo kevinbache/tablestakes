@@ -72,7 +72,7 @@ def train_fn(config: Dict, checkpoint_dir=None):
     ]
     logger = pl_loggers.TensorBoardLogger(
         save_dir=tune.get_trial_dir(),
-        name=hp.project_name,
+        name=hp.experiment_name,
         version=tune.get_trial_id(),
     )
     trainer = pl.Trainer(
@@ -155,7 +155,7 @@ if __name__ == '__main__':
     # extra
     search_params.num_steps_per_histogram_log = 50
     search_params.upload_dir = 's3://kb-tester-2020-10-08'
-    search_params.project_name = 'tablestakes_trans1d_tests'
+    search_params.experiment_name = 'ts_2000_1'
     search_params.num_gpus = 1
     search_params.seed = 4
 
@@ -208,15 +208,16 @@ if __name__ == '__main__':
         model_transformer.RectTransformerModule.get_valid_metric_name(metric_name='loss', output_name='total')
 
     reporter_metric_cols = [
-        'iter',
-        'total time (s)',
-        'ts',
+        'training_iteration',
+        'time_this_iter_s',
+        'time_total_s',
         model_transformer.RectTransformerModule.get_train_metric_name(metric_name='loss', output_name='korv'),
         model_transformer.RectTransformerModule.get_train_metric_name(metric_name='loss', output_name='which_kv'),
         train_loss_name,
         model_transformer.RectTransformerModule.get_valid_metric_name(metric_name='loss', output_name='korv'),
         model_transformer.RectTransformerModule.get_valid_metric_name(metric_name='loss', output_name='which_kv'),
         valid_loss_name,
+        model_transformer.RectTransformerModule.get_valid_metric_name(metric_name='acc', output_name='korv'),
         search_params.search_metric,
     ]
 
@@ -230,7 +231,7 @@ if __name__ == '__main__':
     loggers = list(tune_logger.DEFAULT_LOGGERS)
     if not do_fast_test:
         search_dict['wandb'] = {
-            "project": search_params.project_name,
+            "project": search_params.experiment_name,
             "api_key_file": Path('~/.wandb_api_key').expanduser().resolve(),
             "log_config": True,
         }
@@ -247,22 +248,23 @@ if __name__ == '__main__':
         "cpu": 2,
     }
     if not do_fast_test:
-        resources_per_trial['gpu'] = search_params.num_gpu
+        resources_per_trial['gpu'] = search_params.num_gpus
     analysis = tune.run(
         run_or_experiment=train_fn,
-        # name=None,
+        name=search_params.experiment_name,
         stop={"training_iteration": search_params.num_epochs},
         config=search_dict,
         resources_per_trial=resources_per_trial,
         num_samples=search_params.num_hp_samples,
         # local_dir=None,
         # upload_dir=search_params.upload_dir,
-        trial_name_creator=None,
+        # trial_name_creator=,
         sync_config=tune.SyncConfig(upload_dir=search_params.upload_dir),
         loggers=loggers,
+        log_to_file=True,
         # sync_to_cloud=None,
         # sync_to_driver=None,
-        checkpoint_freq=None,
+        checkpoint_freq=0,
         checkpoint_at_end=False,
         # sync_on_checkpoint=True,
         keep_checkpoints_num=2,
