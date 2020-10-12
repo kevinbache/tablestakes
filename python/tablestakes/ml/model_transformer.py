@@ -149,7 +149,12 @@ class RectTransformerModule(pl.LightningModule):
             x = x.squeeze(2)
             x = torch.cat([basic, x], dim=-1)
         else:
-            x = basic
+            x = F.pad(
+                basic,
+                pad=(0, self.hp.num_extra_embedding_dim),
+                mode='constant',
+                value=0,
+            )
 
         if self.hp.pre_trans_linear_dim is not None:
             x = x.permute(0, 2, 1)
@@ -330,6 +335,7 @@ if __name__ == '__main__':
     dataset_name = 'num=10_40db'
 
     hp = hyperparams.LearningParams(dataset_name)
+    hp.do_include_embeddings = False
     net = RectTransformerModule(hp)
 
     trainer = pl.Trainer(

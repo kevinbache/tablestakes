@@ -5,6 +5,7 @@ from typing import *
 import boto3
 
 import pytorch_lightning as pl
+import wandb
 from pytorch_lightning import loggers as pl_loggers
 
 import ray
@@ -41,7 +42,10 @@ class LogCopierCallback(pl.Callback):
         tune.report(**d)
 
 
+@tune_wandb.wandb_mixin
 def train_fn(config: Dict, checkpoint_dir=None):
+    wandb.log()
+
     hp = hyperparams.LearningParams.from_dict(config)
     assert isinstance(hp, hyperparams.LearningParams)
 
