@@ -32,9 +32,13 @@ def to_list(v: Any):
 
 
 def dict_to_str(d: Dict, indent_width=2, extra_key_width=0, do_norm_key_width=True, line_end=''):
+    if d is None or len(d) == 0:
+        return ' ' * (extra_key_width + indent_width)
+
     indent = ' ' * indent_width
+    lens = [len(k) for k in d.keys()]
     if do_norm_key_width:
-        k_width = max(len(k) for k in d.keys()) + extra_key_width
+        k_width = max(lens) + extra_key_width
         return '\n'.join(f'{indent}{k:{k_width}}: {v}{line_end}' for k, v in d.items())
     else:
         return '\n'.join(f'{indent}{k}: {v}{line_end}' for k, v in d.items())
@@ -50,6 +54,8 @@ def load_json(filename: str):
 
 
 def save_json(filename: str, json_obj: Any):
+    parent = Path(filename).parent.resolve()
+    mkdir_if_not_exist(parent)
     with open(filename, mode='w') as f:
         return json.dump(json_obj, f, default=str)
 
@@ -60,6 +66,8 @@ def load_txt(filename: str):
 
 
 def save_txt(filename: str, txt: str):
+    parent = Path(filename).parent.resolve()
+    mkdir_if_not_exist(parent)
     with open(filename, mode='w') as f:
         return f.write(txt)
 
@@ -70,6 +78,8 @@ def load_pickle(filename: str):
 
 
 def save_pickle(filename: str, obj: Any):
+    parent = Path(filename).parent.resolve()
+    mkdir_if_not_exist(parent)
     with open(filename, mode='wb') as f:
         pickle.dump(obj, f)
 
@@ -80,8 +90,10 @@ def load_cloudpickle(filename: str):
 
 
 def save_cloudpickle(filename: str, obj: Any):
+    parent = Path(filename).parent.resolve()
+    mkdir_if_not_exist(parent)
     with open(filename, mode='wb') as f:
-        cloudpickle.dump(obj, f)
+        cloudpickle.dump(obj, f, protocol=4)
 
 
 def set_seeds(seed: int):

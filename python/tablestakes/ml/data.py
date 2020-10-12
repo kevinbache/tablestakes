@@ -6,7 +6,7 @@ from typing import *
 import pandas as pd
 
 import torch
-from tablestakes import constants
+from tablestakes import constants, utils
 from torch.utils.data import Dataset
 
 X_PREFIX = constants.X_PREFIX
@@ -17,7 +17,7 @@ class XYCsvDataset(Dataset):
     """
     Expects data to look like this:
 
-    data_dir
+    docs_dir
         datapoint_dir_1
             x.csv
             x_2.csv
@@ -26,6 +26,10 @@ class XYCsvDataset(Dataset):
             x.csv
             x_2.csv
             y.csv
+        meta
+            num_y_classes.json
+            word_to_count.json
+            word_to_id.json
     """
     DATAPOINT_DIR_NAME = '*'
 
@@ -57,7 +61,7 @@ class XYCsvDataset(Dataset):
             d[this_file.parent][name] = this_file
         out = d.values()
         lens = [len(e) for e in out]
-        assert cls.all_same(lens), 'Got mismatched numbers of input files in different directories'
+        assert cls.all_same(lens), f'Got mismatched numbers of input files in different directories.  Lens: {lens}'
         return out
 
     @staticmethod
@@ -80,6 +84,10 @@ class XYCsvDataset(Dataset):
 
         self._x_filename_dicts = self._find_files(self.data_dir / self.x_pattern)
         self._y_filename_dicts = self._find_files(self.data_dir / self.y_pattern)
+        if len(self._x_filename_dicts) == 0:
+            raise ValueError(f"Found no files matching {self.data_dir / self.x_pattern}")
+        if len(self._y_filename_dicts) == 0:
+            raise ValueError(f"Found no files matching {self.data_dir / self.y_pattern}")
 
         df_dicts = []
         for x_filename_dict, y_filename_dict in zip(self._x_filename_dicts, self._y_filename_dicts):
@@ -95,11 +103,11 @@ class XYCsvDataset(Dataset):
                 self._convert_dict_of_dfs_to_tensors(y_dict),
             ))
 
-        self.num_x_dims = {k: df.shape[1] for k, df in df_dicts[0][0].items()}
-        self.num_y_dims = {k: df.shape[1] for k, df in df_dicts[0][1].items()}
+        self.num_x_dims = {k: df.shape[1] for k, df in self._datapoints[0][0].items()}
+        self.num_y_dims = {k: df.shape[1] for k, df in self._datapoints[0][1].items()}
 
-        self.x_names = [k for k in self._datapoints[0][0].keys()]
-        self.y_names = [k for k in self._datapoints[0][1].keys()]
+        self.x_names = self.num_x_dims.keys()
+        self.y_names = self.num_y_dims.keys()
 
     def __len__(self):
         return len(self._datapoints)
@@ -123,16 +131,107 @@ class XYCsvDataset(Dataset):
         self.__dict__.update(state)
 
 
+class TablestakesMeta:
+    def __init__(self, word_to_count, word_to_id, num_y_classes, **kwargs):
+        self.word_to_count = word_to_count
+        self.word_to_id = word_to_id
+        self.num_y_classes = num_y_classes
+        self._others = kwargs
+
+    def save(self, target_dir: Path):
+        utils.mkdir_if_not_exist(target_dir)
+
+        metas_dict = {
+            'word_to_count': self.word_to_count,
+            'word_to_id': self.word_to_id,
+            'num_y_classes': self.num_y_classes,
+            **self._others,
+        }
+
+        for meta_name, meta_obj in metas_dict.items():
+            utils.save_json(target_dir / f'{meta_name}.json', meta_obj)
+
+    @classmethod
+    def from_metas_dir(cls, docs_dir: Path):
+        meta_dir = TablestakesDataset.get_meta_dir(docs_dir)
+
+        metas_dict = {
+            meta_name: utils.load_json(meta_dir / f'{meta_name}.json')
+            for meta_name in ['word_to_count', 'word_to_id', 'num_y_classes']
+        }
+        return cls(**metas_dict)
+
+    @classmethod
+    def from_metas_dict(cls, metas_dict: Dict[str, Union[Dict, List, str, int, float]]):
+        return cls(**metas_dict)
+
+    @classmethod
+    def from_dict(cls, d):
+        o = cls({}, {}, {})
+        o.__dict__.update(d)
+        return o
+
+    def __getstate__(self):
+        return self.__dict__
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+
+
+class TablestakesDataset(XYCsvDataset):
+    def __init__(
+            self,
+            docs_dir: Union[Path, str],
+            meta: Optional[TablestakesMeta] = None,
+            x_pattern: Path = Path('**') / f'{X_PREFIX}*.csv',
+            y_pattern: Path = Path('**') / f'{Y_PREFIX}*.csv',
+    ):
+        super().__init__(docs_dir, x_pattern, y_pattern)
+        self.meta = meta or TablestakesMeta.from_metas_dir(self.get_default_meta_dir())
+        self.docs_dir = self.data_dir
+
+    def get_num_vocab(self) -> int:
+        return len(self.word_to_id)
+
+    @classmethod
+    def get_meta_dir(cls, docs_dir: str) -> Path:
+        return Path(docs_dir) / constants.META_DIR_NAME
+
+    def get_default_meta_dir(self) -> Path:
+        return self.get_meta_dir(self.data_dir)
+
+    def save(self, filename: str):
+        utils.save_cloudpickle(filename, self)
+
+    @classmethod
+    def load(self, filename: str):
+         return utils.load_cloudpickle(filename)
+
+    def __getstate__(self):
+        d =  self.__dict__
+        d['meta'] = self.meta.__dict__
+        return d
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.meta = TablestakesMeta.from_dict(state['meta'])
+
+
+
 if __name__ == '__main__':
-    from tablestakes import utils
-
-    doc_set_name = 'num=2000_e4d0'
-    with utils.Timer('ds creation'):
-        ds = XYCsvDataset(constants.DOCS_DIR / doc_set_name)
-
-    ds_file = str(constants.DOCS_DIR / (doc_set_name + '_dataset.cloudpickle'))
-    with utils.Timer('ds save'):
-        utils.save_cloudpickle(ds_file, ds)
-
-    with utils.Timer('ds2 load'):
-        ds2 = utils.load_cloudpickle(ds_file)
+    pass
+    # from tablestakes import utils
+    # this_docs_dir = constants.DOCS_DIR / doc_set_name
+    #
+    # tablestakes_meta = TablestakesMeta.from_metas_dir()
+    #
+    # with utils.Timer('ds creation'):
+    #     ds = TablestakesDataset(this_docs_dir)
+    #
+    # ds_file = str(constants.DOCS_DIR / (doc_set_name + '_dataset.cloudpickle'))
+    # with utils.Timer('ds save'):
+    #     utils.save_cloudpickle(ds_file, ds)
+    #
+    # with utils.Timer('ds2 load'):
+    #     ds2 = utils.load_cloudpickle(ds_file)
+    #

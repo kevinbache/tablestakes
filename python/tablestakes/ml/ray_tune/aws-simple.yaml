@@ -1,4 +1,4 @@
-cluster_name: aws-h=m4-w=g4dn-1
+cluster_name: aws-h=m4-w=g4dn-9
 
 provider:
     type: aws
@@ -7,15 +7,15 @@ provider:
 auth:
     ssh_user: ubuntu
 
-min_workers: 0
-initial_workers: 2
+min_workers: 2
+initial_workers: 6
 max_workers: 12
 
 autoscaling_mode: default
 target_utilization_fraction: 0.8
 idle_timeout_minutes: 20
 
-    # m4.large $0.0342 per Hour
+# m4.large $0.0342 per Hour
 # 2020.07.22: 'latest_dlami'. Using 'ami-09f2f73141c83d4fe', which is the default AWS Deep Learning AMI (Ubuntu 18.04) V26.0 for your region (us-west-1).
 # todo: create AMI containing all needed packages for quick cluster startup
 head_node:
@@ -32,10 +32,10 @@ worker_nodes:
 
 # Remote -> Local
 file_mounts: {
-#    ~/projects/ray: ~/projects/ray,
     ~/.wandb_api_key: ~/.wandb_api_key,
     "/tmp/tablestakes_current_branch_sha": "~/projects/tablestakes/.git/refs/heads/master",
     "/tmp/chillpill_current_branch_sha": "~/projects/chillpill/.git/refs/heads/master",
+    "~/data/tablestakes/datasets/": "~/data/tablestakes/datasets/",
 }
 
 setup_commands:
@@ -53,16 +53,16 @@ setup_commands:
 
     # for https://docs.ray.io/en/stable/webui.html
     - jupyter nbextension enable --py --sys-prefix widgetsnbextension
-#    - echo "************** about to install boto3>=1.10.44 **************"
-#    - pip install boto3>=1.10.44
 
-    - test -e chillpill || git clone https://github.com/kevinbache/chillpill.git
-    - cd chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
-    - pip install --editable ~/chillpill/
+    - mkdir -p ~/projects
 
-    - test -e tablestakes || git clone https://github.com/kevinbache/tablestakes.git
-    - cd tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
-    - pip install --editable ~/tablestakes/python/
+    - test -e projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
+    - cd projects/chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
+    - pip install --editable ~/projects/chillpill/
+
+    - test -e projects/tablestakes/python || git clone https://github.com/kevinbache/tablestakes.git ~/projects/tablestakes
+    - cd projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
+    - pip install --editable ~/projects/tablestakes/python/
 
     - echo "************** done **************"
 

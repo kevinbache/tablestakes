@@ -2,6 +2,8 @@ import argparse
 from pathlib import Path
 from typing import *
 
+import boto3
+
 import pytorch_lightning as pl
 from pytorch_lightning import loggers as pl_loggers
 
@@ -16,6 +18,7 @@ from tablestakes import constants, utils, load_makers
 from tablestakes.ml import hyperparams, model_transformer, data
 
 
+
 class ParamCounterCallback(pl.Callback):
     PARAM_COUNT_NAME = 'param_count'
 
@@ -25,17 +28,20 @@ class ParamCounterCallback(pl.Callback):
 
 
 class LogCopierCallback(pl.Callback):
-    def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, **kwargs):
-        trainer.callback_metrics.update(trainer.logged_metrics)
+    def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
+        d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        tune.report(**d)
 
-    def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule):
-        trainer.callback_metrics.update(trainer.logged_metrics)
+    def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
+        d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        tune.report(**d)
 
-    def on_test_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule):
-        trainer.callback_metrics.update(trainer.logged_metrics)
+    def on_test_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
+        d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        tune.report(**d)
 
 
-def train_fn(config: Dict):
+def train_fn(config: Dict, checkpoint_dir=None):
     hp = hyperparams.LearningParams.from_dict(config)
     assert isinstance(hp, hyperparams.LearningParams)
 
@@ -56,7 +62,7 @@ def train_fn(config: Dict):
         ),
         tune_pl.TuneReportCheckpointCallback(
             metrics=phase_metric_names[model_transformer.RectTransformerModule.VALID_PHASE_NAME],
-            filename=constants.CHECKPOINT_FILE_BASENAME,
+            filename=checkpoint_dir or constants.CHECKPOINT_FILE_BASENAME,
             on='validation_end'
         ),
         tune_pl.TuneReportCallback(
@@ -64,12 +70,16 @@ def train_fn(config: Dict):
             on='test_end',
         ),
     ]
-
+    logger = pl_loggers.TensorBoardLogger(
+        save_dir=tune.get_trial_dir(),
+        name=hp.project_name,
+        version=tune.get_trial_id(),
+    )
     trainer = pl.Trainer(
         callbacks=callbacks,
-        logger=pl_loggers.TensorBoardLogger(save_dir=tune.get_trial_dir(), name=hp.project_name, version="."),
+        logger=logger,
         max_epochs=hp.num_epochs,
-        gpus=hp.num_gpus,
+        gpus=None if do_fast_test else hp.num_gpus,
         weights_summary='full',
         accumulate_grad_batches=utils.pow2int(hp.log2_batch_size),
         profiler=True,
@@ -81,7 +91,13 @@ def train_fn(config: Dict):
 
 
 if __name__ == '__main__':
-    search_params = hyperparams.LearningParams()
+    # e.g. num=1000_68eb
+    # dataset_name = 'num=10_40db'
+    dataset_name = 'num=2000_56d2'
+    search_params = hyperparams.LearningParams(dataset_name)
+
+    import os
+    os.environ['TUNE_DISABLE_STRICT_METRIC_CHECKING'] = '1'
 
     ##############
     # model
@@ -131,8 +147,6 @@ if __name__ == '__main__':
     search_params.batch_size_log2 = params.Integer(0, 12)
     search_params.p_valid = 0.1
     search_params.p_test = 0.1
-    search_params.data_dir = constants.DOCS_DIR / 'num=2000_e4d0'
-    search_params.dataset_file = constants.DOCS_DIR / 'ds_num=2000_e4d0.cloudpickle'
 
     # for data loading
     search_params.num_workers = 4
@@ -142,8 +156,18 @@ if __name__ == '__main__':
     search_params.num_steps_per_histogram_log = 50
     search_params.upload_dir = 's3://kb-tester-2020-10-08'
     search_params.project_name = 'tablestakes_trans1d_tests'
-    search_params.num_gpus = 0
+    search_params.num_gpus = 1
     search_params.seed = 4
+
+    print('search_params.upload_dir', search_params.upload_dir)
+    bucket_name = search_params.upload_dir.replace('s3://', '')
+    print('search_params.bucket_name', bucket_name)
+
+    s3_res = boto3.resource('s3')
+    s3_client = boto3.client('s3')
+
+    if s3_res.Bucket(bucket_name) not in s3_client.list_buckets():
+        s3_client.create_bucket(Bucket=bucket_name)
 
     import socket
     hostname = socket.gethostname()
@@ -152,17 +176,23 @@ if __name__ == '__main__':
     if do_fast_test:
         search_params.num_epochs = 10
         search_params.num_hp_samples = 10
+        search_params.num_trans_enc_layers = 1
+        search_params.num_trans_heads = 1
+        search_params.num_trans_fc_dim_mult = 1
+        search_params.num_fc_blocks = 2
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--address", default='auto')
     args = parser.parse_args()
 
+    ray.shutdown()
     ray.init(
         address=None if do_fast_test else str(args.address),
         ignore_reinit_error=True,
         include_dashboard=not do_fast_test,
-        local_mode=do_fast_test,
+        local_mode=False,
         num_cpus=12 if do_fast_test else None,
+        num_gpus=6 if do_fast_test else None,
     )
 
     tune_scheduler = tune.schedulers.ASHAScheduler(
@@ -206,49 +236,32 @@ if __name__ == '__main__':
         }
         loggers += [tune_wandb.WandbLogger]
 
-    num_y_classes = utils.load_json(search_params.data_dir / constants.NUM_Y_CLASSES_FILENAME)
-    word_to_id = utils.load_json(search_params.data_dir / constants.WORD_ID_FILENAME)
-    word_to_count = utils.load_json(search_params.data_dir / constants.WORD_COUNT_FILENAME)
-
-    # num_y_classes_ref = ray.put(num_y_classes)
-    # print('num_y_classes_ref:', num_y_classes_ref)
-    # search_params.num_y_classes_ray_obj_id = bytes(num_y_classes_ref)
-    # print('bytes:', bytes(num_y_classes_ref))
-    # num_y_classes_ref_2 = ray.ObjectRef(search_params.num_y_classes_ray_obj_id)
-    # print('num_y_classes_ref_2:', num_y_classes_ref_2)
-    #
-    # out = ray.get(num_y_classes_ref)
-    # print('out:', out)
-    #
-    # print('starting puts 2:', out)
-    # search_params.word_to_id_ray_obj_id = bytes(ray.put(word_to_id))
-    # search_params.word_to_count_ray_obj_id = bytes(ray.put(word_to_count))
-    # print('done with puts 2:', out)
-    #
-    # word_to_count_ray_obj_id_ref = ray.ObjectRef(search_params.word_to_count_ray_obj_id)
-    # print('word_to_count_ray_obj_id_ref:', word_to_count_ray_obj_id_ref)
-    # wtc = ray.get(word_to_count_ray_obj_id_ref)
-    # print('wtc:', wtc)
+    # num_y_classes = utils.load_json(search_params.data_dir / constants.NUM_Y_CLASSES_FILENAME)
+    # word_to_id = utils.load_json(search_params.data_dir / constants.WORD_ID_FILENAME)
+    # word_to_count = utils.load_json(search_params.data_dir / constants.WORD_COUNT_FILENAME)
 
     # blocks until done
     print('loading or making data')
     ds = load_makers.DatasetLoadMaker(
         saved_dataset_file=search_params.dataset_file,
-        input_docs_directory_for_maker=search_params.data_dir,
+        input_docs_directory_for_maker=search_params.docs_dir,
     )
 
-    # print('done loading_data')
-    # print('putting data')
-    # search_params.ds_ray_obj_id = bytes(ray.put(ds))
-    # print('done putting data')
-    # ray.get(ray.ObjectRef(search_params.ds_ray_obj_id))
-
+    resources_per_trial = {
+        "cpu": 2,
+    }
+    if not do_fast_test:
+        resources_per_trial['gpu'] = search_params.num_gpu
+    # resources_per_trial = {
+    #     "cpu": 2,
+    #     "gpu": search_params.num_gpu if not do_fast_test else 0,
+    # }
     analysis = tune.run(
         run_or_experiment=train_fn,
         # name=None,
         stop={"training_iteration": search_params.num_epochs},
         config=search_dict,
-        resources_per_trial={"cpu": 2, "gpu": search_params.num_gpus},
+        resources_per_trial=resources_per_trial,
         num_samples=search_params.num_hp_samples,
         # local_dir=None,
         # upload_dir=search_params.upload_dir,
@@ -257,8 +270,8 @@ if __name__ == '__main__':
         loggers=loggers,
         # sync_to_cloud=None,
         # sync_to_driver=None,
-        checkpoint_freq=2,
-        checkpoint_at_end=True,
+        checkpoint_freq=None,
+        checkpoint_at_end=False,
         # sync_on_checkpoint=True,
         keep_checkpoints_num=2,
         checkpoint_score_attr=search_params.search_metric,

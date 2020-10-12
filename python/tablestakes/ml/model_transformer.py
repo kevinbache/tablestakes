@@ -39,12 +39,16 @@ class RectTransformerModule(pl.LightningModule):
 
         self.ds = load_makers.DatasetLoadMaker(
             saved_dataset_file=self.hp.dataset_file,
-            input_docs_directory_for_maker=self.hp.data_dir,
+            input_docs_directory_for_maker=self.hp.docs_dir,
         ).loadmake()
 
-        self.num_y_classes = utils.load_json(self.hp.data_dir / constants.NUM_Y_CLASSES_FILENAME)
-        self.word_to_id = utils.load_json(self.hp.data_dir / constants.WORD_ID_FILENAME)
-        self.word_to_count = utils.load_json(self.hp.data_dir / constants.WORD_COUNT_FILENAME)
+        self.metrics_to_log = {}
+
+        from tablestakes.ml import data as ts_data
+
+        self.num_y_classes = self.ds.meta.num_y_classes
+        self.word_to_id = self.ds.meta.word_to_id
+        self.word_to_count = self.ds.meta.word_to_count
 
         self.hp.num_vocab = len(self.word_to_id)
 
@@ -224,10 +228,15 @@ class RectTransformerModule(pl.LightningModule):
 
         on_epoch = None
 
-        self.log(self._get_phase_name(phase_name, 'loss', 'total'), loss, prog_bar=prog_bar, on_epoch=on_epoch)
+        d = {}
+
+        total_loss_name = self._get_phase_name(phase_name, 'loss', 'total')
+        self.log(total_loss_name, loss, prog_bar=prog_bar, on_epoch=on_epoch)
+        d[total_loss_name] = loss
         for output_name, current_loss in zip(output_names, losses):
             full_metric_name = self._get_phase_name(phase_name, 'loss', output_name)
             self.log(full_metric_name, current_loss, prog_bar=False, on_epoch=on_epoch)
+            d[full_metric_name] = current_loss
 
         for metric_name, metric in self.METRICS.items():
             for output_name in output_names:
@@ -236,6 +245,9 @@ class RectTransformerModule(pl.LightningModule):
                 full_metric_name = self._get_phase_name(phase_name, metric_name, output_name)
                 metric_value = metric(y_hat, y)
                 self.log(full_metric_name, metric_value, prog_bar=False, on_epoch=on_epoch)
+                d[full_metric_name] = metric_value
+
+        self.metrics_to_log = d
 
     def training_step(self, batch, batch_idx):
         xs_dict, ys_dict, y_hats_dict, losses, loss = self._inner_forward_step(batch)
@@ -313,27 +325,26 @@ class RectTransformerModule(pl.LightningModule):
 
 
 if __name__ == '__main__':
-    # dataset_name = 'num=100_60d9'
-    dataset_name = 'num=1000_4475'
+    # dataset_name = 'num=100_c5ff'
+    # dataset_name = 'num=10_08b3'
+    dataset_name = 'num=10_40db'
 
-    hp = hyperparams.LearningParams()
-    hp.data_dir = constants.DOCS_DIR / dataset_name
-
-    ds = data.XYCsvDataset(hp.data_dir)
-
+    hp = hyperparams.LearningParams(dataset_name)
+    net = RectTransformerModule(hp)
 
     trainer = pl.Trainer(
-        logger=pl_loggers.TensorBoardLogger(constants.LOGS_DIR, name="trans1d_trial2"),
+        logger=pl_loggers.TensorBoardLogger(constants.LOGS_DIR, name="trans1d_trial_delme"),
         max_epochs=hp.num_epochs,
         weights_summary='full',
         fast_dev_run=False,
         accumulate_grad_batches=utils.pow2int(hp.log2_batch_size),
         profiler=True,
     )
-    net = RectTransformerModule(hp)
 
     print("HP:")
     utils.print_dict(hp.to_dict())
+
+    print("Starting trainer.fit:")
     fit_out = trainer.fit(net)
 
     print('fit_out:', fit_out)

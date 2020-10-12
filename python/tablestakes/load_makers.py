@@ -33,15 +33,15 @@ class LoadMaker(abc.ABC, Generic[T]):
         pass
 
 
-class DatasetLoadMaker(LoadMaker[ts_data.XYCsvDataset]):
+class DatasetLoadMaker(LoadMaker[ts_data.TablestakesDataset]):
     def __init__(self, saved_dataset_file: str, input_docs_directory_for_maker: str):
         super().__init__([saved_dataset_file])
-        self.docs_directory_for_maker = input_docs_directory_for_maker
+        self.input_docs_directory_for_maker = input_docs_directory_for_maker
 
-    def _load(self) -> ts_data.XYCsvDataset:
+    def _load(self) -> ts_data.TablestakesDataset:
         return utils.load_cloudpickle(self.files_to_check[0])
 
-    def _make(self) -> ts_data.XYCsvDataset:
-        ds = ts_data.XYCsvDataset(self.docs_directory_for_maker)
+    def _make(self) -> ts_data.TablestakesDataset:
+        ds = ts_data.TablestakesDataset(self.input_docs_directory_for_maker)
         utils.save_cloudpickle(self.files_to_check[0], ds)
         return ds

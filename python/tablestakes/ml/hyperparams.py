@@ -1,4 +1,5 @@
 import hashlib
+from typing import *
 
 import numpy as np
 
@@ -9,6 +10,13 @@ from tablestakes import html_css as hc
 
 
 class LearningParams(params.ParameterSet):
+    def __init__(self, dataset_name: str, **kwargs):
+        super().__init__(**kwargs)
+
+        self.dataset_name = dataset_name
+        self.docs_dir = constants.DOCS_DIR / self.dataset_name
+        self.dataset_file = constants.DATASETS_DIR / f'{self.dataset_name}.cloudpickle'
+
     ##############
     # model
     #  embedder
@@ -57,8 +65,7 @@ class LearningParams(params.ParameterSet):
     log2_batch_size = 5
     p_valid = 0.1
     p_test = 0.1
-    data_dir = constants.DOCS_DIR / 'num=2000_e4d0'
-    dataset_file = constants.DOCS_DIR / 'ds_num=2000_e4d0.cloudpickle'
+    dataset_name = 'num=10_c145'
 
     # for transferring objects from tune process to worker processes
     ds_ray_obj_id = None
@@ -79,6 +86,18 @@ class LearningParams(params.ParameterSet):
     num_gpus = 1
 
     seed = 42
+
+    @classmethod
+    def from_dict(cls, d: Dict):
+        hp = cls(dataset_name='dataset_file')
+        for k, v in d.items():
+            # TODO: don't cast array to int
+            if np.issubdtype(type(v), np.integer):
+                v = int(v)
+            elif np.issubdtype(type(v), np.floating):
+                v = float(v)
+            hp.__setattr__(k, v)
+        return hp
 
 
 class DocGenParams(params.ParameterSet):
@@ -134,22 +153,43 @@ class DocSetParams(params.ParameterSet):
         super().__init__(**kwargs)
         self.doc_gen_params = doc_gen_params
         self.doc_prep_params = doc_prep_params
+        self._short_hash = None
 
     seed_start = 42
 
-    num_docs = 1000
+    num_docs = 10
 
     doc_gen_params = DocGenParams()
     doc_prep_params = DocPrepParams()
 
+    _data_dir = constants.DATA_DIR
     docs_root_dir = constants.DOCS_DIR
+    dataset_root_dir = constants.DATASETS_DIR
+
     docs_dir = None
 
     def _get_short_hash(self, num_chars=4):
+        if self._short_hash is not None:
+            return self._short_hash
+
         d = self.to_dict()
         h = hashlib.sha1(str(d).encode('utf-8'))
-        return h.hexdigest()[-num_chars:]
+        self._short_hash = h.hexdigest()[-num_chars:]
+
+        return self._short_hash
+
+    def get_doc_set_name(self):
+        return f'num={self.num_docs}_{self._get_short_hash()}'
+
+    def get_dataset_dir(self):
+        return self.docs_root_dir / 'dataset'
+
+    def get_dataset_file(self):
+        return self.dataset_root_dir / f'{self.get_doc_set_name()}.cloudpickle'
+
+    def get_docs_dir(self):
+        return self.docs_root_dir / self.get_doc_set_name()
 
     def set_docs_dir(self):
-        self.docs_dir = \
-            self.docs_root_dir / f'num={self.num_docs}_{self._get_short_hash()}'
+        self.docs_dir = self.get_docs_dir()
+

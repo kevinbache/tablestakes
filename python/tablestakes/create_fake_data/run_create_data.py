@@ -16,6 +16,7 @@ ray.init(ignore_reinit_error=True)
 from tablestakes import utils, etree_modifiers, ocr, color_matcher, df_modifiers, constants
 from tablestakes.create_fake_data import basic
 from tablestakes.ml import hyperparams
+from tablestakes.ml import data
 
 
 @ray.remote
@@ -205,13 +206,13 @@ if __name__ == '__main__':
     doc_gen_params = hyperparams.DocGenParams()
 
     doc_prep_params = hyperparams.DocPrepParams()
-    doc_prep_params.min_count_to_keep_word = 4
+    doc_prep_params.min_count_to_keep_word = 8
 
     doc_settings = hyperparams.DocSetParams(
         doc_gen_params=doc_gen_params,
         doc_prep_params=doc_prep_params,
     )
-    doc_settings.num_docs = 10000
+    doc_settings.num_docs = 2000
     doc_settings.doc_gen_params.num_extra_fields = 1
 
     fast_test = False
@@ -262,31 +263,35 @@ if __name__ == '__main__':
 
     num_korv_classes, num_which_kv_classes = ray.get(save_dfs_output)
 
-    utils.save_json(
-        doc_settings.docs_dir / 'pre_elimination_all_words.json',
-        ray.get(vocabulizer.get_all_words.remote())
-    )
-    utils.save_json(
-        doc_settings.docs_dir / 'pre_eliminiation_word_to_count.json',
-        ray.get(vocabulizer.get_word_to_count.remote())
-    )
-    utils.save_json(
-        doc_settings.docs_dir / 'word_to_count.json',
-        ray.get(rare_word_eliminator.get_word_to_count.remote())
-    )
-    utils.save_json(
-        doc_settings.docs_dir / 'word_to_id.json',
-        ray.get(rare_word_eliminator.get_word_to_id.remote())
+    extra_meta_dicts = {}
+    extra_meta_dicts['pre_eliminiation_all_words'] = ray.get(vocabulizer.get_all_words.remote())
+    extra_meta_dicts['pre_eliminiation_word_to_count'] = ray.get(vocabulizer.get_word_to_count.remote())
+
+    word_to_count = ray.get(rare_word_eliminator.get_word_to_count.remote())
+    word_to_id = ray.get(rare_word_eliminator.get_word_to_id.remote())
+    num_y_classes = {
+        'korv': num_korv_classes,
+        'which_kv': num_which_kv_classes,
+    }
+
+    meta = data.TablestakesMeta(
+        word_to_count=word_to_count,
+        word_to_id=word_to_id,
+        num_y_classes=num_y_classes,
+        **extra_meta_dicts,
     )
 
-    utils.save_json(
-        doc_settings.docs_dir / 'num_y_classes.json',
-        {
-            'korv': num_korv_classes,
-            'which_kv': num_which_kv_classes,
-        },
-    )
+    meta_dir = data.TablestakesDataset.get_meta_dir(docs_dir=doc_settings.docs_dir)
+    with utils.Timer(f'Saving metadata to {meta_dir}'):
+        meta.save(meta_dir)
+
+    with utils.Timer('Reading csvs into Dataset'):
+        dataset = data.TablestakesDataset(docs_dir=doc_settings.docs_dir, meta=meta)
+
+    dataset_file = doc_settings.get_dataset_file()
+    with utils.Timer(f'Saving Dataset of type {type((dataset))} to {dataset_file}'):
+        dataset.save(dataset_file)
 
     print()
-    print(f'Saved to {str(doc_settings.docs_dir)}')
+    print(f'Saved to {str(doc_settings.docs_dir)} and {meta_dir} and {dataset_file}')
 
