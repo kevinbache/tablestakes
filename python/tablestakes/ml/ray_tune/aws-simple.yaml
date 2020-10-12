@@ -54,9 +54,10 @@ setup_commands:
     # for https://docs.ray.io/en/stable/webui.html
     - jupyter nbextension enable --py --sys-prefix widgetsnbextension
 
+    - pip install --upgrade cloudpickle>=1.6.0
+
     - mkdir -p ~/projects
 
-    - pip install --upgrade cloudpickle>=1.6.0
     - test -e projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
     - cd projects/chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
     - pip install --editable ~/projects/chillpill/
