@@ -9,7 +9,6 @@ from torch import optim
 from torch.utils.data import DataLoader
 
 import pytorch_lightning as pl
-from pytorch_lightning import loggers as pl_loggers
 
 from tablestakes import constants, utils, load_makers
 from tablestakes.ml import torch_helpers, hyperparams
@@ -135,19 +134,19 @@ class RectTransformerModule(pl.LightningModule):
         # save all variables in __init__ signature to self.hparams
         self.save_hyperparameters(self.hp.to_dict())
 
-        if hasattr(self.hp, 'wandb'):
-            from pytorch_lightning.loggers import wandb as pl_wandb
-            self.pl_wandb_logger = pl_wandb.WandbLogger(
-                name=self.hp.experiment_name,
-                # save_dir=None,
-                # offline=False,
-                id=None,
-                anonymous=False,
-                version=None,
-                project=self.hp.project_name,
-                log_model=False,
-                experiment=None,
-            )
+        # if hasattr(self.hp, 'wandb'):
+        #     from pytorch_lightning.loggers import wandb as pl_wandb
+        #     self.pl_wandb_logger = pl_wandb.WandbLogger(
+        #         name=self.hp.experiment_name,
+        #         # save_dir=None,
+        #         # offline=False,
+        #         id=None,
+        #         anonymous=False,
+        #         version=None,
+        #         project=self.hp.project_name,
+        #         log_model=False,
+        #         experiment=None,
+        #     )
 
     def forward(self, basic: torch.Tensor, vocab: torch.Tensor):
         basic = basic.float()
@@ -254,6 +253,7 @@ class RectTransformerModule(pl.LightningModule):
         for output_name, current_loss in zip(output_names, losses):
             full_metric_name = self._get_phase_name(phase_name, 'loss', output_name)
             self.log(full_metric_name, current_loss, prog_bar=False, on_epoch=on_epoch)
+
             d[full_metric_name] = current_loss
 
         for metric_name, metric in self.METRICS.items():
@@ -267,7 +267,11 @@ class RectTransformerModule(pl.LightningModule):
                 d[full_metric_name] = metric_value
 
         self.metrics_to_log = d
-        # self.pl_wandb_logger.agg_and_log_metrics()
+        self.logger.log_metrics(d, step=self.global_step)
+
+    def on_pretrain_routine_start(self) -> None:
+        self.logger[1].watch(self)
+        self.logger.log_hyperparams(self.hp.to_dict())
 
     def training_step(self, batch, batch_idx):
         xs_dict, ys_dict, y_hats_dict, losses, loss = self._inner_forward_step(batch)
@@ -287,14 +291,18 @@ class RectTransformerModule(pl.LightningModule):
             for name, param in self.named_parameters():
                 try:
                     if param is not None:
-                        self.logger.experiment.add_histogram(f'weights/{name}', param, self.current_epoch)
+                        self.logger[1].experiment.add_histogram(
+                            tag=f'my_weights/{name}',
+                            values=param,
+                            global_step=self.global_step,
+                        )
                         if param.grad is not None:
-                            self.logger.experiment.add_histogram(f'grads/{name}', param.grad, self.current_epoch)
-                            self.logger.log_metrics(self.grad_norm(1), step=self.global_step)
+                            self.logger[1].experiment.add_histogram(
+                                tag=f'my_grads/{name}',
+                                values=param.grad,
+                                global_step=self.global_step,
+                            )
                 except BaseException as e:
-                    print("==================================================")
-                    print("==================================================")
-                    print("==================================================")
                     print("==================================================")
                     print("==================================================")
                     print("==================================================")
@@ -307,10 +315,11 @@ class RectTransformerModule(pl.LightningModule):
                     print("==================================================")
                     print("==================================================")
                     print("==================================================")
-                    print("==================================================")
-                    print("==================================================")
-                    print("==================================================")
                     raise e
+                self.logger.log_metrics(
+                    metrics={'grad_norms': self.grad_norm(1)},
+                    step=self.global_step,
+                )
 
     # ---------------------
     # TRAINING SETUP

@@ -84,12 +84,6 @@ class LearningParams(params.ParameterSet):
     p_test = 0.1
     dataset_name = 'num=10_c145'
 
-    # for transferring objects from tune process to worker processes
-    ds_ray_obj_id = None
-    num_y_classes_ray_obj_id = None
-    word_to_id_ray_obj_id = None
-    word_to_count_ray_obj_id = None
-
     # for data loading
     num_workers = 4
 

@@ -26,24 +26,23 @@ def train_fn(config: Dict, checkpoint_dir=None):
     utils.set_seeds(hp.seed)
 
     phase_names = model_transformer.RectTransformerModule.PHASE_NAMES
-
-    phase_metric_names = {
-        name: model_transformer.RectTransformerModule.get_all_metric_names_for_phase(name) for name in phase_names
+    phase_to_metric_names = {
+        pn: model_transformer.RectTransformerModule.get_all_metric_names_for_phase(pn) for pn in phase_names
     }
 
     pl_callbacks = [
         torch_helpers.LogCopierCallback(),
         tune_pl.TuneReportCallback(
-            metrics=phase_metric_names[model_transformer.RectTransformerModule.TRAIN_PHASE_NAME],
+            metrics=phase_to_metric_names[model_transformer.RectTransformerModule.TRAIN_PHASE_NAME],
             on='train_end',
         ),
         tune_pl.TuneReportCheckpointCallback(
-            metrics=phase_metric_names[model_transformer.RectTransformerModule.VALID_PHASE_NAME],
+            metrics=phase_to_metric_names[model_transformer.RectTransformerModule.VALID_PHASE_NAME],
             filename=checkpoint_dir or constants.CHECKPOINT_FILE_BASENAME,
-            on='validation_end'
+            on='validation_end',
         ),
         tune_pl.TuneReportCallback(
-            metrics=phase_metric_names[model_transformer.RectTransformerModule.TEST_PHASE_NAME],
+            metrics=phase_to_metric_names[model_transformer.RectTransformerModule.TEST_PHASE_NAME],
             on='test_end',
         ),
     ]
@@ -147,10 +146,9 @@ if __name__ == '__main__':
     do_test_one = True
     if do_test_one:
         dataset_name = 'num=1000_4d8d'
-        # dataset_name = 'num=10000_99e0'
         search_params = hyperparams.LearningParams(dataset_name)
         search_params.num_hp_samples = 1
-        search_params.num_epochs = 1000
+        search_params.num_epochs = 10
         search_params.num_gpus = 1
         print("=======================================")
         print("=======================================")
@@ -249,7 +247,7 @@ if __name__ == '__main__':
             "project": search_params.project_name,
             "api_key_file": Path('~/.wandb_api_key').expanduser().resolve(),
         }
-        loggers += [tune_wandb.WandbLogger]
+        # loggers += [tune_wandb.WandbLogger]
 
     # blocks until done
     print('loading or making data')
@@ -265,13 +263,10 @@ if __name__ == '__main__':
         resources_per_trial['gpu'] = search_params.num_gpus
 
     def do_stop(trial_id, result):
-        print('do_stop trial_id:', trial_id)
-        print('do_stop result:', result)
         if torch_helpers.CURRENT_EPOCH_NAME in result:
             return result[torch_helpers.CURRENT_EPOCH_NAME] > search_params.num_epochs
         else:
             return False
-
     stopper = tune.stopper.FunctionStopper(do_stop)
 
     analysis = tune.run(
@@ -319,6 +314,9 @@ if __name__ == '__main__':
     utils.save_pickle(analysis_file, analysis)
 
     best_trial = analysis.get_best_trial(search_params.search_metric, "max", "last-5-avg")
+
+    print(f'best_trial.last_result: {best_trial.last_result}')
+
     print("Best trial config: {}".format(best_trial.config))
     print("Best trial final validation loss: {}".format(best_trial.last_result[valid_loss_name]))
     print("Best trial final search_metric: {}".format(best_trial.last_result[search_params.search_metric]))

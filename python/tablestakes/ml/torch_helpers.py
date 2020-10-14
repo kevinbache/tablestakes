@@ -273,12 +273,12 @@ def get_pl_logger(hp: hyperparams.LearningParams, tune=None):
     version = None if tune is None else tune.get_trial_id()
     name = hp.get_project_exp_name()
 
-    pl_loggers.LoggerCollection([
+    logger = pl_loggers.LoggerCollection([
         pl_loggers.TensorBoardLogger(name=name, save_dir=str(save_dir / 'tensorboard'), version=version),
         pl_loggers.WandbLogger(name=name, save_dir=str(save_dir / 'wandb'), id=version),
     ])
 
-    return pl_loggers
+    return logger
 
 
 class BetterAccuracy(pl.metrics.Accuracy):
