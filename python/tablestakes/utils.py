@@ -97,13 +97,10 @@ def save_cloudpickle(filename: str, obj: Any):
 
 
 def set_seeds(seed: int):
-    import random
-    import numpy as np
-    import torch
-
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
+    from pytorch_lightning import seed_everything
+    from faker import Faker
+    seed_everything(seed)
+    Faker.seed(seed)
 
 
 def hprint(s: str, sep_char='=', do_include_pre_break_line=True):
@@ -193,13 +190,6 @@ def set_pandas_disp(width=200, max_rows=200):
     pd.set_option('display.max_columns', width)
     pd.set_option('display.max_rows', max_rows)
     pd.set_option('display.width', width)
-
-
-def set_seed(seed: int):
-    import numpy as np
-    from faker import Faker
-    np.random.seed(seed)
-    Faker.seed(seed)
 
 
 class PdfHandler:

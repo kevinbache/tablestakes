@@ -12,16 +12,16 @@ import pytorch_lightning as pl
 from pytorch_lightning import loggers as pl_loggers
 
 from tablestakes import constants, utils, load_makers
-from tablestakes.ml import data, torch_helpers, hyperparams
+from tablestakes.ml import torch_helpers, hyperparams
 
 from ray.tune.integration import wandb as tune_wandb
 
 
 class BetterAccuracy(pl.metrics.Accuracy):
+    """PyTorch Lightning's += lines cause warnings about transferring lots of scalars between cpu / gpu"""
     def update(self, preds: torch.Tensor, target: torch.Tensor):
         preds, target = self._input_format(preds, target)
-        assert preds.shape == target.shape
-
+        assert preds.shape == target.shape,  f"preds.shape: {preds.shape}, target.shape: {target.shape}"
         self.correct = self.correct + torch.sum(preds == target)
         self.total = self.total + target.numel()
 
@@ -204,9 +204,10 @@ class RectTransformerModule(pl.LightningModule):
         y_hats_dict = self(**xs_dict)
 
         losses = torch.stack([
-            F.cross_entropy(y_hat.squeeze(0), y.view(-1))
+            F.cross_entropy(y_hat.permute(0, 2, 1), y.permute(0, 2, 1).squeeze(), ignore_index=self.Y_VALUE_TO_IGNORE)
             for y, y_hat in zip(ys_dict.values(), y_hats_dict.values())
         ])
+
         losses = torch.mul(losses, self.loss_weights)
         loss = losses.sum()
 
@@ -273,7 +274,7 @@ class RectTransformerModule(pl.LightningModule):
                 y_hat = y_hats_dict[output_name].squeeze()
                 y = ys_dict[output_name].squeeze()
                 full_metric_name = self._get_phase_name(phase_name, metric_name, output_name)
-                metric_value = metric(y_hat, y)
+                metric_value = metric(y_hat.permute(0, 2, 1), y)
 
                 self.log(full_metric_name, metric_value, prog_bar=False, on_epoch=on_epoch)
                 d[full_metric_name] = metric_value
@@ -310,11 +311,11 @@ class RectTransformerModule(pl.LightningModule):
                     print("==================================================")
                     print("==================================================")
                     print("==================================================")
-                    print('param: ', param)
+                    print(' param: ', param)
                     print()
-                    print('param name: ', name)
-                    print('type(param): ', type(param))
-                    print('type(param.grad): ', type(param.grad))
+                    print(' param name: ', name)
+                    print(' type(param): ', type(param))
+                    print(' type(param.grad): ', type(param.grad))
                     print()
                     print("==================================================")
                     print("==================================================")
@@ -352,30 +353,64 @@ class RectTransformerModule(pl.LightningModule):
         # called on every gpu
         pass
 
+    # ignored in the loss calculation.  simple loss masking
+    Y_VALUE_TO_IGNORE = -100
+
+    def _collate_fn(self, batch: List[Any]) -> Any:
+        """
+        batch is a list of tuples like
+          [
+            ((x_basic, x_vocab), (y_korv, y_which_vk)),
+            ...
+          ]
+        """
+        xs, ys = zip(*batch)
+        xs = {k: [d[k] for d in xs] for k in xs[0]}
+        ys = {k: [d[k] for d in ys] for k in ys[0]}
+
+        xs[constants.X_BASIC_BASE_NAME][0] = xs[constants.X_BASIC_BASE_NAME][0].float()
+        xs[constants.X_VOCAB_BASE_NAME][0] = xs[constants.X_VOCAB_BASE_NAME][0].long()
+        ys[constants.Y_KORV_BASE_NAME][0] = ys[constants.Y_KORV_BASE_NAME][0].long()
+        ys[constants.Y_WHICH_KV_BASE_NAME][0] = ys[constants.Y_WHICH_KV_BASE_NAME][0].long()
+
+        xs = {
+            k: torch.nn.utils.rnn.pad_sequence(v, batch_first=True)
+            for k, v in xs.items()
+        }
+        ys = {
+            k: torch.nn.utils.rnn.pad_sequence(v, batch_first=True, padding_value=self.Y_VALUE_TO_IGNORE)
+            for k, v in ys.items()
+        }
+
+        return xs, ys
+
     def train_dataloader(self):
         return DataLoader(
             self.train_dataset,
-            batch_size=1,
+            batch_size=utils.pow2int(self.hp.log2_batch_size),
             shuffle=True,
             num_workers=self.hp.num_workers,
+            collate_fn=self._collate_fn,
             pin_memory=self.hp.num_gpus > 0,
         )
 
     def val_dataloader(self):
         return DataLoader(
             self.valid_dataset,
-            batch_size=1,
+            batch_size=utils.pow2int(self.hp.log2_batch_size),
             shuffle=False,
             num_workers=self.hp.num_workers,
+            collate_fn=self._collate_fn,
             pin_memory=self.hp.num_gpus > 0,
         )
 
     def test_dataloader(self):
         return DataLoader(
             self.test_dataset,
-            batch_size=1,
+            batch_size=utils.pow2int(self.hp.log2_batch_size),
             shuffle=False,
             num_workers=self.hp.num_workers,
+            collate_fn=self._collate_fn,
             pin_memory=self.hp.num_gpus > 0,
         )
 
@@ -394,8 +429,9 @@ if __name__ == '__main__':
         logger=pl_loggers.TensorBoardLogger(constants.LOGS_DIR, name=hp.project_name),
         max_epochs=hp.num_epochs,
         weights_summary='full',
-        fast_dev_run=False,
-        accumulate_grad_batches=utils.pow2int(hp.log2_batch_size),
+        # fast_dev_run=False,
+        # accumulate_grad_batches=utils.pow2int(hp.log2_batch_size),
+        accumulate_grad_batches=1,
         profiler=True,
     )
 

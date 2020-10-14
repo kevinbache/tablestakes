@@ -61,10 +61,13 @@ def train_fn(config: Dict, checkpoint_dir=None):
         weights_summary='full',
         accumulate_grad_batches=utils.pow2int(hp.log2_batch_size),
         profiler=True,
+        deterministic=True,
     )
     net = model_transformer.RectTransformerModule(hp)
 
     fit_out = trainer.fit(net)
+    print('Done with this fit run')
+
     return fit_out
 
 
