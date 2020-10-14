@@ -97,6 +97,7 @@ class LearningParams(params.ParameterSet):
     # extra
     num_steps_per_histogram_log = 100
 
+    logs_dir = constants.LOGS_DIR
     upload_dir = 's3://kb-tester-2020-10-08'
     project_name = 'tablestakes'
     experiment_name = 'trans_v0.1'
@@ -116,6 +117,9 @@ class LearningParams(params.ParameterSet):
                 v = float(v)
             hp.__setattr__(k, v)
         return hp
+
+    def get_project_exp_name(self):
+        return f'{self.project_name}_{self.experiment_name}'
 
 
 class DocGenParams(params.ParameterSet):

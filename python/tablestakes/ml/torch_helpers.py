@@ -1,7 +1,11 @@
+from pathlib import Path
 from typing import List
 
 import pytorch_lightning as pl
+from pytorch_lightning import loggers as pl_loggers
+import torch
 from ray import tune
+from tablestakes import constants
 
 from tablestakes.ml import hyperparams, ablation
 from torch import nn as nn
@@ -260,3 +264,27 @@ class LogCopierCallback(pl.Callback):
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
         d[PARAM_COUNT_NAME] = self._count_params(pl_module)
         tune.report(**d)
+
+
+def get_pl_logger(hp: hyperparams.LearningParams, tune=None):
+    save_dir = hp.logs_dir if tune is None else tune.get_trial_dir()
+    save_dir = Path(save_dir)
+
+    version = None if tune is None else tune.get_trial_id()
+    name = hp.get_project_exp_name()
+
+    pl_loggers.LoggerCollection([
+        pl_loggers.TensorBoardLogger(name=name, save_dir=str(save_dir / 'tensorboard'), version=version),
+        pl_loggers.WandbLogger(name=name, save_dir=str(save_dir / 'wandb'), id=version),
+    ])
+
+    return pl_loggers
+
+
+class BetterAccuracy(pl.metrics.Accuracy):
+    """PyTorch Lightning's += lines cause warnings about transferring lots of scalars between cpu / gpu"""
+    def update(self, preds: torch.Tensor, target: torch.Tensor):
+        preds, target = self._input_format(preds, target)
+        assert preds.shape == target.shape,  f"preds.shape: {preds.shape}, target.shape: {target.shape}"
+        self.correct = self.correct + torch.sum(preds == target)
+        self.total = self.total + target.numel()

@@ -14,24 +14,13 @@ from pytorch_lightning import loggers as pl_loggers
 from tablestakes import constants, utils, load_makers
 from tablestakes.ml import torch_helpers, hyperparams
 
-from ray.tune.integration import wandb as tune_wandb
-
-
-class BetterAccuracy(pl.metrics.Accuracy):
-    """PyTorch Lightning's += lines cause warnings about transferring lots of scalars between cpu / gpu"""
-    def update(self, preds: torch.Tensor, target: torch.Tensor):
-        preds, target = self._input_format(preds, target)
-        assert preds.shape == target.shape,  f"preds.shape: {preds.shape}, target.shape: {target.shape}"
-        self.correct = self.correct + torch.sum(preds == target)
-        self.total = self.total + target.numel()
-
 
 class RectTransformerModule(pl.LightningModule):
     LOSS_VAL_NAME = 'loss'
     TOTAL_NAME = 'total'
 
     METRICS = {
-        'acc': BetterAccuracy(),
+        'acc': torch_helpers.BetterAccuracy(),
     }
 
     def __init__(self, hp: hyperparams.LearningParams):
@@ -45,8 +34,6 @@ class RectTransformerModule(pl.LightningModule):
         ).loadmake()
 
         self.metrics_to_log = {}
-
-        from tablestakes.ml import data as ts_data
 
         self.num_y_classes = self.ds.meta.num_y_classes
         self.word_to_id = self.ds.meta.word_to_id
@@ -426,7 +413,7 @@ if __name__ == '__main__':
     net = RectTransformerModule(hp)
 
     trainer = pl.Trainer(
-        logger=pl_loggers.TensorBoardLogger(constants.LOGS_DIR, name=hp.project_name),
+        logger=torch_helpers.get_pl_logger(hp),
         max_epochs=hp.num_epochs,
         weights_summary='full',
         # fast_dev_run=False,

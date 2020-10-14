@@ -47,14 +47,9 @@ def train_fn(config: Dict, checkpoint_dir=None):
             on='test_end',
         ),
     ]
-    logger = pl_loggers.TensorBoardLogger(
-        save_dir=tune.get_trial_dir(),
-        name=hp.experiment_name,
-        version=tune.get_trial_id(),
-    )
     trainer = pl.Trainer(
         callbacks=pl_callbacks,
-        logger=logger,
+        logger=torch_helpers.get_pl_logger(hp, tune),
         max_epochs=hp.num_epochs,
         gpus=None if is_local_run else hp.num_gpus,
         weights_summary='full',
