@@ -52,7 +52,7 @@ def train_fn(config: Dict, checkpoint_dir=None):
         max_epochs=hp.num_epochs,
         gpus=None if is_local_run else hp.num_gpus,
         weights_summary='full',
-        accumulate_grad_batches=utils.pow2int(hp.log2_batch_size),
+        # accumulate_grad_batches=utils.pow2int(hp.log2_batch_size),
         profiler=True,
         deterministic=True,
     )
@@ -137,13 +137,13 @@ if __name__ == '__main__':
     ##############
     # extra
     search_params.num_steps_per_histogram_log = 50
-    search_params.upload_dir = 's3://kb-tester-2020-10-12'
+    search_params.upload_dir = 's3://kb-tester-2020-10-14'
     search_params.project_name = 'tablestakes'
-    search_params.experiment_name = 'trans_v0.1.1'
+    search_params.experiment_name = 'trans_v0.1.2'
     search_params.num_gpus = 1
     search_params.seed = 42
 
-    do_test_one = True
+    do_test_one = False
     if do_test_one:
         dataset_name = 'num=1000_4d8d'
         search_params = hyperparams.LearningParams(dataset_name)
@@ -168,8 +168,8 @@ if __name__ == '__main__':
     import socket
     hostname = socket.gethostname()
     is_local_run = hostname.endswith('.local')
-    # do_fast_test = is_local_run
-    do_fast_test = False
+
+    do_fast_test = is_local_run
     do_include_wandb = not do_fast_test
 
     if do_fast_test:
@@ -238,14 +238,14 @@ if __name__ == '__main__':
     # see tune.utils.UtilMonitor
     search_dict['log_sys_usage'] = True
 
-    loggers = list(tune_logger.DEFAULT_LOGGERS)
+    tune_loggers = list(tune_logger.DEFAULT_LOGGERS)
     if do_include_wandb:
-        # train_fn = tune_wandb.wandb_mixin(train_fn)
+        train_fn = tune_wandb.wandb_mixin(train_fn)
         search_dict['wandb'] = {
             "project": search_params.project_name,
             "api_key_file": Path('~/.wandb_api_key').expanduser().resolve(),
         }
-        # loggers += [tune_wandb.WandbLogger]
+        tune_loggers += [tune_wandb.WandbLogger]
 
     # blocks until done
     print('loading or making data')
@@ -269,7 +269,7 @@ if __name__ == '__main__':
 
     analysis = tune.run(
         run_or_experiment=train_fn,
-        name=f'{search_params.project_name}-{search_params.experiment_name}',
+        name=search_params.get_project_exp_name(),
         stop=stopper,
         config=search_dict,
         resources_per_trial=resources_per_trial,
@@ -278,8 +278,8 @@ if __name__ == '__main__':
         # upload_dir=search_params.upload_dir,
         # trial_name_creator=,
         sync_config=sync_config,
-        loggers=loggers,
-        log_to_file=True,
+        loggers=tune_loggers,
+        log_to_file=False,
         # sync_to_cloud=None,
         # sync_to_driver=None,
         checkpoint_freq=0,

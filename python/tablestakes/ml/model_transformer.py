@@ -190,7 +190,11 @@ class RectTransformerModule(pl.LightningModule):
         y_hats_dict = self(**xs_dict)
 
         losses = torch.stack([
-            F.cross_entropy(y_hat.permute(0, 2, 1), y.permute(0, 2, 1).squeeze(), ignore_index=self.Y_VALUE_TO_IGNORE)
+            F.cross_entropy(
+                input=y_hat.permute(0, 2, 1),
+                target=y.squeeze(dim=2),
+                ignore_index=self.Y_VALUE_TO_IGNORE,
+            )
             for y, y_hat in zip(ys_dict.values(), y_hats_dict.values())
         ])
 
@@ -258,10 +262,13 @@ class RectTransformerModule(pl.LightningModule):
 
         for metric_name, metric in self.METRICS.items():
             for output_name in output_names:
-                y_hat = y_hats_dict[output_name].squeeze()
-                y = ys_dict[output_name].squeeze()
+                y_hat = y_hats_dict[output_name]
+                y = ys_dict[output_name]
                 full_metric_name = self._get_phase_name(phase_name, metric_name, output_name)
-                metric_value = metric(y_hat.permute(0, 2, 1), y)
+                y_hat = y_hat.permute(0, 2, 1)
+                y = y.squeeze(dim=2)
+
+                metric_value = metric(y_hat, y)
 
                 self.log(full_metric_name, metric_value, prog_bar=False, on_epoch=on_epoch)
                 d[full_metric_name] = metric_value

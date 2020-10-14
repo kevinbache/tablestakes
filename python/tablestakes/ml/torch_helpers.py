@@ -276,13 +276,6 @@ def get_pl_logger(hp: hyperparams.LearningParams, tune=None):
     version = None if tune is None else tune.get_trial_id()
     name = hp.get_project_exp_name()
 
-    print('================================================')
-    print('================================================')
-    print('  get_pl_logger version:', version)
-    print('  get_pl_logger save_dir:', save_dir)
-    print('================================================')
-    print('================================================')
-
     logger = pl_loggers.LoggerCollection([
         pl_loggers.TensorBoardLogger(
             name=name,
