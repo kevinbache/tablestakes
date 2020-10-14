@@ -56,10 +56,6 @@ class FullyConv1Resnet(nn.Module):
         self.num_blocks_per_residual = num_blocks_per_residual
         self.activation = activation
 
-        # # ref https://arxiv.org/pdf/1803.08494.pdf
-        # DESIRED_NUM_CHANNELS_PER_GROUP = 16
-        # num_groups = min(num_groups, num_input_features // DESIRED_NUM_CHANNELS_PER_GROUP)
-
         all_counts = [num_input_features] + neuron_counts
 
         # round up counts so they're group divisible
@@ -238,24 +234,29 @@ def get_simple_ablatable_transformer_encoder(
     )
 
 
-class ParamCounterCallback(pl.Callback):
-    PARAM_COUNT_NAME = 'param_count'
-
-    def on_train_start(self, trainer, pl_module):
-        d = {self.PARAM_COUNT_NAME: sum(p.numel() for p in pl_module.parameters() if p.requires_grad)}
-        tune.report(**d)
-        tune.report()
+CURRENT_EPOCH_NAME = 'current_epoch'
+PARAM_COUNT_NAME = 'param_count'
 
 
 class LogCopierCallback(pl.Callback):
+    @staticmethod
+    def _count_params(pl_module):
+        return sum(p.numel() for p in pl_module.parameters() if p.requires_grad)
+
     def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
         d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        d[CURRENT_EPOCH_NAME] = trainer.current_epoch
+        d[PARAM_COUNT_NAME] = self._count_params(pl_module)
         tune.report(**d)
 
     def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
         d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        d[CURRENT_EPOCH_NAME] = trainer.current_epoch
+        d[PARAM_COUNT_NAME] = self._count_params(pl_module)
         tune.report(**d)
 
     def on_test_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
         d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        d[CURRENT_EPOCH_NAME] = trainer.current_epoch
+        d[PARAM_COUNT_NAME] = self._count_params(pl_module)
         tune.report(**d)

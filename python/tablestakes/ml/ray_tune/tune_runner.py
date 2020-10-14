@@ -31,8 +31,7 @@ def train_fn(config: Dict, checkpoint_dir=None):
         name: model_transformer.RectTransformerModule.get_all_metric_names_for_phase(name) for name in phase_names
     }
 
-    callbacks = [
-        torch_helpers.ParamCounterCallback(),
+    pl_callbacks = [
         torch_helpers.LogCopierCallback(),
         tune_pl.TuneReportCallback(
             metrics=phase_metric_names[model_transformer.RectTransformerModule.TRAIN_PHASE_NAME],
@@ -54,7 +53,7 @@ def train_fn(config: Dict, checkpoint_dir=None):
         version=tune.get_trial_id(),
     )
     trainer = pl.Trainer(
-        callbacks=callbacks,
+        callbacks=pl_callbacks,
         logger=logger,
         max_epochs=hp.num_epochs,
         gpus=None if is_local_run else hp.num_gpus,
@@ -79,6 +78,7 @@ if __name__ == '__main__':
     dataset_name = 'num=10000_99e0'
     search_params = hyperparams.LearningParams(dataset_name)
 
+    # this is required because different types of trial results either do or don't get certain metrics
     import os
     os.environ['TUNE_DISABLE_STRICT_METRIC_CHECKING'] = '1'
 
@@ -152,9 +152,10 @@ if __name__ == '__main__':
     do_test_one = True
     if do_test_one:
         dataset_name = 'num=1000_4d8d'
+        # dataset_name = 'num=10000_99e0'
         search_params = hyperparams.LearningParams(dataset_name)
         search_params.num_hp_samples = 1
-        search_params.num_epochs = 10
+        search_params.num_epochs = 1000
         search_params.num_gpus = 1
         print("=======================================")
         print("=======================================")
@@ -219,7 +220,8 @@ if __name__ == '__main__':
     assert train_loss_name == 'train_loss_total'
 
     reporter_metric_cols = [
-        'training_iteration',
+        torch_helpers.PARAM_COUNT_NAME,
+        torch_helpers.CURRENT_EPOCH_NAME,
         'time_this_iter_s',
         'time_total_s',
         model_transformer.RectTransformerModule.get_train_metric_name(metric_name='loss', output_name='korv'),
@@ -232,7 +234,7 @@ if __name__ == '__main__':
         search_params.search_metric,
     ]
 
-    param_cols = [torch_helpers.ParamCounterCallback.PARAM_COUNT_NAME] + search_params.get_samplable_param_names()
+    param_cols = search_params.get_samplable_param_names()
     reporter = tune.CLIReporter(
         max_progress_rows=search_params.num_hp_samples,
         parameter_columns=param_cols,
@@ -240,8 +242,11 @@ if __name__ == '__main__':
     )
 
     search_dict = search_params.to_ray_tune_search_dict()
-    loggers = list(tune_logger.DEFAULT_LOGGERS)
 
+    # see tune.utils.UtilMonitor
+    search_dict['log_sys_usage'] = True
+
+    loggers = list(tune_logger.DEFAULT_LOGGERS)
     if not do_fast_test:
         train_fn = tune_wandb.wandb_mixin(train_fn)
 
@@ -259,15 +264,25 @@ if __name__ == '__main__':
     )
 
     resources_per_trial = {
-        "cpu": 2,
+        "cpu": 4,
     }
     if not is_local_run:
         resources_per_trial['gpu'] = search_params.num_gpus
 
+    def do_stop(trial_id, result):
+        print('do_stop trial_id:', trial_id)
+        print('do_stop result:', result)
+        if torch_helpers.CURRENT_EPOCH_NAME in result:
+            return result[torch_helpers.CURRENT_EPOCH_NAME] > search_params.num_epochs
+        else:
+            return False
+
+    stopper = tune.stopper.FunctionStopper(do_stop)
+
     analysis = tune.run(
         run_or_experiment=train_fn,
         name=f'{search_params.project_name}-{search_params.experiment_name}',
-        stop={"training_iteration": search_params.num_epochs},
+        stop=stopper,
         config=search_dict,
         resources_per_trial=resources_per_trial,
         num_samples=search_params.num_hp_samples,
