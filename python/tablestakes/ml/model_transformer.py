@@ -245,7 +245,7 @@ class RectTransformerModule(pl.LightningModule):
     def _log_losses_and_metrics(self, phase_name, loss, losses, y_hats_dict, ys_dict, prog_bar=False):
         output_names = ys_dict.keys()
 
-        on_epoch = None
+        on_epoch = True
 
         d = {}
 

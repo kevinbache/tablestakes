@@ -114,7 +114,7 @@ if __name__ == '__main__':
     # korv, which_kv
     search_params.korv_loss_weight = params.Discrete([0.1, 0.5, 1.0])
 
-    search_params.num_epochs = 1000
+    search_params.num_epochs = 100
 
     ##############
     # hp search
@@ -122,7 +122,7 @@ if __name__ == '__main__':
     search_params.search_metric = model_transformer.RectTransformerModule.get_valid_metric_name('acc', 'which_kv')
     search_params.search_mode = 'max'
     search_params.asha_grace_period = 4
-    search_params.asha_reduction_factor = 4
+    search_params.asha_reduction_factor = 2
 
     ##############
     # data
