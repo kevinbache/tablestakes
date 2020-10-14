@@ -288,6 +288,11 @@ class RectTransformerModule(pl.LightningModule):
 
     def on_after_backward(self):
         if self.hp.num_steps_per_histogram_log and not self.global_step % self.hp.num_steps_per_histogram_log:
+            self.logger.log_metrics(
+                metrics={'grad_norms': self.grad_norm(1)},
+                step=self.global_step,
+            )
+
             for name, param in self.named_parameters():
                 try:
                     if param is not None:
@@ -316,10 +321,6 @@ class RectTransformerModule(pl.LightningModule):
                     print("==================================================")
                     print("==================================================")
                     raise e
-                self.logger.log_metrics(
-                    metrics={'grad_norms': self.grad_norm(1)},
-                    step=self.global_step,
-                )
 
     # ---------------------
     # TRAINING SETUP
