@@ -285,7 +285,7 @@ def get_pl_logger(hp: hyperparams.LearningParams, tune=None):
         ),
         pl_loggers.WandbLogger(
             save_dir=str(save_dir / 'wandb'),
-            group='kevins_group_tester',
+            group=hp.group_name,
             project=name,
             # entity='kevin_entity',
             version=version,

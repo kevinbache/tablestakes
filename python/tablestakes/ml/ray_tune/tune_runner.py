@@ -110,6 +110,7 @@ if __name__ == '__main__':
     ##############
     # optimization
     search_params.lr = params.Discrete([3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2])
+    search_params.log2_batch_size = params.Integer(0, 11)
 
     # korv, which_kv
     search_params.korv_loss_weight = params.Discrete([0.1, 0.5, 1.0])
@@ -127,7 +128,6 @@ if __name__ == '__main__':
     ##############
     # data
     # batch size must be 1
-    search_params.batch_size_log2 = params.Integer(3, 11)
     search_params.p_valid = 0.1
     search_params.p_test = 0.1
 
@@ -139,7 +139,9 @@ if __name__ == '__main__':
     search_params.num_steps_per_histogram_log = 50
     search_params.upload_dir = 's3://kb-tester-2020-10-14'
     search_params.project_name = 'tablestakes'
-    search_params.experiment_name = 'trans_v0.1.2'
+    search_params.experiment_name = 'trans_v0.1.3'
+    search_params.group_name = 'log2_batch'
+
     search_params.num_gpus = 1
     search_params.seed = 42
 

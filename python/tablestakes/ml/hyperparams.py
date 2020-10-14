@@ -94,7 +94,8 @@ class LearningParams(params.ParameterSet):
     logs_dir = constants.LOGS_DIR
     upload_dir = 's3://kb-tester-2020-10-14'
     project_name = 'tablestakes'
-    experiment_name = 'trans_v0.1.1'
+    experiment_name = 'trans_v0.1.3'
+    group_name = 'log2_batch'
 
     num_gpus = 1
 
