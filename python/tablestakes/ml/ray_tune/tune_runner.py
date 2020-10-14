@@ -147,7 +147,7 @@ if __name__ == '__main__':
     if do_test_one:
         dataset_name = 'num=1000_4d8d'
         search_params = hyperparams.LearningParams(dataset_name)
-        search_params.num_hp_samples = 1
+        search_params.num_hp_samples = 4
         search_params.num_epochs = 10
         search_params.num_gpus = 1
         print("=======================================")
@@ -170,6 +170,7 @@ if __name__ == '__main__':
     is_local_run = hostname.endswith('.local')
     # do_fast_test = is_local_run
     do_fast_test = False
+    do_include_wandb = not do_fast_test
 
     if do_fast_test:
         search_params.num_epochs = 10
@@ -194,8 +195,6 @@ if __name__ == '__main__':
         ignore_reinit_error=True,
         include_dashboard=True,
         local_mode=False,
-        # num_cpus=8 if is_local_run else None,
-        # num_gpus=4 if is_local_run else None,
     )
 
     tune_scheduler = tune.schedulers.ASHAScheduler(
@@ -240,9 +239,8 @@ if __name__ == '__main__':
     search_dict['log_sys_usage'] = True
 
     loggers = list(tune_logger.DEFAULT_LOGGERS)
-    if not do_fast_test:
-        train_fn = tune_wandb.wandb_mixin(train_fn)
-
+    if do_include_wandb:
+        # train_fn = tune_wandb.wandb_mixin(train_fn)
         search_dict['wandb'] = {
             "project": search_params.project_name,
             "api_key_file": Path('~/.wandb_api_key').expanduser().resolve(),

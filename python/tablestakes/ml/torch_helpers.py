@@ -248,19 +248,22 @@ class LogCopierCallback(pl.Callback):
         return sum(p.numel() for p in pl_module.parameters() if p.requires_grad)
 
     def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        # d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        d = {}
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
         d[PARAM_COUNT_NAME] = self._count_params(pl_module)
         tune.report(**d)
 
     def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        # d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        d = {}
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
         d[PARAM_COUNT_NAME] = self._count_params(pl_module)
         tune.report(**d)
 
     def on_test_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        # d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        d = {}
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
         d[PARAM_COUNT_NAME] = self._count_params(pl_module)
         tune.report(**d)
@@ -273,9 +276,27 @@ def get_pl_logger(hp: hyperparams.LearningParams, tune=None):
     version = None if tune is None else tune.get_trial_id()
     name = hp.get_project_exp_name()
 
+    print('================================================')
+    print('================================================')
+    print('  get_pl_logger version:', version)
+    print('  get_pl_logger save_dir:', save_dir)
+    print('================================================')
+    print('================================================')
+
     logger = pl_loggers.LoggerCollection([
-        pl_loggers.TensorBoardLogger(name=name, save_dir=str(save_dir / 'tensorboard'), version=version),
-        pl_loggers.WandbLogger(name=name, save_dir=str(save_dir / 'wandb'), id=version),
+        pl_loggers.TensorBoardLogger(
+            name=name,
+            save_dir=str(save_dir / 'tensorboard'),
+            version=version,
+            # log_graph=True,
+        ),
+        pl_loggers.WandbLogger(
+            save_dir=str(save_dir / 'wandb'),
+            group='kevins_group_tester',
+            project=name,
+            # entity='kevin_entity',
+            version=version,
+        ),
     ])
 
     return logger

@@ -92,9 +92,9 @@ class LearningParams(params.ParameterSet):
     num_steps_per_histogram_log = 100
 
     logs_dir = constants.LOGS_DIR
-    upload_dir = 's3://kb-tester-2020-10-08'
+    upload_dir = 's3://kb-tester-2020-10-14'
     project_name = 'tablestakes'
-    experiment_name = 'trans_v0.1'
+    experiment_name = 'trans_v0.1.1'
 
     num_gpus = 1
 
