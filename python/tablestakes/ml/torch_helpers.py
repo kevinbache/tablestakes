@@ -249,13 +249,13 @@ class ParamCounterCallback(pl.Callback):
 
 class LogCopierCallback(pl.Callback):
     def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        d = {k: v.detach() for k, v in pl_module.metrics_to_log.items()}
         tune.report(**d)
 
     def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        d = {k: v.detach() for k, v in pl_module.metrics_to_log.items()}
         tune.report(**d)
 
     def on_test_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        d = {k: v.detach() for k, v in pl_module.metrics_to_log.items()}
         tune.report(**d)

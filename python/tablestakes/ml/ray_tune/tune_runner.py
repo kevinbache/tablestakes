@@ -57,7 +57,7 @@ def train_fn(config: Dict, checkpoint_dir=None):
         callbacks=callbacks,
         logger=logger,
         max_epochs=hp.num_epochs,
-        gpus=None if do_fast_test else hp.num_gpus,
+        gpus=None if is_local_run else hp.num_gpus,
         weights_summary='full',
         accumulate_grad_batches=utils.pow2int(hp.log2_batch_size),
         profiler=True,
@@ -71,6 +71,7 @@ def train_fn(config: Dict, checkpoint_dir=None):
 if __name__ == '__main__':
     # e.g. num=1000_68eb
     # dataset_name = 'num=10_40db'
+    # dataset_name = 'num=1000_4d8d'
     # dataset_name = 'num=2000_56d2'
     dataset_name = 'num=10000_99e0'
     search_params = hyperparams.LearningParams(dataset_name)
@@ -141,9 +142,22 @@ if __name__ == '__main__':
     search_params.num_steps_per_histogram_log = 50
     search_params.upload_dir = 's3://kb-tester-2020-10-12'
     search_params.project_name = 'tablestakes'
-    search_params.experiment_name = 'trans_v0-1'
+    search_params.experiment_name = 'trans_v0.1.1'
     search_params.num_gpus = 1
     search_params.seed = 42
+
+    do_test_one = True
+    if do_test_one:
+        dataset_name = 'num=1000_4d8d'
+        search_params = hyperparams.LearningParams(dataset_name)
+        search_params.num_hp_samples = 1
+        search_params.num_epochs = 10
+        search_params.num_gpus = 1
+        print("=======================================")
+        print("=======================================")
+        print("============ TESTING ON 1 =============")
+        print("=======================================")
+        print("=======================================")
 
     print('search_params.upload_dir', search_params.upload_dir)
     bucket_name = search_params.upload_dir.replace('s3://', '')
@@ -152,11 +166,13 @@ if __name__ == '__main__':
     s3_client = boto3.client('s3')
     if s3_res.Bucket(bucket_name) not in s3_client.list_buckets():
         s3_client.create_bucket(Bucket=bucket_name)
+    sync_config = tune.SyncConfig(upload_dir=search_params.upload_dir)
 
     import socket
     hostname = socket.gethostname()
-    do_fast_test = hostname.endswith('.local')
-    # do_fast_test = False
+    is_local_run = hostname.endswith('.local')
+    # do_fast_test = is_local_run
+    do_fast_test = False
 
     if do_fast_test:
         search_params.num_epochs = 10
@@ -165,11 +181,11 @@ if __name__ == '__main__':
         search_params.num_trans_heads = 1
         search_params.num_trans_fc_dim_mult = 1
         search_params.num_fc_blocks = 2
+        search_params.num_head_blocks = 1
+        search_params.log2num_head_neurons = 5
         search_params.dataset_name = 'num=10_40db'
         search_params.update_files()
         sync_config = None
-    else:
-        sync_config = tune.SyncConfig(upload_dir=search_params.upload_dir)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--address", default='auto')
@@ -177,12 +193,12 @@ if __name__ == '__main__':
 
     ray.shutdown()
     ray.init(
-        address=None if do_fast_test else str(args.address),
+        address=None if is_local_run else str(args.address),
         ignore_reinit_error=True,
-        include_dashboard=not do_fast_test,
+        include_dashboard=True,
         local_mode=False,
-        num_cpus=12 if do_fast_test else None,
-        num_gpus=6 if do_fast_test else None,
+        # num_cpus=8 if is_local_run else None,
+        # num_gpus=4 if is_local_run else None,
     )
 
     tune_scheduler = tune.schedulers.ASHAScheduler(
@@ -227,7 +243,7 @@ if __name__ == '__main__':
         train_fn = tune_wandb.wandb_mixin(train_fn)
 
         search_dict['wandb'] = {
-            "project": search_params.experiment_name,
+            "project": search_params.project_name,
             "api_key_file": Path('~/.wandb_api_key').expanduser().resolve(),
         }
         loggers += [tune_wandb.WandbLogger]
@@ -242,11 +258,12 @@ if __name__ == '__main__':
     resources_per_trial = {
         "cpu": 2,
     }
-    if not do_fast_test:
+    if not is_local_run:
         resources_per_trial['gpu'] = search_params.num_gpus
+
     analysis = tune.run(
         run_or_experiment=train_fn,
-        name=search_params.experiment_name,
+        name=f'{search_params.project_name}-{search_params.experiment_name}',
         stop={"training_iteration": search_params.num_epochs},
         config=search_dict,
         resources_per_trial=resources_per_trial,

@@ -11,6 +11,9 @@ python/tablestakes/tensorboard_logs/
 python/tablestakes/ml/logs/
 logs
 
+wandb
+**/wandb/
+
 data/docs
 
 **/node_modules
