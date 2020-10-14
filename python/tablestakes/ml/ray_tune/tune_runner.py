@@ -5,7 +5,6 @@ from typing import *
 import boto3
 
 import pytorch_lightning as pl
-import wandb
 from pytorch_lightning import loggers as pl_loggers
 
 import ray
@@ -16,36 +15,11 @@ from ray.tune.integration import wandb as tune_wandb, pytorch_lightning as tune_
 from chillpill import params
 
 from tablestakes import constants, utils, load_makers
-from tablestakes.ml import hyperparams, model_transformer, data
+from tablestakes.ml import hyperparams, model_transformer
+from tablestakes.ml import torch_helpers
 
 
-
-class ParamCounterCallback(pl.Callback):
-    PARAM_COUNT_NAME = 'param_count'
-
-    def on_train_start(self, trainer, pl_module):
-        d = {self.PARAM_COUNT_NAME: sum(p.numel() for p in pl_module.parameters() if p.requires_grad)}
-        tune.report(**d)
-
-
-class LogCopierCallback(pl.Callback):
-    def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
-        tune.report(**d)
-
-    def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
-        tune.report(**d)
-
-    def on_test_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
-        tune.report(**d)
-
-
-@tune_wandb.wandb_mixin
 def train_fn(config: Dict, checkpoint_dir=None):
-    wandb.log()
-
     hp = hyperparams.LearningParams.from_dict(config)
     assert isinstance(hp, hyperparams.LearningParams)
 
@@ -58,8 +32,8 @@ def train_fn(config: Dict, checkpoint_dir=None):
     }
 
     callbacks = [
-        ParamCounterCallback(),
-        LogCopierCallback(),
+        torch_helpers.ParamCounterCallback(),
+        torch_helpers.LogCopierCallback(),
         tune_pl.TuneReportCallback(
             metrics=phase_metric_names[model_transformer.RectTransformerModule.TRAIN_PHASE_NAME],
             on='train_end',
@@ -97,7 +71,8 @@ def train_fn(config: Dict, checkpoint_dir=None):
 if __name__ == '__main__':
     # e.g. num=1000_68eb
     # dataset_name = 'num=10_40db'
-    dataset_name = 'num=2000_56d2'
+    # dataset_name = 'num=2000_56d2'
+    dataset_name = 'num=10000_99e0'
     search_params = hyperparams.LearningParams(dataset_name)
 
     import os
@@ -128,9 +103,15 @@ if __name__ == '__main__':
     # prob of dropping each unit
     search_params.dropout_p = params.Float(0.1, 0.7)
 
+    search_params.num_head_blocks = params.Discrete([1, 2, 4, 8])
+    search_params.log2num_head_neurons = params.Integer(3, 8)
+    search_params.num_head_blocks_per_resid = params.Integer(1, 3)
+
+    search_params.num_groups_for_gn = params.Discrete([16, 32])
+
     ##############
     # optimization
-    search_params.lr = params.Discrete([1e-4, 3e-4, 1e-3, 3e-3, 1e-2])
+    search_params.lr = params.Discrete([3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2])
 
     # korv, which_kv
     search_params.korv_loss_weight = params.Discrete([0.1, 0.5, 1.0])
@@ -148,7 +129,7 @@ if __name__ == '__main__':
     ##############
     # data
     # batch size must be 1
-    search_params.batch_size_log2 = params.Integer(0, 12)
+    search_params.batch_size_log2 = params.Integer(3, 11)
     search_params.p_valid = 0.1
     search_params.p_test = 0.1
 
@@ -158,32 +139,37 @@ if __name__ == '__main__':
     ##############
     # extra
     search_params.num_steps_per_histogram_log = 50
-    search_params.upload_dir = 's3://kb-tester-2020-10-08'
-    search_params.experiment_name = 'ts_2000_1'
+    search_params.upload_dir = 's3://kb-tester-2020-10-12'
+    search_params.project_name = 'tablestakes'
+    search_params.experiment_name = 'trans_v0-1'
     search_params.num_gpus = 1
-    search_params.seed = 4
+    search_params.seed = 42
 
     print('search_params.upload_dir', search_params.upload_dir)
     bucket_name = search_params.upload_dir.replace('s3://', '')
-    print('search_params.bucket_name', bucket_name)
 
     s3_res = boto3.resource('s3')
     s3_client = boto3.client('s3')
-
     if s3_res.Bucket(bucket_name) not in s3_client.list_buckets():
         s3_client.create_bucket(Bucket=bucket_name)
 
     import socket
     hostname = socket.gethostname()
     do_fast_test = hostname.endswith('.local')
+    # do_fast_test = False
 
     if do_fast_test:
         search_params.num_epochs = 10
-        search_params.num_hp_samples = 10
+        search_params.num_hp_samples = 2
         search_params.num_trans_enc_layers = 1
         search_params.num_trans_heads = 1
         search_params.num_trans_fc_dim_mult = 1
         search_params.num_fc_blocks = 2
+        search_params.dataset_name = 'num=10_40db'
+        search_params.update_files()
+        sync_config = None
+    else:
+        sync_config = tune.SyncConfig(upload_dir=search_params.upload_dir)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--address", default='auto')
@@ -211,6 +197,8 @@ if __name__ == '__main__':
     valid_loss_name = \
         model_transformer.RectTransformerModule.get_valid_metric_name(metric_name='loss', output_name='total')
 
+    assert train_loss_name == 'train_loss_total'
+
     reporter_metric_cols = [
         'training_iteration',
         'time_this_iter_s',
@@ -225,19 +213,22 @@ if __name__ == '__main__':
         search_params.search_metric,
     ]
 
+    param_cols = [torch_helpers.ParamCounterCallback.PARAM_COUNT_NAME] + search_params.get_samplable_param_names()
     reporter = tune.CLIReporter(
         max_progress_rows=search_params.num_hp_samples,
-        parameter_columns=[ParamCounterCallback.PARAM_COUNT_NAME] + search_params.get_samplable_param_names(),
+        parameter_columns=param_cols,
         metric_columns=reporter_metric_cols,
     )
 
     search_dict = search_params.to_ray_tune_search_dict()
     loggers = list(tune_logger.DEFAULT_LOGGERS)
+
     if not do_fast_test:
+        train_fn = tune_wandb.wandb_mixin(train_fn)
+
         search_dict['wandb'] = {
             "project": search_params.experiment_name,
             "api_key_file": Path('~/.wandb_api_key').expanduser().resolve(),
-            "log_config": True,
         }
         loggers += [tune_wandb.WandbLogger]
 
@@ -263,7 +254,7 @@ if __name__ == '__main__':
         # local_dir=None,
         # upload_dir=search_params.upload_dir,
         # trial_name_creator=,
-        sync_config=tune.SyncConfig(upload_dir=search_params.upload_dir),
+        sync_config=sync_config,
         loggers=loggers,
         log_to_file=True,
         # sync_to_cloud=None,
@@ -293,11 +284,12 @@ if __name__ == '__main__':
         # ray_auto_init=True,
     )
 
-    utils.save_pickle('tune_analysis.pkl', analysis)
+    analysis_file = constants.LOGS_DIR / f'tune_analysis_{search_params.get_short_hash(num_chars=8)}.pkl'
+    print(f"Saving {analysis_file}")
+    utils.save_pickle(analysis_file, analysis)
 
     best_trial = analysis.get_best_trial(search_params.search_metric, "max", "last-5-avg")
     print("Best trial config: {}".format(best_trial.config))
     print("Best trial final validation loss: {}".format(best_trial.last_result[valid_loss_name]))
     print("Best trial final search_metric: {}".format(best_trial.last_result[search_params.search_metric]))
 
-# what am i doooooing

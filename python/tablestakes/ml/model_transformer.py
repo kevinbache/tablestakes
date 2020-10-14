@@ -14,6 +14,8 @@ from pytorch_lightning import loggers as pl_loggers
 from tablestakes import constants, utils, load_makers
 from tablestakes.ml import data, torch_helpers, hyperparams
 
+from ray.tune.integration import wandb as tune_wandb
+
 
 class BetterAccuracy(pl.metrics.Accuracy):
     def update(self, preds: torch.Tensor, target: torch.Tensor):
@@ -121,23 +123,44 @@ class RectTransformerModule(pl.LightningModule):
         self.fc_module = torch_helpers.FullyConv1Resnet(
             num_input_features=self.hp.num_fc_inputs,
             neuron_counts=num_fc_neurons,
+            num_groups=self.hp.num_groups_for_gn,
             num_blocks_per_residual=self.hp.num_fc_blocks_per_resid,
+            do_exclude_first_norm=True,
         )
 
-        # TODO: requires grad = false? buffer?
         self.register_buffer(
             'loss_weights',
             torch.tensor([self.hp.korv_loss_weight, 1.0], dtype=torch.float),
         )
 
-        # output
         self.heads = nn.ModuleList([
-            nn.Conv1d(self.fc_module.get_num_outputs(), num_classes, 1)
+            torch_helpers.HeadedSlabNet(
+                num_input_features=self.fc_module.get_num_outputs(),
+                num_output_features=num_classes,
+                num_neurons=utils.pow2int(self.hp.log2num_head_neurons),
+                num_layers=self.hp.num_head_blocks,
+                num_groups=self.hp.num_groups_for_gn,
+                num_blocks_per_residual=self.hp.num_head_blocks_per_resid,
+            )
             for name, num_classes in self.num_y_classes.items()
         ])
 
         # save all variables in __init__ signature to self.hparams
         self.save_hyperparameters(self.hp.to_dict())
+
+        if hasattr(self.hp, 'wandb'):
+            from pytorch_lightning.loggers import wandb as pl_wandb
+            self.pl_wandb_logger = pl_wandb.WandbLogger(
+                name=self.hp.experiment_name,
+                # save_dir=None,
+                # offline=False,
+                id=None,
+                anonymous=False,
+                version=None,
+                project=self.hp.project_name,
+                log_model=False,
+                experiment=None,
+            )
 
     def forward(self, basic: torch.Tensor, vocab: torch.Tensor):
         basic = basic.float()
@@ -236,8 +259,10 @@ class RectTransformerModule(pl.LightningModule):
         d = {}
 
         total_loss_name = self._get_phase_name(phase_name, 'loss', 'total')
+
         self.log(total_loss_name, loss, prog_bar=prog_bar, on_epoch=on_epoch)
         d[total_loss_name] = loss
+
         for output_name, current_loss in zip(output_names, losses):
             full_metric_name = self._get_phase_name(phase_name, 'loss', output_name)
             self.log(full_metric_name, current_loss, prog_bar=False, on_epoch=on_epoch)
@@ -249,10 +274,12 @@ class RectTransformerModule(pl.LightningModule):
                 y = ys_dict[output_name].squeeze()
                 full_metric_name = self._get_phase_name(phase_name, metric_name, output_name)
                 metric_value = metric(y_hat, y)
+
                 self.log(full_metric_name, metric_value, prog_bar=False, on_epoch=on_epoch)
                 d[full_metric_name] = metric_value
 
         self.metrics_to_log = d
+        # self.pl_wandb_logger.agg_and_log_metrics()
 
     def training_step(self, batch, batch_idx):
         xs_dict, ys_dict, y_hats_dict, losses, loss = self._inner_forward_step(batch)
@@ -270,8 +297,32 @@ class RectTransformerModule(pl.LightningModule):
     def on_after_backward(self):
         if self.hp.num_steps_per_histogram_log and not self.global_step % self.hp.num_steps_per_histogram_log:
             for name, param in self.named_parameters():
-                self.logger.experiment.add_histogram(f'weights/{name}', param, self.current_epoch)
-                self.logger.experiment.add_histogram(f'grads/{name}', param.grad, self.current_epoch)
+                try:
+                    if param is not None:
+                        self.logger.experiment.add_histogram(f'weights/{name}', param, self.current_epoch)
+                        if param.grad is not None:
+                            self.logger.experiment.add_histogram(f'grads/{name}', param.grad, self.current_epoch)
+                            self.logger.log_metrics(self.grad_norm(1), step=self.global_step)
+                except BaseException as e:
+                    print("==================================================")
+                    print("==================================================")
+                    print("==================================================")
+                    print("==================================================")
+                    print("==================================================")
+                    print("==================================================")
+                    print('param: ', param)
+                    print()
+                    print('param name: ', name)
+                    print('type(param): ', type(param))
+                    print('type(param.grad): ', type(param.grad))
+                    print()
+                    print("==================================================")
+                    print("==================================================")
+                    print("==================================================")
+                    print("==================================================")
+                    print("==================================================")
+                    print("==================================================")
+                    raise e
 
     # ---------------------
     # TRAINING SETUP
@@ -332,14 +383,15 @@ class RectTransformerModule(pl.LightningModule):
 if __name__ == '__main__':
     # dataset_name = 'num=100_c5ff'
     # dataset_name = 'num=10_08b3'
-    dataset_name = 'num=10_40db'
+    # dataset_name = 'num=10_40db'
+    dataset_name = 'num=1000_4d8d'
 
     hp = hyperparams.LearningParams(dataset_name)
-    hp.do_include_embeddings = False
+    hp.do_include_embeddings = True
     net = RectTransformerModule(hp)
 
     trainer = pl.Trainer(
-        logger=pl_loggers.TensorBoardLogger(constants.LOGS_DIR, name="trans1d_trial_delme"),
+        logger=pl_loggers.TensorBoardLogger(constants.LOGS_DIR, name=hp.project_name),
         max_epochs=hp.num_epochs,
         weights_summary='full',
         fast_dev_run=False,

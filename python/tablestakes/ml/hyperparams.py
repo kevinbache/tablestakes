@@ -14,6 +14,11 @@ class LearningParams(params.ParameterSet):
         super().__init__(**kwargs)
 
         self.dataset_name = dataset_name
+        self.docs_dir = None
+        self.dataset_file = None
+        self.update_files()
+
+    def update_files(self):
         self.docs_dir = constants.DOCS_DIR / self.dataset_name
         self.dataset_file = constants.DATASETS_DIR / f'{self.dataset_name}.cloudpickle'
 
@@ -22,6 +27,7 @@ class LearningParams(params.ParameterSet):
     #  embedder
     num_embedding_dim = 12
     do_include_embeddings = True
+    num_extra_embedding_dim = None
 
     #  transformer
     pre_trans_linear_dim = None
@@ -42,6 +48,17 @@ class LearningParams(params.ParameterSet):
     # prob of dropping each unit
     dropout_p = 0.5
 
+    #  head_nets
+    num_head_blocks = 2
+    log2num_head_neurons = 4
+    num_head_blocks_per_resid = 1
+
+    # https://arxiv.org/pdf/1803.08494.pdf
+    # paper default is 32
+    # optimal num channels for group is 16
+    # conv block maker will min this to num_neurons // 4
+    num_groups_for_gn = 32
+
     ##############
     # optimization
     lr = 0.001
@@ -57,7 +74,7 @@ class LearningParams(params.ParameterSet):
     search_metric = 'valid_acc_which_kv'
     search_mode = 'max'
     asha_grace_period = 4
-    asha_reduction_factor = 4
+    asha_reduction_factor = 2
 
     ##############
     # data
@@ -81,7 +98,8 @@ class LearningParams(params.ParameterSet):
     num_steps_per_histogram_log = 100
 
     upload_dir = 's3://kb-tester-2020-10-08'
-    experiment_name = 'ts_trans_1'
+    project_name = 'tablestakes'
+    experiment_name = 'trans_v0.1'
 
     num_gpus = 1
 
@@ -168,18 +186,8 @@ class DocSetParams(params.ParameterSet):
 
     docs_dir = None
 
-    def _get_short_hash(self, num_chars=4):
-        if self._short_hash is not None:
-            return self._short_hash
-
-        d = self.to_dict()
-        h = hashlib.sha1(str(d).encode('utf-8'))
-        self._short_hash = h.hexdigest()[-num_chars:]
-
-        return self._short_hash
-
     def get_doc_set_name(self):
-        return f'num={self.num_docs}_{self._get_short_hash()}'
+        return f'num={self.num_docs}_{self.get_short_hash()}'
 
     def get_dataset_dir(self):
         return self.docs_root_dir / 'dataset'

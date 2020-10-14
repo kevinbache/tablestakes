@@ -212,8 +212,8 @@ if __name__ == '__main__':
         doc_gen_params=doc_gen_params,
         doc_prep_params=doc_prep_params,
     )
-    doc_settings.num_docs = 2000
-    doc_settings.doc_gen_params.num_extra_fields = 1
+    doc_settings.num_docs = 1000
+    doc_settings.doc_gen_params.num_extra_fields = 0
 
     fast_test = False
     if fast_test:
@@ -256,30 +256,34 @@ if __name__ == '__main__':
         min_count=doc_settings.doc_prep_params.min_count_to_keep_word,
     )
 
-    for doc_dir, joined_df in zip(doc_dirs, joined_dfs):
-        assert isinstance(joined_df, pd.DataFrame), \
-            f"joined_df isn't a df!  Did you ray.get right?  type(joined_df)={type(joined_df)}"
-        save_dfs_output = eliminate_rare_words_and_save_dfs.remote(joined_df, doc_dir, rare_word_eliminator)
+    with utils.Timer(f'Eliminate rare words'):
+        for doc_dir, joined_df in zip(doc_dirs, joined_dfs):
+            assert isinstance(joined_df, pd.DataFrame), \
+                f"joined_df isn't a df!  Did you ray.get right?  type(joined_df)={type(joined_df)}"
+            save_dfs_output = eliminate_rare_words_and_save_dfs.remote(joined_df, doc_dir, rare_word_eliminator)
 
-    num_korv_classes, num_which_kv_classes = ray.get(save_dfs_output)
+    with utils.Timer(f'Get save_dfs_output s'):
+        num_korv_classes, num_which_kv_classes = ray.get(save_dfs_output)
 
-    extra_meta_dicts = {}
-    extra_meta_dicts['pre_eliminiation_all_words'] = ray.get(vocabulizer.get_all_words.remote())
-    extra_meta_dicts['pre_eliminiation_word_to_count'] = ray.get(vocabulizer.get_word_to_count.remote())
+    with utils.Timer(f'Getting meta dicts together'):
+        extra_meta_dicts = {
+            'pre_eliminiation_all_words': ray.get(vocabulizer.get_all_words.remote()),
+            'pre_eliminiation_word_to_count': ray.get(vocabulizer.get_word_to_count.remote()),
+        }
 
-    word_to_count = ray.get(rare_word_eliminator.get_word_to_count.remote())
-    word_to_id = ray.get(rare_word_eliminator.get_word_to_id.remote())
-    num_y_classes = {
-        'korv': num_korv_classes,
-        'which_kv': num_which_kv_classes,
-    }
+        word_to_count = ray.get(rare_word_eliminator.get_word_to_count.remote())
+        word_to_id = ray.get(rare_word_eliminator.get_word_to_id.remote())
+        num_y_classes = {
+            'korv': num_korv_classes,
+            'which_kv': num_which_kv_classes,
+        }
 
-    meta = data.TablestakesMeta(
-        word_to_count=word_to_count,
-        word_to_id=word_to_id,
-        num_y_classes=num_y_classes,
-        **extra_meta_dicts,
-    )
+        meta = data.TablestakesMeta(
+            word_to_count=word_to_count,
+            word_to_id=word_to_id,
+            num_y_classes=num_y_classes,
+            **extra_meta_dicts,
+        )
 
     meta_dir = data.TablestakesDataset.get_meta_dir(docs_dir=doc_settings.docs_dir)
     with utils.Timer(f'Saving metadata to {meta_dir}'):
@@ -294,4 +298,5 @@ if __name__ == '__main__':
 
     print()
     print(f'Saved to {str(doc_settings.docs_dir)} and {meta_dir} and {dataset_file}')
-
+    print(f'Settings:')
+    utils.print_dict((doc_settings.to_dict()))
