@@ -248,22 +248,22 @@ class LogCopierCallback(pl.Callback):
         return sum(p.numel() for p in pl_module.parameters() if p.requires_grad)
 
     def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        # d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
-        d = {}
+        d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        # d = {}
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
         d[PARAM_COUNT_NAME] = self._count_params(pl_module)
         tune.report(**d)
 
     def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        # d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
-        d = {}
+        d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        # d = {}
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
         d[PARAM_COUNT_NAME] = self._count_params(pl_module)
         tune.report(**d)
 
     def on_test_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        # d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
-        d = {}
+        d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        # d = {}
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
         d[PARAM_COUNT_NAME] = self._count_params(pl_module)
         tune.report(**d)
