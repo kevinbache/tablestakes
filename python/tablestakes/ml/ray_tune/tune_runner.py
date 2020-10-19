@@ -138,7 +138,8 @@ if __name__ == '__main__':
 
     ##############
     # extra
-    search_params.num_steps_per_histogram_log = 100
+    search_params.num_steps_per_histogram_log = 200
+    search_params.num_steps_per_metric_log = 100
     search_params.upload_dir = 's3://kb-tester-2020-10-14'
     search_params.project_name = 'tablestakes'
     search_params.experiment_name = 'trans_v0.1.3'

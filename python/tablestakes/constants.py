@@ -13,7 +13,7 @@ DATA_DIR = Path.home().expanduser().resolve() / 'data' / 'tablestakes'
 DOCS_DIR = DATA_DIR / 'docs'
 DATASETS_DIR = DATA_DIR / 'datasets'
 
-LOGS_DIR = DATA_DIR / 'logs/'
+LOGS_DIR = DATA_DIR / 'logs'
 
 CHECKPOINT_FILE_BASENAME = 'checkpoint'
 

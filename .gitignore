@@ -8,6 +8,7 @@ python/tablestakes/ml/lightning_logs/
 
 *.whl
 
+.ipynb_checkpoints
 python/tablestakes/ml/tensorboard_logs/
 python/tablestakes/tensorboard_logs/
 python/tablestakes/ml/logs/

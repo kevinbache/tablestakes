@@ -1,4 +1,4 @@
-cluster_name: aws-m4-g4dn-d500-23
+cluster_name: aws-m4-g4dn-d500-1
 
 provider:
     type: aws
@@ -8,8 +8,8 @@ auth:
     ssh_user: ubuntu
 
 min_workers: 0
-initial_workers: 20
-max_workers: 20
+initial_workers: 4
+max_workers: 4
 
 autoscaling_mode: default
 target_utilization_fraction: 0.8
