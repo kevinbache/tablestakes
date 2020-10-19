@@ -52,12 +52,12 @@ setup_commands:
 
     # deel learning stuff
     - source activate pytorch_p36 && pip install \
-        torchvision tabulate \
-        tensorboard tensorboardX pytorch-lightning hyperopt neptune-client \
+        torchvision tabulate tensorboard tensorboardX \
+        pytorch-lightning hyperopt neptune-client \
         jupyter ipywidgets bokeh "boto3>=1.10.44"
 
     # ray
-    - source activate pytorch_p36 && pip install -U ray && ray install-nightly
+    - source activate pytorch_p36 && pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-1.1.0.dev0-cp37-cp37m-manylinux1_x86_64.whl
     - source activate pytorch_p36 && pip install ray[all]
     # for https://docs.ray.io/en/stable/webui.html
     - source activate pytorch_p36 && jupyter nbextension enable --py --sys-prefix widgetsnbextension
@@ -65,7 +65,7 @@ setup_commands:
     # my stuff
     - mkdir -p ~/projects
 
-    - source activate pytorch_p36 && pip install lib/pytorch_fast_transformers-0.3.0-cp36-cp36m-linux_x86_64.whl
+    - source activate pytorch_p36 && pip install lib/pytorch_fast_transformers-0.3.0-cp37-cp37m-linux_x86_64.whl
     - source activate pytorch_p36 && pip install --upgrade "cloudpickle>=1.6.0"
 
     - test -e projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
@@ -77,6 +77,7 @@ setup_commands:
     # todo: recompile fast-transformers on gpu node to get gpu speed?
     - source activate pytorch_p36 && pip install --editable ~/projects/tablestakes/python/
 
+# note the virtual env activation
 head_start_ray_commands:
     - ray stop
     - ulimit -n 65536; source activate pytorch_p36 && ray start --head --port=6379 --object-manager-port=8076 --autoscaling-config=~/ray_bootstrap_config.yaml

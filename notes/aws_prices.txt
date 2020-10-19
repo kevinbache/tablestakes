@@ -1,0 +1,105 @@
+
+
+
+# https://aws.amazon.com/ec2/spot/pricing/
+# m3.medium	    $0.0067 per Hour
+# m3.large	    $0.0307 per Hour
+# c6g.medium	$0.0169 per Hour
+# c6g.large	    $0.0338 per Hour
+
+# g2.2xlarge	$0.195 per Hour
+# g2.8xlarge	$0.78 per Hour
+# g3s.xlarge	$0.225 per Hour
+# g3.4xlarge	$0.342 per Hour
+# g3.8xlarge	$0.684 per Hour
+# g3.16xlarge	$1.368 per Hour
+# g4dn.xlarge	$0.1578 per Hour
+# g4dn.2xlarge	$0.2256 per Hour
+# g4dn.4xlarge	$0.3612 per Hour
+# g4dn.8xlarge	$0.6528 per Hour
+# g4dn.12xlarge	$1.304 per Hour
+# g4dn.16xlarge	$1.3056 per Hour
+# g4dn.metal	$3.1354 per Hour
+# p2.xlarge	    $0.27 per Hour
+# p2.8xlarge	$2.16 per Hour
+# p2.16xlarge	$4.32 per Hour
+# p3.2xlarge	$0.918 per Hour
+# p3.8xlarge	$3.672 per Hour
+# p3.16xlarge	$7.344 per Hour
+# p3dn.24xlarge	$9.3636 per Hour
+# inf1.xlarge	$0.1104 per Hour
+# inf1.2xlarge	$0.1752 per Hour
+# inf1.6xlarge	$0.5712 per Hour
+# inf1.24xlarge	$2.2845 per Hour
+
+# Instance 	vCPU* 	Mem (GiB) 	Storage 	Dedicated EBS Bandwidth (Mbps) 	Network Performance
+# m4.large 	    2 	8 	EBS-only 	450 	Moderate
+# m4.xlarge 	4 	16 	EBS-only 	750 	High
+
+# https://aws.amazon.com/ec2/instance-types/g4/
+#  	Instance Size	vCPUs	Memory (GB)	GPU	 Storage (GB)	 Network   Bandwidth (Gbps)	EBS Bandwidth (GBps)	On-Demand Price/hr*	1-yr Reserved Instance Effective Hourly* (Linux)	3-yr Reserved Instance Effective Hourly* (Linux)
+# g4dn.xlarge           4	   16	      1	       125	    Up to 25	Up to 3.5	$0.526	$0.316	$0.210
+# g4dn.2xlarge	        8	   32	      1	       225	    Up to 25	Up to 3.5	$0.752	$0.452	$0.300
+# g4dn.4xlarge	       16	   64	      1	       225	    Up to 25	     4.75	$1.204	$0.722	$0.482
+# g4dn.8xlarge	       32	   128	      1	       1x900	      50	      9.5	$2.176	$1.306	$0.870
+# g4dn.16xlarge	       64	   256	      1	       1x900	      50	      9.5	$4.352	$2.612	$1.740
+#
+# Multi GPU VMs
+# g4dn.12xlarge	       48	   192	      4	       1x900	      50	      9.5	$3.912	$2.348	$1.564
+# g4dn.metal	       96	   384	      8	       2x900	     100	     19	    $7.824	$4.694	$3.130
+
+# https://aws.amazon.com/ec2/instance-types/p3/
+# Instance Size	Tesla V100s	    GPU Peer to Peer	GPU Memory (GB)	 vCPUs	 Memory (GB)	Network Bandwidth	EBS Bandwidth	On-Demand Price/hr*	1-yr Reserved Instance Effective Hourly*	3-yr Reserved Instance Effective Hourly*
+# p3.2xlarge	    1	                    N/A	                16	     8	         61	    Up to 10 Gbps	1.5 Gbps	        $3.06	            $1.99	                                        $1.05
+# p3.8xlarge	    4                    NVLink	                64	    32	        244	    10 Gbps	        7 Gbps	            $12.24	            $7.96	                                        $4.19
+# p3.16xlarge	    8	                 NVLink	               128	    64	        488	    25 Gbps	        14 Gbps	            $24.48	            $15.91	                                        $8.39
+# p3dn.24xlarge	    8	                 NVLink	               256	    96	        768	    100 Gbps	    19 Gbps	            $31.218	            $18.30                                          $9.64
+
+
+# # https://aws.amazon.com/sagemaker/pricing/instance-types/
+# Accelerated Computing – Current Generation
+# Instance type     vCPU	   GPU	    Mem (GiB)	GPU Mem (GiB) Network Performance   Spot price
+# ml.p3.2xlarge	       8	1xV100	           61	          16	 Up to 10 Gbps      $0.918  per Hour
+# ml.p3.8xlarge	      32	4xV100	          244	          64	 10 Gigabit         $3.672  per Hour
+# ml.p3.16xlarge      64	8xV100	          488	         128	 25 Gigabit         $7.344  per Hour
+# ml.p3dn.24xlarge    96	8xV100	          768	         256	 100 Gigabit        $9.3636 per Hour
+# ml.p2.xlarge	       4	 1xK80	           61	          12	 High               $0.27   per Hour
+# ml.p2.8xlarge	      32	 8xK80	          488             96	 10 Gigabit         $2.16   per Hour
+# ml.p2.16xlarge      64	16xK80	          732	         192	 25 Gigabit         $4.32   per Hour
+# ml.g4dn.xlarge       4	  1xT4	           16	          16	 Up to 25 Gbps      $0.1578 per Hour
+# ml.g4dn.2xlarge      8	  1xT4	           32	          16	 Up to 25 Gbps      $0.2256 per Hour
+# ml.g4dn.4xlarge     16	  1xT4	           64	          16	 Up to 25 Gbps      $0.3612 per Hour
+# ml.g4dn.8xlarge     32	  1xT4	          128	          16	 50 Gbps            $0.6528 per Hour
+# ml.g4dn.12xlarge    48	  4xT4	          192	          64	 50 Gbps            $1.304  per Hour
+# ml.g4dn.16xlarge    64	  1xT4	          256	          16	 50 Gbps            $1.3056 per Hour
+#
+# ml.inf1.xlarge       4	                    8	                 Up to 25 Gbps      $0.1104 per Hour
+# ml.inf1.2xlarge      8	                   16	                 Up to 25 Gbps      $0.1752 per Hour
+# ml.inf1.6xlarge     24	                   48	                 25 Gbps            $0.5712 per Hour
+# ml.inf1.24xlarge    96	                  192	                 100 Gbps           $2.2845 per Hour
+#
+#
+# ml.g4dn.xlarge      4	      1xT4	           16	          16	 Up to 25 Gbps      $0.1578 per Hour
+# ml.p2.xlarge	      4	     1xK80	           61	          12	 High               $0.27   per Hour
+# ml.p3.2xlarge	      8	    1xV100	           61	          16	 Up to 10 Gbps      $0.918  per Hour
+
+
+
+## Tell the autoscaler the allowed node types and the resources they provide.
+## This only has an effect if you use the experimental request_resources() call.
+#available_instance_types:
+##    m4.xlarge:
+##        resources: {"CPU": 4}
+##        max_workers: 10
+##    m4.4xlarge:
+##        resources: {"CPU": 16}
+##        max_workers: 10
+##    p2.xlarge:
+##        resources: {"CPU": 4, "GPU": 1}
+##        max_workers: 4
+##    p2.8xlarge:
+##        resources: {"CPU": 32, "GPU": 8}
+##        max_workers: 2
+#    g4dn.xlarge:
+#        resources: {"CPU": 4, "GPU": 1}
+#        max_workers: 2
