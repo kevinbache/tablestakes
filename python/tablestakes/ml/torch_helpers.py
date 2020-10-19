@@ -1,3 +1,4 @@
+import time
 from argparse import Namespace
 from pathlib import Path
 from typing import *
@@ -251,6 +252,8 @@ def get_simple_ablatable_transformer_encoder(
 
 CURRENT_EPOCH_NAME = 'current_epoch'
 PARAM_COUNT_NAME = 'param_count'
+TIME_PERF_NAME = 'time_perf'
+TIME_PROCESS_NAME = 'time_process'
 
 
 class LogCopierCallback(pl.Callback):
@@ -275,6 +278,42 @@ class LogCopierCallback(pl.Callback):
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
         d[PARAM_COUNT_NAME] = self._count_params(pl_module)
         tune.report(**d)
+
+
+class CounterTimerCallback(pl.Callback):
+    def __init__(self):
+        self._train_start_perf = None
+        self._train_start_process = None
+
+    @staticmethod
+    def _count_params(pl_module):
+        return sum(p.numel() for p in pl_module.parameters() if p.requires_grad)
+
+    def on_train_epoch_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
+        pl_module.log(name=PARAM_COUNT_NAME, value=self._count_params(pl_module), prog_bar=True, logger=True)
+        self._train_start_perf = time.perf_counter()
+        self._train_start_process = time.process_time()
+
+    def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
+        pl_module.log(name=PARAM_COUNT_NAME, value=self._count_params(pl_module), prog_bar=True, logger=True)
+        pl_module.log(
+            name=TIME_PERF_NAME,
+            value=time.perf_counter() - self._train_start_perf,
+            prog_bar=True,
+            logger=True,
+        )
+        pl_module.log(
+            name=TIME_PROCESS_NAME,
+            value=time.process_time() - self._train_start_process,
+            prog_bar=True,
+            logger=True,
+        )
+
+    def on_validation_epoch_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
+        pl_module.log(name=PARAM_COUNT_NAME, value=self._count_params(pl_module), prog_bar=False, logger=True)
+
+    def on_test_epoch_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
+        pl_module.log(name=PARAM_COUNT_NAME, value=self._count_params(pl_module), prog_bar=False, logger=True)
 
 
 class MyLightningNeptuneLogger(pl_loggers.NeptuneLogger):
@@ -329,6 +368,7 @@ class TuneNeptuneLogger(TuneLogger):
         experiment_name = f'tune_logger-{hp.get_exp_group_name()}-{tune.get_trial_id()}'
 
         project = Session().get_project(project_name)
+
         self.exp = project.create_experiment(
             name=experiment_name,
             params=self.config,

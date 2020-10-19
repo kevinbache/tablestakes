@@ -85,14 +85,30 @@ class RectTransformerModule(pl.LightningModule):
 
         #############
         # trans
-        self.encoder = torch_helpers.get_pytorch_transformer_encoder(self.hp, num_trans_input_dims)
-        # self.encoder = torch_helpers.get_fast_linear_attention_encoder(self.hp, num_trans_input_dims, 'favor')
-        # self.encoder = torch_helpers.get_performer_encoder(hp, num_trans_input_dims)
-        # self.encoder = torch_helpers.get_simple_ablatable_transformer_encoder(
-        #     self.hp,
-        #     num_trans_input_dims,
-        #     do_drop_k=True,
-        # )
+        if self.hp.trans_encoder_type == 'torch':
+            self.encoder = torch_helpers.get_pytorch_transformer_encoder(self.hp, num_trans_input_dims)
+        elif self.hp.trans_encoder_type == 'fast_default':
+            self.encoder = torch_helpers.get_fast_linear_attention_encoder(self.hp, num_trans_input_dims, None)
+        elif self.hp.trans_encoder_type == 'fast_favor':
+            self.encoder = torch_helpers.get_fast_linear_attention_encoder(self.hp, num_trans_input_dims, 'favor')
+        elif self.hp.trans_encoder_type == 'fast_grf':
+            self.encoder = torch_helpers.get_fast_linear_attention_encoder(self.hp, num_trans_input_dims, 'grf')
+        elif self.hp.trans_encoder_type == 'performer':
+            self.encoder = torch_helpers.get_performer_encoder(hp, num_trans_input_dims)
+        elif self.hp.trans_encoder_type == 'ablatable_do_drop_k':
+            self.encoder = torch_helpers.get_simple_ablatable_transformer_encoder(
+                self.hp,
+                num_trans_input_dims,
+                do_drop_k=True,
+            )
+        elif self.hp.trans_encoder_type == 'ablatable_do_not_drop_k':
+            self.encoder = torch_helpers.get_simple_ablatable_transformer_encoder(
+                self.hp,
+                num_trans_input_dims,
+                do_drop_k=False,
+            )
+        else:
+            raise ValueError('invalid trans_encoder_type')
 
         ######################################################################
         ### CAT
@@ -280,7 +296,7 @@ class RectTransformerModule(pl.LightningModule):
         self._log_losses_and_metrics(self.TEST_PHASE_NAME, loss, losses, y_hats_dict, ys_dict)
 
     def on_after_backward(self):
-        if self.hp.num_steps_per_histogram_log and not (self.global_step + 1) % self.hp.num_steps_per_histogram_log:
+        if self.hp.num_steps_per_histogram_log and (self.global_step + 1) % self.hp.num_steps_per_histogram_log == 0:
             # pass
             d = {f'gradnorms/{k}': v for k, v in self.logger._flatten_dict(self.grad_norm(1)).items()}
             # print('model on after backwards')

@@ -2,7 +2,7 @@ import pytorch_lightning as pl
 
 import ray
 
-from tablestakes.ml import model_transformer, hyperparams
+from tablestakes.ml import model_transformer, hyperparams, torch_helpers
 
 num_gpus = 1
 
@@ -12,16 +12,17 @@ ray.init(
 )
 
 
-@ray.remote(num_gpus=num_gpus)
-def run_one():
-    dataset_name = 'num=10000_99e0'
-
-    hp = hyperparams.LearningParams(dataset_name)
-    hp.do_include_embeddings = True
+@ray.remote(num_gpus=num_gpus, max_calls=1)
+def run_one(hp: hyperparams.LearningParams):
     net = model_transformer.RectTransformerModule(hp)
 
+    pl_callbacks = [
+        torch_helpers.CounterTimerCallback(hp),
+    ]
+
     trainer = pl.Trainer(
-        # logger=torch_helpers.get_pl_logger(hp),
+        logger=torch_helpers.get_pl_logger(hp),
+        callbacks=pl_callbacks,
         max_epochs=hp.num_epochs,
         weights_summary='full',
         profiler=True,
@@ -37,6 +38,27 @@ def run_one():
 
 
 if __name__ == '__main__':
-    out = run_one.remote()
+    dataset_name = 'num=10000_99e0'
+
+    encoder_types = [
+        'torch',
+        'fast_default',
+        'fast_favor',
+        'fast_grf',
+        'performer',
+        'ablatable_do_drop_k',
+        'ablatable_do_not_drop_k',
+    ]
+
+    hp = hyperparams.LearningParams(dataset_name)
+    hp.num_epochs = 10
+    hp.lr = 0.001
+
+    for encoder_type in encoder_types:
+        hp.trans_encoder_type = encoder_type
+        hp.experiment_tags = ['test', 'benchmark_encoder']
+
+        out = run_one.remote(hp)
+
     print(ray.get(out))
     print('done')

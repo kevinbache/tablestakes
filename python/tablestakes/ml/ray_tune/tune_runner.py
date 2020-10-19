@@ -89,6 +89,8 @@ if __name__ == '__main__':
     search_params.num_trans_heads = params.Discrete([2, 4, 8, 16])
     search_params.num_trans_fc_dim_mult = params.Discrete([2, 3, 4, 6])
 
+    search_params.trans_encoder_type = 'fast_default'
+
     search_params.do_cat_x_base_before_fc = params.Boolean(p_true=0.9)
 
     #  fully connected
@@ -250,7 +252,6 @@ if __name__ == '__main__':
     search_dict[LOG_SYS_USAGE] = True
 
     tune_loggers = list(tune_logger.DEFAULT_LOGGERS)
-
     # if not is_local_run:
     #     tune_loggers.append(torch_helpers.TuneNeptuneLogger)
 

@@ -36,6 +36,8 @@ class LearningParams(params.ParameterSet):
     num_trans_heads = 8
     num_trans_fc_dim_mult = 4
 
+    trans_encoder_type = 'fast_default'
+
     do_cat_x_base_before_fc = True
 
     #  fully connected
@@ -90,7 +92,7 @@ class LearningParams(params.ParameterSet):
     ##############
     # extra
     num_steps_per_metric_log = 100
-    num_steps_per_histogram_log = 200
+    num_steps_per_histogram_log = 500
 
     logs_dir = constants.LOGS_DIR
     upload_dir = 's3://kb-tester-2020-10-14'
