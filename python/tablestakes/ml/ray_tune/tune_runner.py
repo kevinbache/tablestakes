@@ -1,5 +1,4 @@
 import argparse
-from pathlib import Path
 from typing import *
 
 import boto3
@@ -9,7 +8,7 @@ import pytorch_lightning as pl
 import ray
 from ray import tune
 from ray.tune import logger as tune_logger
-from ray.tune.integration import wandb as tune_wandb, pytorch_lightning as tune_pl
+from ray.tune.integration import pytorch_lightning as tune_pl
 
 from chillpill import params
 
@@ -51,7 +50,6 @@ def train_fn(config: Dict, checkpoint_dir=None):
         max_epochs=hp.num_epochs,
         gpus=None if is_local_run else hp.num_gpus,
         weights_summary='full',
-        # accumulate_grad_batches=utils.pow2int(hp.log2_batch_size),
         profiler=True,
         deterministic=True,
         log_every_n_steps=hp.num_steps_per_metric_log,
@@ -65,7 +63,6 @@ def train_fn(config: Dict, checkpoint_dir=None):
 
 
 if __name__ == '__main__':
-    # e.g. num=1000_68eb
     # dataset_name = 'num=10_40db'
     # dataset_name = 'num=1000_4d8d'
     # dataset_name = 'num=2000_56d2'
@@ -307,7 +304,7 @@ if __name__ == '__main__':
         # server_port=TuneServer.DEFAULT_PORT,
         verbose=2,
         progress_reporter=reporter,
-        # resume=False,
+        # resume='REMOTE',
         queue_trials=False,
         # reuse_actors=False,
         # trial_executor=None,

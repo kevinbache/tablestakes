@@ -1,4 +1,4 @@
-cluster_name: aws-m4-g4dn-d500-1
+cluster_name: aws-m4-g4dn-d200-1
 
 provider:
     type: aws
@@ -24,7 +24,7 @@ head_node:
     BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
-              VolumeSize: 500
+              VolumeSize: 200
 
 worker_nodes:
     InstanceType: g4dn.xlarge
