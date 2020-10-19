@@ -251,8 +251,8 @@ if __name__ == '__main__':
 
     tune_loggers = list(tune_logger.DEFAULT_LOGGERS)
 
-    if not is_local_run:
-        tune_loggers.append(torch_helpers.TuneNeptuneLogger)
+    # if not is_local_run:
+    #     tune_loggers.append(torch_helpers.TuneNeptuneLogger)
 
     # blocks until done
     print('loading or making data')
