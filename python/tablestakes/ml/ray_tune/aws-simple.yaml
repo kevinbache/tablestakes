@@ -1,4 +1,4 @@
-cluster_name: aws-m4-g4dn-d500-6
+cluster_name: aws-m4-g4dn-d500-22
 
 provider:
     type: aws
@@ -47,36 +47,40 @@ file_mounts: {
 }
 
 setup_commands:
-    # prep up
-    - grep -qxFi 'source activate pytorch_latest_p36' ~/.bashrc || echo 'source activate pytorch_latest_p36' >> ~/.bashrc
-
     # deel learning stuff
-    - source activate pytorch_latest_p36 && pip install tabulate tensorboard tensorboardX
-    - source activate pytorch_latest_p36 && pip install fsspec>=0.8.0 pytorch-lightning --no-deps
-    - source activate pytorch_latest_p36 && pip install \
+    - pip install torch torchvision tabulate tensorboard tensorboardX \
+        pytorch-lightning \
         hyperopt neptune-client neptune-contrib[viz] mlflow hiplot \
-        jupyter ipywidgets bokeh "boto3>=1.10.44"
+        jupyter ipywidgets bokeh "boto3>=1.10.44" \
 
     # ray
-    - source activate pytorch_latest_p36 && pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-1.1.0.dev0-cp37-cp37m-manylinux1_x86_64.whl
-    - source activate pytorch_latest_p36 && pip install ray[all]
-    # for https://docs.ray.io/en/stable/webui.html
-    - source activate pytorch_latest_p36 && jupyter nbextension enable --py --sys-prefix widgetsnbextension
+    - pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-1.1.0.dev0-cp37-cp37m-manylinux1_x86_64.whl
+    - pip install ray[all]
+    #  for https://docs.ray.io/en/stable/webui.html
+    - jupyter nbextension enable --py --sys-prefix widgetsnbextension
 
     # my stuff
     - mkdir -p ~/projects
 
-    - source activate pytorch_latest_p36 && pip install --no-deps lib/pytorch_fast_transformers-0.3.0-cp37-cp37m-linux_x86_64.whl
-    - source activate pytorch_latest_p36 && pip install --upgrade "cloudpickle>=1.6.0"
+    - pip install --no-deps lib/pytorch_fast_transformers-0.3.0-cp37-cp37m-linux_x86_64.whl
+    - pip install --upgrade "cloudpickle>=1.6.0"
 
     - test -e projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
     - cd projects/chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
-    - source activate pytorch_latest_p36 && pip install --editable ~/projects/chillpill/
+    - pip install --editable ~/projects/chillpill/
 
     - test -e projects/tablestakes/python || git clone https://github.com/kevinbache/tablestakes.git ~/projects/tablestakes
     - cd projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
     # todo: recompile fast-transformers on gpu node to get gpu speed?
-    - source activate pytorch_latest_p36 && pip install --editable ~/projects/tablestakes/python/
+    - pip install --editable ~/projects/tablestakes/python/
+
+
+# Custom commands that will be run on the head node after common setup.
+head_setup_commands: []
+#    - conda install pytorch torchvision cuda90 -c pytorch
+
+
+worker_setup_commands: []
 
 # note the virtual env activation
 head_start_ray_commands:
