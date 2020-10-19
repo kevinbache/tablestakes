@@ -143,7 +143,7 @@ if __name__ == '__main__':
     search_params.project_name = 'tablestakes'
     search_params.experiment_name = 'trans_v0.1.3'
     search_params.group_name = 'new_group'
-    search_params.experiment_tags = ['tune', 'testing', 'search_v0.0.3']
+    search_params.experiment_tags = ['tune', 'search', 'v0.0.3']
 
     search_params.num_cpus = 2
     search_params.num_gpus = 1
