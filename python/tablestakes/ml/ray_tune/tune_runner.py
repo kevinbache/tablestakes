@@ -30,7 +30,7 @@ def train_fn(config: Dict, checkpoint_dir=None):
     }
 
     pl_callbacks = [
-        torch_helpers.LogCopierCallback(),
+        torch_helpers.CounterTimerCallback(),
         tune_pl.TuneReportCallback(
             metrics=phase_to_metric_names[model_transformer.RectTransformerModule.TRAIN_PHASE_NAME],
             on='train_end',

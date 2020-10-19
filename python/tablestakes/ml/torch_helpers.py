@@ -252,8 +252,8 @@ def get_simple_ablatable_transformer_encoder(
 
 CURRENT_EPOCH_NAME = 'current_epoch'
 PARAM_COUNT_NAME = 'param_count'
-TIME_PERF_NAME = 'time_perf'
-TIME_PROCESS_NAME = 'time_process'
+TIME_PERF_NAME = 'train_time_perf'
+TIME_PROCESS_NAME = 'train_time_process'
 
 
 class LogCopierCallback(pl.Callback):
@@ -289,31 +289,22 @@ class CounterTimerCallback(pl.Callback):
     def _count_params(pl_module):
         return sum(p.numel() for p in pl_module.parameters() if p.requires_grad)
 
+    def on_fit_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule, ):
+        d = {
+            PARAM_COUNT_NAME: self._count_params(pl_module),
+        }
+        trainer.logger.log_hyperparams(params=d)
+
     def on_train_epoch_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        pl_module.log(name=PARAM_COUNT_NAME, value=self._count_params(pl_module), prog_bar=True, logger=True)
         self._train_start_perf = time.perf_counter()
         self._train_start_process = time.process_time()
 
     def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        pl_module.log(name=PARAM_COUNT_NAME, value=self._count_params(pl_module), prog_bar=True, logger=True)
-        pl_module.log(
-            name=TIME_PERF_NAME,
-            value=time.perf_counter() - self._train_start_perf,
-            prog_bar=True,
-            logger=True,
-        )
-        pl_module.log(
-            name=TIME_PROCESS_NAME,
-            value=time.process_time() - self._train_start_process,
-            prog_bar=True,
-            logger=True,
-        )
-
-    def on_validation_epoch_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        pl_module.log(name=PARAM_COUNT_NAME, value=self._count_params(pl_module), prog_bar=False, logger=True)
-
-    def on_test_epoch_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        pl_module.log(name=PARAM_COUNT_NAME, value=self._count_params(pl_module), prog_bar=False, logger=True)
+        d = {
+            TIME_PERF_NAME: time.perf_counter() - self._train_start_perf,
+            TIME_PROCESS_NAME: time.process_time() - self._train_start_process,
+        }
+        trainer.logger.log_metrics(d, step=trainer.global_step)
 
 
 class MyLightningNeptuneLogger(pl_loggers.NeptuneLogger):

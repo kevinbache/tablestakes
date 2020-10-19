@@ -17,7 +17,7 @@ def run_one(hp: hyperparams.LearningParams):
     net = model_transformer.RectTransformerModule(hp)
 
     pl_callbacks = [
-        torch_helpers.CounterTimerCallback(hp),
+        torch_helpers.CounterTimerCallback(),
     ]
 
     trainer = pl.Trainer(
@@ -55,10 +55,10 @@ if __name__ == '__main__':
     hp.lr = 0.001
 
     for encoder_type in encoder_types:
+        print('')
+        print(f'Starting {encoder_type}')
         hp.trans_encoder_type = encoder_type
         hp.experiment_tags = ['test', 'benchmark_encoder']
+        run_one.remote(hp)
 
-        out = run_one.remote(hp)
-
-    print(ray.get(out))
     print('done')
