@@ -89,7 +89,7 @@ if __name__ == '__main__':
     search_params.num_trans_heads = params.Discrete([2, 4, 8, 16])
     search_params.num_trans_fc_dim_mult = params.Discrete([2, 3, 4, 6])
 
-    search_params.trans_encoder_type = 'fast_default'
+    search_params.trans_encoder_type = 'torch'
 
     search_params.do_cat_x_base_before_fc = params.Boolean(p_true=0.9)
 
@@ -142,8 +142,8 @@ if __name__ == '__main__':
     search_params.upload_dir = 's3://kb-tester-2020-10-14'
     search_params.project_name = 'tablestakes'
     search_params.experiment_name = 'trans_v0.1.3'
-    search_params.group_name = 'log2_batch_2'
-    search_params.experiment_tags = ['tune', 'testing']
+    search_params.group_name = 'new_group'
+    search_params.experiment_tags = ['tune', 'testing', 'search_v0.0.1']
 
     search_params.num_cpus = 2
     search_params.num_gpus = 1

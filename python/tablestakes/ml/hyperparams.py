@@ -36,7 +36,7 @@ class LearningParams(params.ParameterSet):
     num_trans_heads = 8
     num_trans_fc_dim_mult = 4
 
-    trans_encoder_type = 'fast_default'
+    trans_encoder_type = 'torch'
 
     do_cat_x_base_before_fc = True
 

@@ -43,13 +43,14 @@ if __name__ == '__main__':
 
     encoder_types = [
         'torch',
-        'fast_default',
-        'fast_favor',
-        'fast_grf',
-        # 'performer',
-        'ablatable_do_drop_k',
-        'ablatable_do_not_drop_k',
+        # 'fast_default',
+        # 'fast_favor',
+        # 'fast_grf',
+        # # 'performer',
+        # 'ablatable_do_drop_k',
+        # 'ablatable_do_not_drop_k',
     ]
+    encoder_types.reverse()
 
     hp = hyperparams.LearningParams(dataset_name)
     hp.num_epochs = 10
@@ -60,7 +61,7 @@ if __name__ == '__main__':
     for encoder_type in encoder_types:
         print(f'Starting {encoder_type}')
         hp.trans_encoder_type = encoder_type
-        hp.experiment_tags = ['encoder_benchmark_v2']
+        hp.experiment_tags = ['encoder_benchmark_v2-reverse']
         outs.append(run_one.remote(hp))
 
     print(ray.get(outs))
