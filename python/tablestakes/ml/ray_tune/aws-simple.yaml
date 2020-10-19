@@ -33,10 +33,6 @@ worker_nodes:
         MarketType: spot
         SpotOptions:
             MaxPrice: "0.30"
-#    BlockDeviceMappings:
-#        - DeviceName: /dev/sda1
-#          Ebs:
-#              VolumeSize: 1000
 
 # Remote -> Local
 file_mounts: {
