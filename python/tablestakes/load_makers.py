@@ -9,6 +9,7 @@ T = TypeVar('T')
 
 
 class LoadMaker(abc.ABC, Generic[T]):
+    """A LoadMaker is designed to make caching easeir.  If If the cached object isn't there, then it'll """
     def __init__(self, files_to_load: List[str]):
         super().__init__()
         if isinstance(files_to_load, str):
@@ -33,7 +34,7 @@ class LoadMaker(abc.ABC, Generic[T]):
         pass
 
 
-class DatasetLoadMaker(LoadMaker[ts_data.TablestakesDataset]):
+class TablestakesDatasetLoadMaker(LoadMaker[ts_data.TablestakesDataset]):
     def __init__(self, saved_dataset_file: str, input_docs_directory_for_maker: str):
         super().__init__([saved_dataset_file])
         self.input_docs_directory_for_maker = input_docs_directory_for_maker

@@ -1,4 +1,4 @@
-cluster_name: aws-h=m4-w=g4dn-d500-2
+cluster_name: aws-m4-g4dn-d500-4
 
 provider:
     type: aws
@@ -43,23 +43,19 @@ file_mounts: {
     ~/.wandb_api_key: ~/.wandb_api_key,
     "/tmp/tablestakes_current_branch_sha": "~/projects/tablestakes/.git/refs/heads/master",
     "/tmp/chillpill_current_branch_sha": "~/projects/chillpill/.git/refs/heads/master",
-    "~/data/tablestakes/datasets/": "~/data/tablestakes/datasets/",
+    "~/lib/": "~/projects/tablestakes/python/lib/",
 }
 
 setup_commands:
 #    - pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-0.9.0.dev0-cp37-cp37m-macosx_10_13_intel.whl
     - echo "************** about to install ray et al **************"
-    - pip install torch torchvision tabulate \
-                  tensorboard tensorboardX pytorch-lightning hyperopt wandb \
+    - echo "Some text here." >> ~/.
+    - source activate pytorch_p36 && pip install torch torchvision tabulate \
+                  tensorboard tensorboardX pytorch-lightning hyperopt wandb neptune\
                   jupyter ipywidgets bokeh "boto3>=1.10.44" \
-                  pytorch-fast-transformers \
-                  https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-1.1.0.dev0-cp37-cp37m-manylinux1_x86_64.whl
+                  https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-1.1.0.dev0-cp36-cp36m-manylinux1_x86_64.whl
 
-    # i don't need these cause i'm using my local copy
-    - pip install ray ray[tune] ray[rllib] ray[dashboard]
-##    - git clone https://github.com/ray-project/ray.git ~/projects/ray
-#    - python ~/projects/ray/python/ray/setup-dev.py --yes
-
+    - source activate pytorch_p36 && pip install ray[all]
     # for https://docs.ray.io/en/stable/webui.html
     - jupyter nbextension enable --py --sys-prefix widgetsnbextension
 
@@ -73,6 +69,8 @@ setup_commands:
 
     - test -e projects/tablestakes/python || git clone https://github.com/kevinbache/tablestakes.git ~/projects/tablestakes
     - cd projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
+    # todo: recompile fast-transformers on gpu node to get gpu speed?
+    - pip install lib/pytorch_fast_transformers-0.3.0-cp36-cp36m-linux_x86_64.whl
     - pip install --editable ~/projects/tablestakes/python/
 
     - echo "************** done **************"

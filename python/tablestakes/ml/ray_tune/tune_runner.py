@@ -148,7 +148,7 @@ if __name__ == '__main__':
     search_params.num_gpus = 1
     search_params.seed = 42
 
-    do_test_one = True
+    do_test_one = False
     if do_test_one:
         dataset_name = 'num=1000_4d8d'
         search_params = hyperparams.LearningParams(dataset_name)
@@ -264,7 +264,7 @@ if __name__ == '__main__':
 
     # blocks until done
     print('loading or making data')
-    ds = load_makers.DatasetLoadMaker(
+    ds = load_makers.TablestakesDatasetLoadMaker(
         saved_dataset_file=search_params.dataset_file,
         input_docs_directory_for_maker=search_params.docs_dir,
     )

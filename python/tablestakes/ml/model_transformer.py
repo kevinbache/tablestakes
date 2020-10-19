@@ -27,7 +27,7 @@ class RectTransformerModule(pl.LightningModule):
 
         self.hp = hp
 
-        self.ds = load_makers.DatasetLoadMaker(
+        self.ds = load_makers.TablestakesDatasetLoadMaker(
             saved_dataset_file=self.hp.dataset_file,
             input_docs_directory_for_maker=self.hp.docs_dir,
         ).loadmake()
@@ -285,36 +285,6 @@ class RectTransformerModule(pl.LightningModule):
                 metrics={'grad_norms': self.grad_norm(1)},
                 step=self.global_step,
             )
-
-            # for name, param in self.named_parameters():
-            #     try:
-            #         if param is not None:
-            #             self.logger[0].experiment.add_histogram(
-            #                 tag=f'my_weights/{name}',
-            #                 values=param,
-            #                 global_step=self.global_step,
-            #             )
-            #             if param.grad is not None:
-            #                 self.logger[0].experiment.add_histogram(
-            #                     tag=f'my_grads/{name}',
-            #                     values=param.grad,
-            #                     global_step=self.global_step,
-            #                 )
-            #         pass
-            #     except BaseException as e:
-            #         print("==================================================")
-            #         print("==================================================")
-            #         print("==================================================")
-            #         print(' param: ', param)
-            #         print()
-            #         print(' param name: ', name)
-            #         print(' type(param): ', type(param))
-            #         print(' type(param.grad): ', type(param.grad))
-            #         print()
-            #         print("==================================================")
-            #         print("==================================================")
-            #         print("==================================================")
-            #         raise e
 
     # ---------------------
     # TRAINING SETUP
