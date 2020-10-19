@@ -6,6 +6,8 @@ data/images
 python/tablestakes/ml/lightning_logs/
 *.pdf
 
+*.whl
+
 python/tablestakes/ml/tensorboard_logs/
 python/tablestakes/tensorboard_logs/
 python/tablestakes/ml/logs/
