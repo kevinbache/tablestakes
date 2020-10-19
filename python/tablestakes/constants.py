@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from tablestakes import utils
+
 WORD_ID_FILENAME = 'word_to_id.json'
 WORD_COUNT_FILENAME = 'word_to_count.json'
 NUM_Y_CLASSES_FILENAME = 'num_y_classes.json'
@@ -30,3 +32,8 @@ X_BASIC_NAME = X_PREFIX + X_BASIC_BASE_NAME
 X_VOCAB_NAME = X_PREFIX + X_VOCAB_BASE_NAME
 
 META_DIR_NAME = 'meta'
+
+NEPTUNE_API_KEY_FILE = str(Path.home() / '.neptune_api_key')
+NEPTUNE_USERNAME = 'kevinbache'
+
+SOURCES_GLOB_STR = str(THIS_DIR / '**/*.py')

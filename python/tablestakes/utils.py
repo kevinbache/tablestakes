@@ -16,6 +16,7 @@ from matplotlib.image import imread
 import numpy as np
 import pandas as pd
 import pdf2image
+from tablestakes import constants
 from torch.utils.data import Dataset
 
 StrDict = Dict[str, Union[str, int, float]]
@@ -46,6 +47,13 @@ def dict_to_str(d: Dict, indent_width=2, extra_key_width=0, do_norm_key_width=Tr
 
 def print_dict(d: Dict, indent_width=2, extra_key_width=0, do_norm_key_width=True, line_end=''):
     print(dict_to_str(d, indent_width, extra_key_width, do_norm_key_width, line_end))
+
+
+def split_dict(dict_to_split: Dict, keys_for_first) -> Tuple[Dict, Dict]:
+    d1 = {k: dict_to_split[k] for k in keys_for_first}
+    d2 = {k: dict_to_split[k] for k in [k for k in dict_to_split if k not in keys_for_first]}
+
+    return d1, d2
 
 
 def load_json(filename: str):
@@ -257,6 +265,14 @@ def split_df_by_cols(df: pd.DataFrame, col_sets: List[List[str]], names=List[str
 
 def pow2int(num):
     return int(np.power(2, num))
+
+
+def get_neptune_api_key():
+    return load_txt(constants.NEPTUNE_API_KEY_FILE).strip()
+
+
+def get_neptune_fully_qualified_project_name(project_name):
+    return f'{constants.NEPTUNE_USERNAME}/{project_name}'
 
 
 if __name__ == '__main__':

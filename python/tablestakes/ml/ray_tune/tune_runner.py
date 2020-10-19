@@ -5,7 +5,6 @@ from typing import *
 import boto3
 
 import pytorch_lightning as pl
-from pytorch_lightning import loggers as pl_loggers
 
 import ray
 from ray import tune
@@ -19,6 +18,7 @@ from tablestakes.ml import hyperparams, model_transformer
 from tablestakes.ml import torch_helpers
 
 
+@ray.remote(max_calls=1)
 def train_fn(config: Dict, checkpoint_dir=None):
     hp = hyperparams.LearningParams.from_dict(config)
     assert isinstance(hp, hyperparams.LearningParams)
@@ -55,6 +55,7 @@ def train_fn(config: Dict, checkpoint_dir=None):
         # accumulate_grad_batches=utils.pow2int(hp.log2_batch_size),
         profiler=True,
         deterministic=True,
+        log_every_n_steps=hp.num_steps_per_metric_log,
     )
     net = model_transformer.RectTransformerModule(hp)
 
@@ -136,22 +137,26 @@ if __name__ == '__main__':
 
     ##############
     # extra
-    search_params.num_steps_per_histogram_log = 50
+    search_params.num_steps_per_histogram_log = 100
     search_params.upload_dir = 's3://kb-tester-2020-10-14'
     search_params.project_name = 'tablestakes'
     search_params.experiment_name = 'trans_v0.1.3'
-    search_params.group_name = 'log2_batch'
+    search_params.group_name = 'log2_batch_2'
+
+    search_params.experiment_tags = ['tune', 'testing']
 
     search_params.num_gpus = 1
     search_params.seed = 42
 
-    do_test_one = False
+    do_test_one = True
     if do_test_one:
         dataset_name = 'num=1000_4d8d'
         search_params = hyperparams.LearningParams(dataset_name)
         search_params.num_hp_samples = 4
         search_params.num_epochs = 10
-        search_params.num_gpus = 1
+        search_params.num_cpus = 0.5
+        search_params.num_gpus = 0.5
+        search_params.experiment_tags.append('do_test_one')
         print("=======================================")
         print("=======================================")
         print("============ TESTING ON 1 =============")
@@ -170,9 +175,9 @@ if __name__ == '__main__':
     import socket
     hostname = socket.gethostname()
     is_local_run = hostname.endswith('.local')
+    search_params.experiment_tags.append('local' if is_local_run else 'cluster')
 
     do_fast_test = is_local_run
-    do_include_wandb = not do_fast_test
 
     if do_fast_test:
         search_params.num_epochs = 10
@@ -185,6 +190,7 @@ if __name__ == '__main__':
         search_params.log2num_head_neurons = 5
         search_params.dataset_name = 'num=10_40db'
         search_params.update_files()
+        search_params.experiment_tags.append('do_fast_test')
         sync_config = None
 
     parser = argparse.ArgumentParser()
@@ -238,9 +244,15 @@ if __name__ == '__main__':
     search_dict = search_params.to_ray_tune_search_dict()
 
     # see tune.utils.UtilMonitor
-    search_dict['log_sys_usage'] = True
+    LOG_SYS_USAGE = 'log_sys_usage'
+    util_keys = [
+        LOG_SYS_USAGE,
+    ]
+    search_dict[LOG_SYS_USAGE] = True
 
     tune_loggers = list(tune_logger.DEFAULT_LOGGERS)
+    # do_include_wandb = not do_fast_test
+    do_include_wandb = False
     if do_include_wandb:
         train_fn = tune_wandb.wandb_mixin(train_fn)
         search_dict['wandb'] = {
@@ -248,6 +260,7 @@ if __name__ == '__main__':
             "api_key_file": Path('~/.wandb_api_key').expanduser().resolve(),
         }
         tune_loggers += [tune_wandb.WandbLogger]
+        util_keys.append('wandb')
 
     # blocks until done
     print('loading or making data')
@@ -257,7 +270,7 @@ if __name__ == '__main__':
     )
 
     resources_per_trial = {
-        "cpu": 4,
+        "cpu": search_params.num_cpus,
     }
     if not is_local_run:
         resources_per_trial['gpu'] = search_params.num_gpus

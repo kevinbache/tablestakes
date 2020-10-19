@@ -1,11 +1,14 @@
+from argparse import Namespace
 from pathlib import Path
-from typing import List
+from typing import *
 
 import pytorch_lightning as pl
 from pytorch_lightning import loggers as pl_loggers
 import torch
 from ray import tune
-from tablestakes import constants
+from ray.tune.logger import Logger as TuneLogger
+from ray.tune import result as tune_result
+from tablestakes import constants, utils
 
 from tablestakes.ml import hyperparams, ablation
 from torch import nn as nn
@@ -180,12 +183,19 @@ class ReachAroundTransformer(nn.Module):
         super().__init__()
 
 
-def get_fast_linear_attention_encoder(hp: hyperparams.LearningParams, num_trans_input_dims: int):
+def get_fast_linear_attention_encoder(hp: hyperparams.LearningParams, num_trans_input_dims: int, feature_map=None):
     """https://github.com/idiap/fast-transformers"""
-    from fast_transformers.builders import TransformerEncoderBuilder
+    from fast_transformers import builders, feature_maps
+
+    if feature_map == 'favor':
+        feature_map = feature_maps.Favor.factory(n_dims=num_trans_input_dims)
+    elif feature_map == 'grf':
+        feature_map = feature_maps.GeneralizedRandomFeatures.factory(n_dims=num_trans_input_dims)
+    else:
+        feature_map = None
 
     # Create the builder for our transformers
-    builder = TransformerEncoderBuilder.from_kwargs(
+    builder = builders.TransformerEncoderBuilder.from_kwargs(
         n_layers=hp.num_trans_enc_layers,
         n_heads=hp.num_trans_heads,
         query_dimensions=num_trans_input_dims // hp.num_trans_heads,
@@ -193,6 +203,7 @@ def get_fast_linear_attention_encoder(hp: hyperparams.LearningParams, num_trans_
         feed_forward_dimensions=num_trans_input_dims * hp.num_trans_fc_dim_mult,
         attention_type='linear',
         activation='gelu',
+        feature_map=feature_map,
     )
 
     # Build a transformer with linear attention
@@ -249,48 +260,49 @@ class LogCopierCallback(pl.Callback):
 
     def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
         d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
-        # d = {}
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
         d[PARAM_COUNT_NAME] = self._count_params(pl_module)
         tune.report(**d)
 
     def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
         d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
-        # d = {}
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
         d[PARAM_COUNT_NAME] = self._count_params(pl_module)
         tune.report(**d)
 
     def on_test_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
         d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
-        # d = {}
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
         d[PARAM_COUNT_NAME] = self._count_params(pl_module)
         tune.report(**d)
 
 
+class MyLightningNeptuneLogger(pl_loggers.NeptuneLogger):
+    def __init__(self, hp: hyperparams.LearningParams, version: str = ''):
+        super().__init__(
+            api_key=utils.get_neptune_api_key(),
+            project_name=utils.get_neptune_fully_qualified_project_name(hp.project_name),
+            close_after_fit=True,
+            offline_mode=False,
+            experiment_name=f'pl_logger-{hp.get_exp_group_name()}-{version}',
+            params=hp.to_dict(),
+            tags=hp.experiment_tags,
+            upload_source_files=constants.SOURCES_GLOB_STR,
+        )
+        self.append_tags(hp.experiment_tags)
+
+    @pl.utilities.rank_zero_only
+    def log_hyperparams(self, params: Union[Dict[str, Any], Namespace]) -> None:
+        # params = self._convert_params(params)
+        # params = self._flatten_dict(params)
+        for key, val in params.items():
+            # self.experiment.set_property(f'param__{key}', val)
+            self.experiment.set_property(key, val)
+
+
 def get_pl_logger(hp: hyperparams.LearningParams, tune=None):
-    save_dir = hp.logs_dir if tune is None else tune.get_trial_dir()
-    save_dir = Path(save_dir)
-
-    version = None if tune is None else tune.get_trial_id()
-    name = hp.get_project_exp_name()
-
-    logger = pl_loggers.LoggerCollection([
-        pl_loggers.TensorBoardLogger(
-            name=name,
-            save_dir=str(save_dir / 'tensorboard'),
-            version=version,
-            # log_graph=True,
-        ),
-        pl_loggers.WandbLogger(
-            save_dir=str(save_dir / 'wandb'),
-            group=hp.group_name,
-            project=name,
-            # entity='kevin_entity',
-            version=version,
-        ),
-    ])
+    version = 'local' if tune is None else tune.get_trial_id()
+    logger = MyLightningNeptuneLogger(hp, version),
 
     return logger
 
@@ -302,3 +314,47 @@ class BetterAccuracy(pl.metrics.Accuracy):
         assert preds.shape == target.shape,  f"preds.shape: {preds.shape}, target.shape: {target.shape}"
         self.correct = self.correct + torch.sum(preds == target)
         self.total = self.total + target.numel()
+
+
+# ref: https://community.neptune.ai/t/neptune-and-hyperparameter-search-with-tune/567/3
+class TuneNeptuneLogger(TuneLogger):
+    """Neptune logger.
+    Requires the experiment configuration to have a MLFlow Experiment ID
+    or manually set the proper environment variables.
+    """
+
+    def _init(self):
+        from neptune.sessions import Session
+
+        hp = hyperparams.LearningParams.from_dict(self.config)
+        project_name = utils.get_neptune_fully_qualified_project_name(hp.project_name)
+        experiment_name = f'tune_logger-{hp.get_exp_group_name()}-{tune.get_trial_id()}'
+
+        project = Session().get_project(project_name)
+        self.exp = project.create_experiment(
+            name=experiment_name,
+            params=self.config,
+            tags=hp.experiment_tags,
+            upload_source_files=constants.SOURCES_GLOB_STR,
+        )
+
+    def on_result(self, result):
+        for name, value in result.items():
+            if isinstance(value, float):
+                self.exp.log_metric(name, x=result.get(tune_result.TRAINING_ITERATION), y=value)
+            elif isinstance(value, int):
+                self.exp.log_metric(name, x=result.get(tune_result.TRAINING_ITERATION), y=value)
+            elif isinstance(value, str):
+                self.exp.log_text(name, x=result.get(tune_result.TRAINING_ITERATION), y=value)
+            else:
+                continue
+
+        # from ray.tune.result import (NODE_IP, TRAINING_ITERATION, TIME_TOTAL_S,
+        #                              TIMESTEPS_TOTAL, EXPR_PARAM_FILE,
+        #                              EXPR_PARAM_PICKLE_FILE, EXPR_PROGRESS_FILE,
+        #                              EXPR_RESULT_FILE)
+
+    def close(self):
+        self.exp.stop()
+
+

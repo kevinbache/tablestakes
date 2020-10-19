@@ -1,0 +1,128 @@
+new macbook cpu
+batch size = 32 (isn't accum)
+
+
+torch transformer
+	0: 8.48, 0.956
+	1: 8.24, 0.716
+	2: 7.74, 0.584
+	3: 7.94, 0.513
+
+			model_forward       	|  0.036784       	|  36.784         
+			model_backward      	|  0.076098       	|  76.098         
+			on_after_backward   	|  3.3244e-05     	|  0.033244       
+			optimizer_step      	|  0.0071494      	|  7.1494         
+
+
+fast
+	favor:
+		0: 4.11, 0.966
+		1: 3.99, 0.710
+		2: 3.82, 0.594
+		3: 3.82, 0.500
+
+			model_forward       	|  0.065918       	|  65.918         
+			model_backward      	|  0.17588        	|  175.88         
+			on_after_backward   	|  3.2885e-05     	|  0.032885       
+			optimizer_step      	|  0.0086105      	|  8.6105         
+
+
+	grf:
+		0: 4.97, 0.969
+		1: 4.88, 0.678
+		2: 4.67, 0.580
+		3: 4.32, 0.519
+
+			model_forward       	|  0.06014        	|  60.14          
+			model_backward      	|  0.14152        	|  141.52         
+			on_after_backward   	|  3.2948e-05     	|  0.032948       
+			optimizer_step      	|  0.0084973      	|  8.4973         
+
+
+	(default)
+		0: 12.16, 0.949
+		1: 11.20, 0.674
+		2: 10.35, 0.557
+		3: 10.73, 0.479
+
+			model_forward       	|  0.031328       	|  31.328         
+			model_backward      	|  0.046263       	|  46.263         
+			on_after_backward   	|  3.4948e-05     	|  0.034948       
+			optimizer_step      	|  0.008591       	|  8.591          
+
+
+		0: 11.18, 0.924
+		1: 10.60, 0.649
+		2: 10.10, 0.563
+		3: 10.01, 0.470
+
+
+			model_forward       	|  0.030715       	|  30.715         
+			model_backward      	|  0.053139       	|  53.139         
+			on_after_backward   	|  3.3603e-05     	|  0.033603       
+			optimizer_step      	|  0.0078472      	|  7.8472         
+
+
+performer
+	0: 1.20it/s, loss=0.926,
+	1: 1.19it/s, loss=0.669
+	2: 1.22it/s, loss=0.541
+	3: 1.20it/s, loss=0.426
+
+
+		model_forward       	|  0.27013        	|  270.13         
+		model_backward      	|  0.54837        	|  548.37         
+		on_after_backward   	|  3.759e-05      	|  0.03759        
+		optimizer_step      	|  0.0077535      	|  7.7535         
+
+
+ablatable do_drop_k=False
+	0: 5.53it/s, loss=0.93
+	1: 5.41it/s, loss=0.709
+	2: 5.17it/s, loss=0.614
+	3: 5.11it/s, loss=0.547
+
+
+		model_forward       	|  0.077024       	|  77.024         
+		model_backward      	|  0.098849       	|  98.849         
+		on_after_backward   	|  3.9271e-05     	|  0.039271       
+		optimizer_step      	|  0.0084934      	|  8.4934         
+
+
+
+
+ablatable do_drop_k=True
+	0: 5.01it/s, loss=0.895
+	1: 5.18it/s, loss=0.652
+	2: 5.02it/s, loss=0.572
+	3: 4.85it/s, loss=0.552
+
+
+		model_forward       	|  0.079222       	|  79.222         
+		model_backward      	|  0.10833        	|  108.33         
+		on_after_backward   	|  3.6425e-05     	|  0.036425       
+		optimizer_step      	|  0.0077661      	|  7.7661         
+
+
+
+
+
+
+=========================
+ on the cloud with 1 gpu
+=========================
+
+(pid=3154, ip=172.31.47.88) model_forward       	|  0.010584       	|  10.584
+(pid=3154, ip=172.31.47.88) model_backward      	|  0.0075763      	|  7.5763
+(pid=3154, ip=172.31.47.88) on_after_backward   	|  2.1992e-05     	|  0.021992
+(pid=3154, ip=172.31.47.88) optimizer_step      	|  0.0081754      	|  8.1754
+
+
+
+
+
+
+
+
+
+

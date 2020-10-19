@@ -9,7 +9,7 @@ auth:
 
 min_workers: 0
 initial_workers: 4
-max_workers: 20
+max_workers: 4
 
 autoscaling_mode: default
 target_utilization_fraction: 0.8
@@ -25,7 +25,6 @@ head_node:
         - DeviceName: /dev/sda1
           Ebs:
               VolumeSize: 500
-
 
 worker_nodes:
     InstanceType: g4dn.xlarge
@@ -53,6 +52,7 @@ setup_commands:
     - pip install torch torchvision tabulate \
                   tensorboard tensorboardX pytorch-lightning hyperopt wandb \
                   jupyter ipywidgets bokeh "boto3>=1.10.44" \
+                  pytorch-fast-transformers \
                   https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-1.1.0.dev0-cp37-cp37m-manylinux1_x86_64.whl
 
     # i don't need these cause i'm using my local copy

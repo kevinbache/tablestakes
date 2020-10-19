@@ -32,9 +32,9 @@ setup(
     # `main_funk` in the file imported in
     # `tablestakes.tablestakes_docker_entrypoint`
     entry_points={
-        'console_scripts': [
-            'tablestakes_docker_entrypoint=tablestakes.tablestakes_docker_entrypoint:main_funk',
-        ],
+        # 'console_scripts': [
+        #     'tablestakes_docker_entrypoint=tablestakes.tablestakes_docker_entrypoint:main_funk',
+        # ],
     },
 
     install_requires=[

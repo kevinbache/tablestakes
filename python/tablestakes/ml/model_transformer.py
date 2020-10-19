@@ -77,19 +77,21 @@ class RectTransformerModule(pl.LightningModule):
         if hp.do_include_embeddings:
             self.embedder = nn.Embedding(self.hp.num_vocab, self.hp.num_total_embedding_dim)
 
-        #############
-        # trans
         if self.hp.pre_trans_linear_dim is not None:
             self.pre_enc_linear = nn.Conv1d(self.hp.num_basic_plus_embed_dims, self.hp.pre_trans_linear_dim, 1)
             num_trans_input_dims = self.hp.pre_trans_linear_dim
         else:
             num_trans_input_dims = self.hp.num_basic_plus_embed_dims
 
+        #############
+        # trans
         self.encoder = torch_helpers.get_pytorch_transformer_encoder(self.hp, num_trans_input_dims)
-        # self.encoder = get_simple_ablatable_transformer_encoder(
+        # self.encoder = torch_helpers.get_fast_linear_attention_encoder(self.hp, num_trans_input_dims, 'favor')
+        # self.encoder = torch_helpers.get_performer_encoder(hp, num_trans_input_dims)
+        # self.encoder = torch_helpers.get_simple_ablatable_transformer_encoder(
         #     self.hp,
         #     num_trans_input_dims,
-        #     do_drop_k=False,
+        #     do_drop_k=True,
         # )
 
         ######################################################################
@@ -133,20 +135,6 @@ class RectTransformerModule(pl.LightningModule):
 
         # save all variables in __init__ signature to self.hparams
         self.save_hyperparameters(self.hp.to_dict())
-
-        # if hasattr(self.hp, 'wandb'):
-        #     from pytorch_lightning.loggers import wandb as pl_wandb
-        #     self.pl_wandb_logger = pl_wandb.WandbLogger(
-        #         name=self.hp.experiment_name,
-        #         # save_dir=None,
-        #         # offline=False,
-        #         id=None,
-        #         anonymous=False,
-        #         version=None,
-        #         project=self.hp.project_name,
-        #         log_model=False,
-        #         experiment=None,
-        #     )
 
     def forward(self, basic: torch.Tensor, vocab: torch.Tensor):
         basic = basic.float()
@@ -245,13 +233,13 @@ class RectTransformerModule(pl.LightningModule):
     def _log_losses_and_metrics(self, phase_name, loss, losses, y_hats_dict, ys_dict, prog_bar=False):
         output_names = ys_dict.keys()
 
-        on_epoch = True
+        on_epoch = None
 
         d = {}
 
         total_loss_name = self._get_phase_name(phase_name, 'loss', 'total')
 
-        self.log(total_loss_name, loss, prog_bar=prog_bar, on_epoch=on_epoch)
+        self.log(total_loss_name, loss, prog_bar=False, on_epoch=on_epoch)
         d[total_loss_name] = loss
 
         for output_name, current_loss in zip(output_names, losses):
@@ -274,10 +262,8 @@ class RectTransformerModule(pl.LightningModule):
                 d[full_metric_name] = metric_value
 
         self.metrics_to_log = d
-        self.logger.log_metrics(d, step=self.global_step)
 
     def on_pretrain_routine_start(self) -> None:
-        self.logger[1].watch(self)
         self.logger.log_hyperparams(self.hp.to_dict())
 
     def training_step(self, batch, batch_idx):
@@ -294,40 +280,41 @@ class RectTransformerModule(pl.LightningModule):
         self._log_losses_and_metrics(self.TEST_PHASE_NAME, loss, losses, y_hats_dict, ys_dict)
 
     def on_after_backward(self):
-        if self.hp.num_steps_per_histogram_log and not self.global_step % self.hp.num_steps_per_histogram_log:
-            # self.logger.log_metrics(
-            #     metrics={'grad_norms': self.grad_norm(1)},
-            #     step=self.global_step,
-            # )
+        if self.hp.num_steps_per_histogram_log and not (self.global_step + 1) % self.hp.num_steps_per_histogram_log:
+            self.logger.log_metrics(
+                metrics={'grad_norms': self.grad_norm(1)},
+                step=self.global_step,
+            )
 
-            for name, param in self.named_parameters():
-                try:
-                    if param is not None:
-                        self.logger[0].experiment.add_histogram(
-                            tag=f'my_weights/{name}',
-                            values=param,
-                            global_step=self.global_step,
-                        )
-                        if param.grad is not None:
-                            self.logger[0].experiment.add_histogram(
-                                tag=f'my_grads/{name}',
-                                values=param.grad,
-                                global_step=self.global_step,
-                            )
-                except BaseException as e:
-                    print("==================================================")
-                    print("==================================================")
-                    print("==================================================")
-                    print(' param: ', param)
-                    print()
-                    print(' param name: ', name)
-                    print(' type(param): ', type(param))
-                    print(' type(param.grad): ', type(param.grad))
-                    print()
-                    print("==================================================")
-                    print("==================================================")
-                    print("==================================================")
-                    raise e
+            # for name, param in self.named_parameters():
+            #     try:
+            #         if param is not None:
+            #             self.logger[0].experiment.add_histogram(
+            #                 tag=f'my_weights/{name}',
+            #                 values=param,
+            #                 global_step=self.global_step,
+            #             )
+            #             if param.grad is not None:
+            #                 self.logger[0].experiment.add_histogram(
+            #                     tag=f'my_grads/{name}',
+            #                     values=param.grad,
+            #                     global_step=self.global_step,
+            #                 )
+            #         pass
+            #     except BaseException as e:
+            #         print("==================================================")
+            #         print("==================================================")
+            #         print("==================================================")
+            #         print(' param: ', param)
+            #         print()
+            #         print(' param name: ', name)
+            #         print(' type(param): ', type(param))
+            #         print(' type(param.grad): ', type(param.grad))
+            #         print()
+            #         print("==================================================")
+            #         print("==================================================")
+            #         print("==================================================")
+            #         raise e
 
     # ---------------------
     # TRAINING SETUP
@@ -423,10 +410,10 @@ if __name__ == '__main__':
     # dataset_name = 'num=100_c5ff'
     # dataset_name = 'num=10_08b3'
     # dataset_name = 'num=10_40db'
-    dataset_name = 'num=1000_4d8d'
+    # dataset_name = 'num=1000_4d8d'
+    dataset_name = 'num=10000_99e0'
 
     hp = hyperparams.LearningParams(dataset_name)
-    hp.do_include_embeddings = True
     net = RectTransformerModule(hp)
 
     trainer = pl.Trainer(
@@ -437,10 +424,8 @@ if __name__ == '__main__':
         # accumulate_grad_batches=utils.pow2int(hp.log2_batch_size),
         accumulate_grad_batches=1,
         profiler=True,
+        auto_lr_find=False,
     )
-
-    print("HP:")
-    utils.print_dict(hp.to_dict())
 
     print("Starting trainer.fit:")
     fit_out = trainer.fit(net)

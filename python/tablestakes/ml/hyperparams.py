@@ -89,15 +89,20 @@ class LearningParams(params.ParameterSet):
 
     ##############
     # extra
-    num_steps_per_histogram_log = 100
+    num_steps_per_metric_log = 100
+    num_steps_per_histogram_log = 200
 
     logs_dir = constants.LOGS_DIR
     upload_dir = 's3://kb-tester-2020-10-14'
+    # neptune won't let you create projects from its api so this has to already exist
     project_name = 'tablestakes'
     experiment_name = 'trans_v0.1.3'
     group_name = 'log2_batch'
 
-    num_gpus = 1
+    experiment_tags = ['default', 'testing']
+
+    num_cpus = 2
+    num_gpus = 0.5
 
     seed = 42
 
@@ -115,6 +120,9 @@ class LearningParams(params.ParameterSet):
 
     def get_project_exp_name(self):
         return f'{self.project_name}_{self.experiment_name}'
+
+    def get_exp_group_name(self):
+        return f'{self.experiment_name}_{self.group_name}'
 
 
 class DocGenParams(params.ParameterSet):
