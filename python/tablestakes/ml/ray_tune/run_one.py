@@ -5,6 +5,7 @@ import ray
 from tablestakes.ml import model_transformer, hyperparams, torch_helpers
 
 num_gpus = 1
+num_cpus = 2
 
 ray.init(
     address='auto',
@@ -12,7 +13,7 @@ ray.init(
 )
 
 
-@ray.remote(num_gpus=num_gpus, max_calls=1)
+@ray.remote(num_gpus=num_gpus, num_cpus=num_cpus, max_calls=1)
 def run_one(hp: hyperparams.LearningParams):
     net = model_transformer.RectTransformerModule(hp)
 
@@ -45,7 +46,7 @@ if __name__ == '__main__':
         'fast_default',
         'fast_favor',
         'fast_grf',
-        'performer',
+        # 'performer',
         'ablatable_do_drop_k',
         'ablatable_do_not_drop_k',
     ]
@@ -54,11 +55,13 @@ if __name__ == '__main__':
     hp.num_epochs = 10
     hp.lr = 0.001
 
+    print('')
+    outs = []
     for encoder_type in encoder_types:
-        print('')
         print(f'Starting {encoder_type}')
         hp.trans_encoder_type = encoder_type
-        hp.experiment_tags = ['test', 'benchmark_encoder']
-        run_one.remote(hp)
+        hp.experiment_tags = ['encoder_benchmark_v2']
+        outs.append(run_one.remote(hp))
 
+    print(ray.get(outs))
     print('done')
