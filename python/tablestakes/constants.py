@@ -33,7 +33,7 @@ X_VOCAB_NAME = X_PREFIX + X_VOCAB_BASE_NAME
 
 META_DIR_NAME = 'meta'
 
-NEPTUNE_API_KEY_FILE = str(Path.home() / '.neptune_api_key')
+LOGGER_API_KEY_FILE = str(Path.home() / '.logger_api_key')
 NEPTUNE_USERNAME = 'kevinbache'
 
 SOURCES_GLOB_STR = str(THIS_DIR / '**/*.py')

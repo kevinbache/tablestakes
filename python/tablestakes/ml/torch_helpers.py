@@ -280,7 +280,7 @@ class LogCopierCallback(pl.Callback):
 class MyLightningNeptuneLogger(pl_loggers.NeptuneLogger):
     def __init__(self, hp: hyperparams.LearningParams, version: str = ''):
         super().__init__(
-            api_key=utils.get_neptune_api_key(),
+            api_key=utils.get_logger_api_key(),
             project_name=utils.get_neptune_fully_qualified_project_name(hp.project_name),
             close_after_fit=True,
             offline_mode=False,

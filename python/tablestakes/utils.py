@@ -267,8 +267,8 @@ def pow2int(num):
     return int(np.power(2, num))
 
 
-def get_neptune_api_key():
-    return load_txt(constants.NEPTUNE_API_KEY_FILE).strip()
+def get_logger_api_key():
+    return load_txt(constants.LOGGER_API_KEY_FILE).strip()
 
 
 def get_neptune_fully_qualified_project_name(project_name):
