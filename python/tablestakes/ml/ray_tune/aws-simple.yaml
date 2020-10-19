@@ -1,4 +1,4 @@
-cluster_name: aws-m4-g4dn-d500-22
+cluster_name: aws-m4-g4dn-d500-23
 
 provider:
     type: aws
@@ -44,6 +44,7 @@ file_mounts: {
     "/tmp/tablestakes_current_branch_sha": "~/projects/tablestakes/.git/refs/heads/master",
     ~/.logger_api_key: ~/.logger_api_key,
     "~/lib/": "~/projects/tablestakes/python/lib/",
+    "~/data/tablestakes/datasets/": "~/data/tablestakes/datasets/",
 }
 
 setup_commands:
@@ -51,7 +52,7 @@ setup_commands:
     - pip install torch torchvision tabulate tensorboard tensorboardX \
         pytorch-lightning \
         hyperopt neptune-client neptune-contrib[viz] mlflow hiplot \
-        jupyter ipywidgets bokeh "boto3>=1.10.44" \
+        jupyter ipywidgets bokeh "boto3>=1.10.44"
 
     # ray
     - pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-1.1.0.dev0-cp37-cp37m-manylinux1_x86_64.whl
@@ -62,7 +63,7 @@ setup_commands:
     # my stuff
     - mkdir -p ~/projects
 
-    - pip install --no-deps lib/pytorch_fast_transformers-0.3.0-cp37-cp37m-linux_x86_64.whl
+    - pip install lib/pytorch_fast_transformers-0.3.0-cp37-cp37m-linux_x86_64.whl
     - pip install --upgrade "cloudpickle>=1.6.0"
 
     - test -e projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
@@ -77,16 +78,16 @@ setup_commands:
 
 # Custom commands that will be run on the head node after common setup.
 head_setup_commands: []
-#    - conda install pytorch torchvision cuda90 -c pytorch
-
+#    - conda install pytorch torchvision cpuonly -c pytorch
 
 worker_setup_commands: []
+#    - conda install pytorch torchvision cudatoolkit=10.2 -c pytorch
 
 # note the virtual env activation
 head_start_ray_commands:
     - ray stop
-    - ulimit -n 65536; source activate pytorch_latest_p36 && ray start --head --port=6379 --object-manager-port=8076 --autoscaling-config=~/ray_bootstrap_config.yaml
+    - ulimit -n 65536; source activate && ray start --head --port=6379 --object-manager-port=8076 --autoscaling-config=~/ray_bootstrap_config.yaml
 
 worker_start_ray_commands:
     - ray stop
-    - ulimit -n 65536; source activate pytorch_latest_p36 && ray start --address=$RAY_HEAD_IP:6379 --object-manager-port=8076
+    - ulimit -n 65536; source activate && ray start --address=$RAY_HEAD_IP:6379 --object-manager-port=8076

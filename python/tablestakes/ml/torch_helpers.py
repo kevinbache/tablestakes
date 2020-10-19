@@ -319,8 +319,6 @@ class BetterAccuracy(pl.metrics.Accuracy):
 # ref: https://community.neptune.ai/t/neptune-and-hyperparameter-search-with-tune/567/3
 class TuneNeptuneLogger(TuneLogger):
     """Neptune logger.
-    Requires the experiment configuration to have a MLFlow Experiment ID
-    or manually set the proper environment variables.
     """
 
     def _init(self):

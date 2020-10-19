@@ -18,7 +18,6 @@ from tablestakes.ml import hyperparams, model_transformer
 from tablestakes.ml import torch_helpers
 
 
-@ray.remote(max_calls=1)
 def train_fn(config: Dict, checkpoint_dir=None):
     hp = hyperparams.LearningParams.from_dict(config)
     assert isinstance(hp, hyperparams.LearningParams)
@@ -142,9 +141,9 @@ if __name__ == '__main__':
     search_params.project_name = 'tablestakes'
     search_params.experiment_name = 'trans_v0.1.3'
     search_params.group_name = 'log2_batch_2'
-
     search_params.experiment_tags = ['tune', 'testing']
 
+    search_params.num_cpus = 2
     search_params.num_gpus = 1
     search_params.seed = 42
 
@@ -251,16 +250,9 @@ if __name__ == '__main__':
     search_dict[LOG_SYS_USAGE] = True
 
     tune_loggers = list(tune_logger.DEFAULT_LOGGERS)
-    # do_include_wandb = not do_fast_test
-    do_include_wandb = False
-    if do_include_wandb:
-        train_fn = tune_wandb.wandb_mixin(train_fn)
-        search_dict['wandb'] = {
-            "project": search_params.project_name,
-            "api_key_file": Path('~/.wandb_api_key').expanduser().resolve(),
-        }
-        tune_loggers += [tune_wandb.WandbLogger]
-        util_keys.append('wandb')
+
+    if not is_local_run:
+        tune_loggers.append(torch_helpers.TuneNeptuneLogger)
 
     # blocks until done
     print('loading or making data')

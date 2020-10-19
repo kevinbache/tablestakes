@@ -281,8 +281,10 @@ class RectTransformerModule(pl.LightningModule):
 
     def on_after_backward(self):
         if self.hp.num_steps_per_histogram_log and not (self.global_step + 1) % self.hp.num_steps_per_histogram_log:
+            # pass
+            d = {f'gradnorms/{k}': v for k, v in self.logger._flatten_dict(self.grad_norm(1)).items()}
             self.logger.log_metrics(
-                metrics={'grad_norms': self.grad_norm(1)},
+                metrics=d,
                 step=self.global_step,
             )
 

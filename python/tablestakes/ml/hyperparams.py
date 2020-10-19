@@ -102,7 +102,7 @@ class LearningParams(params.ParameterSet):
     experiment_tags = ['default', 'testing']
 
     num_cpus = 2
-    num_gpus = 0.5
+    num_gpus = 1
 
     seed = 42
 
