@@ -92,7 +92,7 @@ class TrapezoidConv1Module(pl.LightningModule):
         #############
         # emb
         if hp.do_include_embeddings:
-            self.embedder = nn.Embedding(self.num_vocab, self.hp.num_embedding_dim)
+            self.embedder = nn.Embedding(self.num_vocab, self.hp.num_embedding_base_dim)
 
         #############
         # conv
@@ -107,7 +107,7 @@ class TrapezoidConv1Module(pl.LightningModule):
         conv_layers = []
         prev_num_filters = hp.num_x_dims[0]
         if hp.do_include_embeddings:
-            prev_num_filters += hp.num_embedding_dim
+            prev_num_filters += hp.num_embedding_base_dim
 
         for conv_ind, num_filters in enumerate(num_conv_filters):
             conv_layers.append(

@@ -61,14 +61,14 @@ class RectTransformerModule(pl.LightningModule):
 
         num_basic_plus_embed_dims = num_x_basic_dims
         if hp.do_include_embeddings:
-            num_basic_plus_embed_dims += hp.num_embedding_dim
+            num_basic_plus_embed_dims += hp.num_embedding_base_dim
 
         remainder = num_basic_plus_embed_dims % hp.num_trans_heads
         if remainder:
             self.hp.num_extra_embedding_dim = hp.num_trans_heads - remainder
         else:
             self.hp.num_extra_embedding_dim = 0
-        self.hp.num_total_embedding_dim = self.hp.num_embedding_dim + self.hp.num_extra_embedding_dim
+        self.hp.num_total_embedding_dim = self.hp.num_embedding_base_dim + self.hp.num_extra_embedding_dim
         num_basic_plus_embed_dims += self.hp.num_extra_embedding_dim
         self.hp.num_basic_plus_embed_dims = num_basic_plus_embed_dims
 
@@ -145,6 +145,7 @@ class RectTransformerModule(pl.LightningModule):
                 num_layers=self.hp.num_head_blocks,
                 num_groups=self.hp.num_groups_for_gn,
                 num_blocks_per_residual=self.hp.num_head_blocks_per_resid,
+                do_include_first_norm=True,
             )
             for name, num_classes in self.num_y_classes.items()
         ])

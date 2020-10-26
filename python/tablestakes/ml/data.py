@@ -1,5 +1,6 @@
 import collections
 import glob
+import re
 from pathlib import Path
 from typing import *
 
@@ -60,27 +61,56 @@ class XYCsvDataset(Dataset):
             name = name.replace('.csv', '')
             d[this_file.parent][name] = this_file
         out = d.values()
-        lens = [len(e) for e in out]
-        assert cls.all_same(lens), f'Got mismatched numbers of input files in different directories.  Lens: {lens}'
+        # lens = [len(e) for e in out]
+        # assert cls.all_same(lens), f'Got mismatched numbers of input files in different directories.  Lens: {lens}'
         return out
 
     @staticmethod
-    def _read_csvs_from_dict(d: dict, remove_from_k: str):
-        return {k.replace(remove_from_k, ''): pd.read_csv(v) for k, v in d.items()}
+    def _read_csvs_from_dict(d: dict, key_to_base_name_fn: Callable[[str], str], df_postproc: Callable[[pd.DataFrame], pd.DataFrame]):
+        return {key_to_base_name_fn(k): df_postproc(pd.read_csv(v)) for k, v in d.items()}
 
     @staticmethod
     def _convert_dict_of_dfs_to_tensors(d: dict):
-        return {k: torch.tensor(v.values) for k, v in d.items()}
+        try:
+            return {k: torch.tensor(v.values) for k, v in d.items()}
+        except BaseException as e:
+            utils.print_dict(d)
+            raise e
 
     def __init__(
             self,
             data_dir: Union[Path, str],
             x_pattern=Path('**') / f'{X_PREFIX}*.csv',
             y_pattern=Path('**') / f'{Y_PREFIX}*.csv',
+            csv_filename_to_x_name: Optional[Callable[[str], str]] = None,
+            csv_filename_to_y_name: Optional[Callable[[str], str]] = None,
+            x_df_postproc: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
+            y_df_postproc: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
     ):
         self.data_dir = str(Path(data_dir))
         self.x_pattern = x_pattern
         self.y_pattern = y_pattern
+
+        drop_unnamed = lambda df: df.loc[:, ~df.columns.str.contains('^Unnamed')]
+        if x_df_postproc is None:
+            x_df_postproc = drop_unnamed
+        self._x_df_postproc = x_df_postproc
+
+        if y_df_postproc is None:
+            y_df_postproc = drop_unnamed
+        self._y_df_postproc = y_df_postproc
+
+        def _match_after_prefix(filename: str, prefix: str) -> str:
+            m = re.match(fr'.*{prefix}(\w+)$', filename)
+            return m.groups()[0]
+
+        if csv_filename_to_x_name is None:
+            csv_filename_to_x_name = lambda filename: _match_after_prefix(filename, X_PREFIX)
+        self._csv_filename_to_x_name = csv_filename_to_x_name
+
+        if csv_filename_to_y_name is None:
+            csv_filename_to_y_name = lambda filename: _match_after_prefix(filename, Y_PREFIX)
+        self._csv_filename_to_y_name = csv_filename_to_y_name
 
         self._x_filename_dicts = self._find_files(self.data_dir / self.x_pattern)
         self._y_filename_dicts = self._find_files(self.data_dir / self.y_pattern)
@@ -92,8 +122,16 @@ class XYCsvDataset(Dataset):
         df_dicts = []
         for x_filename_dict, y_filename_dict in zip(self._x_filename_dicts, self._y_filename_dicts):
             df_dicts.append((
-                self._read_csvs_from_dict(x_filename_dict, remove_from_k=X_PREFIX),
-                self._read_csvs_from_dict(y_filename_dict, remove_from_k=Y_PREFIX),
+                self._read_csvs_from_dict(
+                    x_filename_dict,
+                    key_to_base_name_fn=self._csv_filename_to_x_name,
+                    df_postproc=self._x_df_postproc,
+                ),
+                self._read_csvs_from_dict(
+                    y_filename_dict,
+                    key_to_base_name_fn=self._csv_filename_to_y_name,
+                    df_postproc=self._y_df_postproc,
+                ),
             ))
 
         self._datapoints = []
@@ -131,14 +169,15 @@ class XYCsvDataset(Dataset):
         self.__dict__.update(state)
 
 
-class TablestakesMeta:
+class TablestakesMetaCounts:
     def __init__(self, word_to_count, word_to_id, num_y_classes, **kwargs):
         self.word_to_count = word_to_count
         self.word_to_id = word_to_id
         self.num_y_classes = num_y_classes
         self._others = kwargs
 
-    def save(self, target_dir: Path):
+    def save(self, target_dir: utils.DirtyPath):
+        target_dir = Path(target_dir)
         utils.mkdir_if_not_exist(target_dir)
 
         metas_dict = {
@@ -182,40 +221,39 @@ class TablestakesDataset(XYCsvDataset):
     def __init__(
             self,
             docs_dir: Union[Path, str],
-            meta: Optional[TablestakesMeta] = None,
+            meta: Optional[TablestakesMetaCounts] = None,
             x_pattern: Path = Path('**') / f'{X_PREFIX}*.csv',
             y_pattern: Path = Path('**') / f'{Y_PREFIX}*.csv',
     ):
         super().__init__(docs_dir, x_pattern, y_pattern)
-        self.meta = meta or TablestakesMeta.from_metas_dir(self.get_default_meta_dir())
+        # self.meta = meta or TablestakesMetaCounts.from_metas_dir(self.get_default_meta_dir())
         self.docs_dir = self.data_dir
 
-    def get_num_vocab(self) -> int:
-        return len(self.word_to_id)
-
-    @classmethod
-    def get_meta_dir(cls, docs_dir: str) -> Path:
-        return Path(docs_dir) / constants.META_DIR_NAME
-
-    def get_default_meta_dir(self) -> Path:
-        return self.get_meta_dir(self.data_dir)
+    # def get_num_vocab(self) -> int:
+    #     return len(self.word_to_id)
+    #
+    # @classmethod
+    # def get_meta_dir(cls, docs_dir: str) -> Path:
+    #     return Path(docs_dir) / constants.META_DIR_NAME
+    #
+    # def get_default_meta_dir(self) -> Path:
+    #     return self.get_meta_dir(self.data_dir)
 
     def save(self, filename: str):
         utils.save_cloudpickle(filename, self)
 
     @classmethod
-    def load(self, filename: str):
-         return utils.load_cloudpickle(filename)
+    def load(cls, filename: str):
+        return utils.load_cloudpickle(filename)
 
-    def __getstate__(self):
-        d =  self.__dict__
-        d['meta'] = self.meta.__dict__
-        return d
-
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-        self.meta = TablestakesMeta.from_dict(state['meta'])
-
+    # def __getstate__(self):
+    #     d =  self.__dict__
+    #     d['meta'] = self.meta.__dict__
+    #     return d
+    #
+    # def __setstate__(self, state):
+    #     self.__dict__.update(state)
+    #     self.meta = TablestakesMetaCounts.from_dict(state['meta'])
 
 
 if __name__ == '__main__':

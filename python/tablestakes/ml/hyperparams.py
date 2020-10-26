@@ -5,29 +5,44 @@ import numpy as np
 
 from chillpill import params
 
-from tablestakes import constants, kv_styles
+from tablestakes import constants, kv_styles, utils
 from tablestakes import html_css as hc
+from tablestakes.ml import torch_helpers, param_torch_mods
 
 
 class LearningParams(params.ParameterSet):
-    def __init__(self, dataset_name: str, **kwargs):
+    def __init__(
+            self,
+            dataset_name: str,
+            docs_dir_base=constants.DOCS_DIR,
+            datasets_dir=constants.DATASETS_DIR,
+            **kwargs,
+    ):
         super().__init__(**kwargs)
-
         self.dataset_name = dataset_name
+        self.docs_dir_base = docs_dir_base
+        self.datasets_dir = datasets_dir
+
         self.docs_dir = None
         self.dataset_file = None
         self.update_files()
 
     def update_files(self):
-        self.docs_dir = constants.DOCS_DIR / self.dataset_name
-        self.dataset_file = constants.DATASETS_DIR / f'{self.dataset_name}.cloudpickle'
+        self.docs_dir = self.docs_dir_base / self.dataset_name
+        self.dataset_file = self.datasets_dir / f'{self.dataset_name}.cloudpickle'
 
-    ##############
-    # model
+    def get_batch_size(self):
+        return utils.pow2int(self.log2_batch_size)
+
+    # data
+
     #  embedder
-    num_embedding_dim = 12
     do_include_embeddings = True
+    num_embedding_base_dim = 64
     num_extra_embedding_dim = None
+    embed = param_torch_mods.BertEmbedder.Params()
+    embed.dim = None
+    embed.requires_grad = True
 
     #  transformer
     pre_trans_linear_dim = None
@@ -41,25 +56,34 @@ class LearningParams(params.ParameterSet):
     do_cat_x_base_before_fc = True
 
     #  fully connected
-    num_fc_blocks = 4
-    log2num_neurons_start = 5
-    log2num_neurons_end = 5
-    num_fc_blocks_per_resid = 2
+    # num_fc_blocks = 4
+    # log2num_neurons_start = 5
+    # log2num_neurons_end = 5
+    # num_fc_blocks_per_resid = 2
 
-    num_fc_layers_per_dropout = 10
-    # prob of dropping each unit
-    dropout_p = 0.5
+    fc = param_torch_mods.SlabNet.Params(
+        num_neurons=32,
+        num_layers=2,
+        num_groups=32,
+        num_blocks_per_residual=2,
+        do_include_first_norm=True,
+    )
+
+    # num_fc_layers_per_dropout = 10
+    # # prob of dropping each unit
+    # dropout_p = 0.5
 
     #  head_nets
-    num_head_blocks = 2
-    log2num_head_neurons = 4
-    num_head_blocks_per_resid = 1
+    # num_head_blocks = 2
+    # log2num_head_neurons = 4
+    # num_head_blocks_per_resid = 1
 
-    # https://arxiv.org/pdf/1803.08494.pdf
-    # paper default is 32
-    # optimal num channels for group is 16
-    # conv block maker will min this to num_neurons // 4
-    num_groups_for_gn = 32
+    heads = param_torch_mods.HeadedSlabNet.Params(
+        num_neurons=32,
+        num_layers=2,
+        num_groups=32,
+        num_blocks_per_residual=1,
+    )
 
     ##############
     # optimization
@@ -86,6 +110,8 @@ class LearningParams(params.ParameterSet):
     p_test = 0.1
     dataset_name = 'num=10_c145'
 
+    max_seq_length = int(np.power(2, 14))
+
     # for data loading
     num_workers = 4
 
@@ -107,18 +133,6 @@ class LearningParams(params.ParameterSet):
     num_gpus = 1
 
     seed = 42
-
-    @classmethod
-    def from_dict(cls, d: Dict):
-        hp = cls(dataset_name='dataset_file')
-        for k, v in d.items():
-            # TODO: don't cast array to int
-            if np.issubdtype(type(v), np.integer):
-                v = int(v)
-            elif np.issubdtype(type(v), np.floating):
-                v = float(v)
-            hp.__setattr__(k, v)
-        return hp
 
     def get_project_exp_name(self):
         return f'{self.project_name}_{self.experiment_name}'
@@ -167,7 +181,7 @@ class DocGenParams(params.ParameterSet):
 
 
 class DocPrepParams(params.ParameterSet):
-    min_count_to_keep_word = 2
+    min_count_to_keep_word = 4
 
 
 class DocSetParams(params.ParameterSet):

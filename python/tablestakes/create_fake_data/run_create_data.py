@@ -130,7 +130,7 @@ def join_and_create_vocab(
         modifiers=[
             df_modifiers.Tokenizer(),
             df_modifiers.CharCounter(),
-            df_modifiers.DetailedOtherCharCounter(),
+            # df_modifiers.DetailedOtherCharCounter(),
             df_modifiers.TokenPostProcessor(),
             vocabulizer,
         ],
@@ -146,20 +146,20 @@ def eliminate_rare_words_and_save_dfs(joined_df, this_doc_dir, rare_word_elimina
     joined_df = ray.get(joined_df)
 
     x_base_cols = [
-        ocr.TesseractOcrProvider.PAGE_NUM_COL_NAME,
-        ocr.OcrDfNames.LEFT,
-        ocr.OcrDfNames.RIGHT,
-        ocr.OcrDfNames.TOP,
-        ocr.OcrDfNames.BOTTOM,
-        ocr.OcrDfNames.CONFIDENCE,
-        color_matcher.WordColorMatcher.PAGE_HEIGHT_COL_NAME,
-        color_matcher.WordColorMatcher.PAGE_WIDTH_COL_NAME,
-        color_matcher.WordColorMatcher.NUM_PAGES_COL_NAME,
-        df_modifiers.RareWordEliminator.WORD_WAS_ELIMINATED_COL_NAME,
+        constants.ColNames.PAGE_NUM,
+        constants.ColNames.LEFT,
+        constants.ColNames.RIGHT,
+        constants.ColNames.TOP,
+        constants.ColNames.BOTTOM,
+        constants.ColNames.CONFIDENCE,
+        constants.ColNames.PAGE_WIDTH,
+        constants.ColNames.PAGE_HEIGHT,
+        constants.ColNames.NUM_PAGES,
     ]
-    x_base_cols += [c for c in joined_df.columns if c.startswith(df_modifiers.CharCounter.PREFIX)]
 
-    x_vocab_cols = [df_modifiers.RareWordEliminator.VOCAB_ID_COL_NAME]
+    x_base_cols += [c for c in joined_df.columns if c.startswith(constants.ColNames.CHAR_COUNT_PREFIX)]
+
+    x_vocab_cols = [constants.ColNames.TOKEN_ID]
 
     y_korv_cols = [
         etree_modifiers.SetIsKeyOnWordsModifier.KEY_NAME,
@@ -175,7 +175,7 @@ def eliminate_rare_words_and_save_dfs(joined_df, this_doc_dir, rare_word_elimina
         joined_df,
         [x_base_cols, x_vocab_cols, y_korv_cols, y_which_kv_cols],
         do_output_leftovers_df=True,
-        names=[
+        df_names=[
             constants.X_BASIC_NAME,
             constants.X_VOCAB_NAME,
             constants.Y_KORV_NAME,
@@ -278,7 +278,7 @@ if __name__ == '__main__':
             'which_kv': num_which_kv_classes,
         }
 
-        meta = data.TablestakesMeta(
+        meta = data.TablestakesMetaCounts(
             word_to_count=word_to_count,
             word_to_id=word_to_id,
             num_y_classes=num_y_classes,

@@ -2,6 +2,7 @@ import abc
 import pickle
 import json
 import os
+import unicodedata
 from pathlib import Path
 import time
 from typing import *
@@ -9,6 +10,7 @@ import xml.dom.minidom
 
 import cloudpickle
 import torch
+from glob2 import glob
 
 from lxml import etree
 from PIL import Image
@@ -56,48 +58,64 @@ def split_dict(dict_to_split: Dict, keys_for_first) -> Tuple[Dict, Dict]:
     return d1, d2
 
 
-def load_json(filename: str):
+def globster(p, *args, **kwargs):
+    return glob(str(p), *args, **kwargs)
+
+
+DirtyPath = Union[Path, str]
+
+
+def load_json(filename: DirtyPath):
     with open(filename, mode='r') as f:
         return json.load(f)
 
 
-def save_json(filename: str, json_obj: Any):
+def save_json(filename: DirtyPath, json_obj: Any):
     parent = Path(filename).parent.resolve()
     mkdir_if_not_exist(parent)
     with open(filename, mode='w') as f:
         return json.dump(json_obj, f, default=str)
 
 
-def load_txt(filename: str):
-    with open(filename, mode='r') as f:
+def load_txt(filename: DirtyPath, **kwargs):
+    with open(filename, mode='r', **kwargs) as f:
         return f.read()
 
 
-def save_txt(filename: str, txt: str):
+def load_btxt(filename: DirtyPath, **kwargs):
+    with open(filename, mode='rb', **kwargs) as f:
+        return f.read()
+
+
+def load_txt_dirty(filename: DirtyPath, **kwargs):
+    return str(load_btxt(filename, **kwargs), encoding='utf-8', errors='ignore')
+
+
+def save_txt(filename: DirtyPath, txt: str):
     parent = Path(filename).parent.resolve()
     mkdir_if_not_exist(parent)
     with open(filename, mode='w') as f:
         return f.write(txt)
 
 
-def load_pickle(filename: str):
+def load_pickle(filename: DirtyPath):
     with open(filename, mode='rb') as f:
         return pickle.load(f)
 
 
-def save_pickle(filename: str, obj: Any):
+def save_pickle(filename: DirtyPath, obj: Any):
     parent = Path(filename).parent.resolve()
     mkdir_if_not_exist(parent)
     with open(filename, mode='wb') as f:
         pickle.dump(obj, f)
 
 
-def load_cloudpickle(filename: str):
+def load_cloudpickle(filename: DirtyPath):
     with open(filename, mode='rb') as f:
         return cloudpickle.load(f)
 
 
-def save_cloudpickle(filename: str, obj: Any):
+def save_cloudpickle(filename: DirtyPath, obj: Any):
     parent = Path(filename).parent.resolve()
     mkdir_if_not_exist(parent)
     with open(filename, mode='wb') as f:
@@ -151,7 +169,7 @@ class Timer:
 
     def __exit__(self, *args):
         if self.do_print_outputs:
-           print(f'Timer{self.name_str} took {time.time() - self.t:2.3g} secs.')
+            print(f'Timer{self.name_str} took {time.time() - self.t:2.3g} secs.')
 
 
 def levenshtein(a: str, b: str):
@@ -253,14 +271,14 @@ def generate_unique_color_strings(num_colors: int) -> List[str]:
     return ['rgb({r}, {g}, {b})'.format(r=e[0], g=e[1], b=e[2]) for e in datapoint_by_color]
 
 
-def split_df_by_cols(df: pd.DataFrame, col_sets: List[List[str]], names=List[str], do_output_leftovers_df=True):
+def split_df_by_cols(df: pd.DataFrame, col_sets: List[List[str]], df_names=List[str], do_output_leftovers_df=True):
     if do_output_leftovers_df:
         # flat list
         used_cols = [col_name for col_set in col_sets for col_name in col_set]
         leftover_cols = [col_name for col_name in df.columns if col_name not in used_cols]
         col_sets.append(leftover_cols)
 
-    return {name: df[col_set].copy() for name, col_set in zip(names, col_sets)}
+    return {name: df[col_set].copy() for name, col_set in zip(df_names, col_sets)}
 
 
 def pow2int(num):
@@ -273,6 +291,14 @@ def get_logger_api_key():
 
 def get_neptune_fully_qualified_project_name(project_name):
     return f'{constants.NEPTUNE_USERNAME}/{project_name}'
+
+
+def unicode_norm(s):
+    return unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('ascii')
+
+
+def invert_list_of_lists(lol):
+    return list(zip(*lol))
 
 
 if __name__ == '__main__':

@@ -76,7 +76,7 @@ if __name__ == '__main__':
     ##############
     # model
     #  embedder
-    search_params.num_embedding_dim = params.Discrete([20, 20+16, 20+32])
+    search_params.num_embedding_base_dim = params.Discrete([20, 20 + 16, 20 + 32])
     search_params.do_include_embeddings = params.Boolean(p_true=0.9)
 
     #  transformer

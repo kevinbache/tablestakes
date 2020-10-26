@@ -1,7 +1,5 @@
 from pathlib import Path
 
-from tablestakes import utils
-
 WORD_ID_FILENAME = 'word_to_id.json'
 WORD_COUNT_FILENAME = 'word_to_count.json'
 NUM_Y_CLASSES_FILENAME = 'num_y_classes.json'
@@ -22,11 +20,10 @@ Y_KORV_BASE_NAME = 'korv'
 Y_WHICH_KV_BASE_NAME = 'which_kv'
 Y_KORV_NAME = Y_PREFIX + Y_KORV_BASE_NAME
 Y_WHICH_KV_NAME = Y_PREFIX + Y_WHICH_KV_BASE_NAME
-
 Y_BASE_NAMES = [Y_KORV_BASE_NAME, Y_WHICH_KV_BASE_NAME]
 
 X_PREFIX = 'x_'
-X_BASIC_BASE_NAME = 'basic'
+X_BASIC_BASE_NAME = 'basics'
 X_VOCAB_BASE_NAME = 'vocab'
 X_BASIC_NAME = X_PREFIX + X_BASIC_BASE_NAME
 X_VOCAB_NAME = X_PREFIX + X_VOCAB_BASE_NAME
@@ -37,3 +34,50 @@ LOGGER_API_KEY_FILE = str(Path.home() / '.logger_api_key')
 NEPTUNE_USERNAME = 'kevinbache'
 
 SOURCES_GLOB_STR = str(THIS_DIR / '**/*.py')
+
+
+class ColNames:
+    """DataFrame column names for input data matrices"""""
+
+    LEFT = 'left'
+    RIGHT = 'right'
+    TOP = 'top'
+    BOTTOM = 'bottom'
+    CONFIDENCE = 'confidence'
+
+    BBOX_NAMES = [LEFT, RIGHT, TOP, BOTTOM]
+
+    PAGE_NUM = 'page_num'
+    PAGE_WIDTH = 'page_width'
+    PAGE_HEIGHT = 'page_height'
+    NUM_PAGES = 'num_pages'
+
+    # the row index value from the raw ocr csv
+    RAW_OCR_INDEX = 'raw_ocr_index'
+
+    TEXT = 'text'
+    TOKEN_RAW = 'token_raw'
+    TOKEN = 'token'
+    TOKEN_ID = 'token_id'
+    TOKENIZER = 'tokenizer'
+    # ocr tokenizes to "text", then we further tokenize into "tokens".
+    # this tells us which tokens correspond to which original text items
+    ORIGINAL_TEXT_INDEX = 'original_text_index'
+    # WORD_WAS_ELIMINATED = 'was_removed_rare_token'
+
+    # CharCounter
+    CHAR_COUNT_PREFIX = 'num_chars_'
+    LOWER_COUNT = f'{CHAR_COUNT_PREFIX}lower'
+    UPPER_COUNT = f'{CHAR_COUNT_PREFIX}upper'
+    NUMBER_COUNT = f'{CHAR_COUNT_PREFIX}number'
+    OTHER_COUNT = f'{CHAR_COUNT_PREFIX}other'
+    TOTAL_COUNT = f'{CHAR_COUNT_PREFIX}total'
+    UNICODE_NORM_CHANGED_COUNT = f'{CHAR_COUNT_PREFIX}unicodechanged'
+    NONASCII_COUNT = f'{CHAR_COUNT_PREFIX}nonascii'
+
+    HAS_LEADING_ZERO = f'has_leading_zero'
+
+
+class SpecialTokens:
+    NUMBER = '<num>'
+    UNKNOWN = '<unk>'
