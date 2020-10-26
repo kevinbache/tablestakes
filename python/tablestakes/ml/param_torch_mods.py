@@ -2,7 +2,6 @@ import glob
 from argparse import Namespace
 from typing import *
 
-import glob2
 from tablestakes import utils
 from torch import nn as nn
 from torch.nn import functional as F
@@ -47,14 +46,13 @@ class SizedSequential(nn.Sequential):
 
 def resnet_conv1_block(
         num_input_features: int,
-        num_hidden_features: int,
+        num_output_features: int,
         num_gn_groups: int = 32,
         activation=nn.LeakyReLU,
         do_include_activation=True,
         do_include_group_norm=True,
         kernel_size=1,
         stride=1,
-        padding=0
 ):
     """activation, fc, groupnorm"""
     layers = OrderedDict()
@@ -65,13 +63,13 @@ def resnet_conv1_block(
 
     layers['conv'] = nn.Conv1d(
         in_channels=num_input_features,
-        out_channels=num_hidden_features,
+        out_channels=num_output_features,
         kernel_size=kernel_size,
         stride=stride,
-        padding=padding,
+        padding=kernel_size // 2,
     )
 
-    return SizedSequential(layers, num_output_features=num_hidden_features)
+    return SizedSequential(layers, num_output_features=num_output_features)
 
 
 class BertEmbedder(ParametrizedModule['BertEmbedder.Params']):
@@ -111,11 +109,14 @@ class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.Params']):
     """
 
     SKIP_SUFFIX = '_skip'
+    DROP_SUFFIX = '_drop'
     BLOCK_SUFFIX = ''
 
     class Params(params.ParameterSet):
         num_groups = 32
         num_blocks_per_residual = 2
+        num_blocks_per_dropout = 2
+        dropout_p = 0.5
         activation = nn.LeakyReLU
         do_include_first_norm = True
 
@@ -166,7 +167,7 @@ class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.Params']):
 
             block = resnet_conv1_block(
                 num_input_features=num_in,
-                num_hidden_features=num_hidden,
+                num_output_features=num_hidden,
                 num_gn_groups=self.hp.num_groups,
                 activation=self.hp.activation,
                 do_include_group_norm=do_include_norm,
@@ -181,6 +182,9 @@ class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.Params']):
                     layer = nn.Conv1d(prev_size, new_size, 1)
                 blocks[f'{block_ind}{self.SKIP_SUFFIX}'] = layer
                 prev_size = new_size
+
+            if (block_ind + 1) % self.hp.num_blocks_per_dropout == 0:
+                blocks[f'{block_ind}{self.DROP_SUFFIX }'] = nn.Dropout(self.hp.dropout_p)
 
         self.blocks = nn.ModuleDict(blocks)
 
@@ -208,12 +212,96 @@ class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.Params']):
         return self._num_output_features
 
 
+class ConvBlock(nn.Module, Parametrized['ConvBlock.Params']):
+    SKIP_SUFFIX = '_skip'
+
+    class Params(params.ParameterSet):
+        num_layers = 8
+        num_features = 32
+        kernel_size = 3
+        stride = 1
+        pool_size = 2
+        num_groups = 32
+        num_blocks_per_pool = 2
+        activation = nn.LeakyReLU
+        do_include_first_norm = True
+
+    def __init__(
+            self,
+            num_input_features: int,
+            hp: Optional[Params] = None,
+            do_error_if_group_div_off: bool = False,
+    ):
+        if hp is None:
+            hp = self.Params.default()
+
+        super().__init__()
+        self.hp = hp
+
+        all_counts = [num_input_features] + [self.hp.num_features] * self.hp.num_layers
+
+        # round up counts so they're group divisible
+        remainders = [count % self.hp.num_groups for count in all_counts]
+        if any(remainders) and do_error_if_group_div_off:
+            raise ValueError(
+                f"Number of neurons ({all_counts}) must be divisible by number of groups ({self.hp.num_groups})")
+
+        # neurons which are added to each layer to ensure that layer sizes are divisible by num_groups
+        self._extra_counts = [self.hp.num_groups - r if r else 0 for r in remainders]
+
+        all_counts = [c + e for c, e in zip(all_counts, self._extra_counts)]
+
+        blocks = OrderedDict()
+        num_prev_features = all_counts[0]
+        self._num_output_features = all_counts[-1]
+        for block_ind, num_features in enumerate(all_counts[1:]):
+            blocks[f'{block_ind}'] = resnet_conv1_block(
+                num_input_features=num_prev_features,
+                num_output_features=num_features,
+                num_gn_groups=self.hp.num_groups,
+                activation=self.hp.activation,
+                kernel_size=self.hp.kernel_size,
+                stride=self.hp.stride,
+            )
+            num_prev_features = num_features
+            if (block_ind + 1) % self.hp.num_blocks_per_pool == 0:
+                blocks[f'{block_ind}_pool'] = nn.MaxPool1d(kernel_size=self.hp.pool_size)
+                if num_prev_features != num_features:
+                    blocks[f'{block_ind}{self.SKIP_SUFFIX}'] = nn.Conv1d(num_features, num_prev_features, kernel_size=1)
+
+        self.blocks = nn.ModuleDict(blocks)
+
+    def forward(self, x):
+        if self._extra_counts[0] > 0:
+            old_x = F.pad(x, pad=(0, 0, 0, self._extra_counts[0]), mode='constant', value=0)
+        else:
+            old_x = x
+
+        for extra_count, (name, block) in zip(self._extra_counts, self.blocks.items()):
+            if extra_count > 0:
+                x = F.pad(x, pad=(0, 0, 0, extra_count), mode='constant', value=0)
+
+            if name.endswith(self.SKIP_SUFFIX):
+                # this block is a resizer for the skip connection
+                x += block(old_x)
+                old_x = x
+            else:
+                x = block(x)
+
+        return x
+
+    def get_num_output_features(self):
+        return self._num_output_features
+
+
 class SlabNet(FullyConv1Resnet):
     class Params(FullyConv1Resnet.Params):
         num_neurons = 32
         num_layers = 4
         num_groups = 32
         num_blocks_per_residual = 2
+        num_blocks_per_dropout = 2
+        dropout_p = 0.5
         activation = nn.LeakyReLU
         do_include_first_norm = True
 

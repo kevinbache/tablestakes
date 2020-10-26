@@ -31,13 +31,15 @@ def artless_smash(input: torch.Tensor) -> torch.Tensor:
     """
     means = torch.mean(input, dim=1, keepdim=True)
     vars = torch.var(input, dim=1, keepdim=True)
-    l1s = torch.abs(input - means).mean(dim=1, keepdim=True)
+    l1s = torch.norm(input, p=1, dim=1, keepdim=True)
+    l2s = torch.norm(input, p=2, dim=1, keepdim=True)
+    lse = torch.logsumexp(input, dim=1, keepdim=True)
 
     maxs = torch.max(input, dim=1, keepdim=True)[0]
     mins = torch.min(input, dim=1, keepdim=True)[0]
     medians = torch.median(input, dim=1, keepdim=True)[0]
 
-    return torch.cat((means, vars, l1s, maxs, mins, medians), dim=1).view(input.shape[0], 1, -1)
+    return torch.cat((means, vars, l1s, l2s, lse, maxs, mins, medians), dim=1).view(input.shape[0], 1, -1)
 
 
 class ArtlessSmasher(nn.Module):
@@ -45,11 +47,12 @@ class ArtlessSmasher(nn.Module):
         super().__init__()
         self.num_input_channels = num_input_channels
 
-    def forward(self, x):
+    @staticmethod
+    def forward(x):
         return artless_smash(x)
 
-    def get_num_output_dims(self):
-        return 6 * self.num_input_channels
+    def get_num_output_features(self):
+        return 8 * self.num_input_channels
 
 
 # class ReachAroundTransformer(nn.Module):
