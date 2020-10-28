@@ -1,25 +1,26 @@
-import abc
-import pickle
+from typing import List
+
+import ray
+from glob2 import glob
 import json
 import os
-import unicodedata
 from pathlib import Path
+import pickle
 import time
 from typing import *
+import unicodedata
 import xml.dom.minidom
 
-import cloudpickle
-import torch
-from glob2 import glob
-
 from lxml import etree
+import cloudpickle
 from PIL import Image
-from matplotlib.image import imread
+import pdf2image
+
 import numpy as np
 import pandas as pd
-import pdf2image
+from matplotlib.image import imread
+
 from tablestakes import constants
-from torch.utils.data import Dataset
 
 StrDict = Dict[str, Union[str, int, float]]
 
@@ -313,3 +314,15 @@ if __name__ == '__main__':
 
 def one_hot_to_categorical(df: pd.DataFrame, col_name) -> pd.DataFrame:
     return pd.DataFrame(np.argmax(df.values, axis=-1).astype(np.int), columns=[col_name])
+
+
+def ray_prog_bar(obj_refs: List[ray.ObjectRef]):
+    import tqdm
+
+    def to_iterator(obj_refs):
+        while obj_refs:
+            done, obj_refs = ray.wait(obj_refs)
+            yield ray.get(done[0])
+
+    for _ in tqdm.tqdm(to_iterator(obj_refs), total=len(obj_refs)):
+        pass

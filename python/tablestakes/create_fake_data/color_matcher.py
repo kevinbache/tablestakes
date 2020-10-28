@@ -1,7 +1,8 @@
 from pathlib import Path
 from typing import List, Union, Dict
 
-from tablestakes import ocr, utils, etree_modifiers
+from tablestakes import utils, constants
+from tablestakes.create_fake_data import etree_modifiers
 
 import numpy as np
 import pandas as pd
@@ -10,21 +11,17 @@ import pandas as pd
 class WordColorMatcher:
     """Matches ocr words to true words via parallel color lookup images"""
 
-    PAGE_WIDTH_COL_NAME = 'page_width'
-    PAGE_HEIGHT_COL_NAME = 'page_height'
-    NUM_PAGES_COL_NAME = 'num_pages'
-
     @classmethod
     def get_colors_under_word(cls, colored_page_image_arrays: List[np.ndarray], row: pd.Series):
         """row from the ocr df (ocr.csv) representing a word and including fields for page_num, LRTB"""
-        page_num = row[ocr.TesseractOcrProvider.PAGE_NUM_COL_NAME]
+        page_num = row[constants.ColNames.PAGE_NUM]
         if page_num > len(colored_page_image_arrays):
             raise ValueError(f"page_num: {page_num}, len(page_image_arrays): {len(colored_page_image_arrays)}")
 
         page = colored_page_image_arrays[page_num]
 
-        word_slice = page[row[ocr.TesseractOcrDfFactory.TOP]:row[ocr.TesseractOcrDfFactory.BOTTOM], :]
-        word_slice = word_slice[:, row[ocr.TesseractOcrDfFactory.LEFT]:row[ocr.TesseractOcrDfFactory.RIGHT]]
+        word_slice = page[row[constants.ColNames.TOP]:row[constants.ColNames.BOTTOM], :]
+        word_slice = word_slice[:, row[constants.ColNames.LEFT]:row[constants.ColNames.RIGHT]]
 
         return {
             'median': np.median(word_slice, axis=(0, 1)),
@@ -94,13 +91,12 @@ class WordColorMatcher:
         ocr_df[CLOSEST_WORD_ID] = word_ids
         ocr_df[CLOSEST_DIST] = dists
 
-        PAGE_NUM_COL_NAME = ocr.TesseractOcrProvider.PAGE_NUM_COL_NAME
         for page_num, page_array in enumerate(colored_page_image_arrays):
-            this_page_rows_selector = ocr_df[PAGE_NUM_COL_NAME] == page_num
-            ocr_df.loc[this_page_rows_selector, [cls.PAGE_HEIGHT_COL_NAME, cls.PAGE_WIDTH_COL_NAME]] = \
+            this_page_rows_selector = ocr_df[constants.ColNames.PAGE_NUM] == page_num
+            ocr_df.loc[this_page_rows_selector, [constants.ColNames.PAGE_HEIGHT, constants.ColNames.PAGE_WIDTH]] = \
                 int(page_array.shape[0]), int(page_array.shape[1])
 
-        ocr_df[cls.NUM_PAGES_COL_NAME] = len(colored_page_image_arrays)
+        ocr_df[constants.ColNames.NUM_PAGES] = len(colored_page_image_arrays)
 
         joined_df = pd.merge(
             ocr_df,

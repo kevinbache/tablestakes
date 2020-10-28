@@ -1,7 +1,7 @@
 import collections
 import glob
-import re
 from pathlib import Path
+import re
 from typing import *
 
 import pandas as pd
@@ -27,16 +27,8 @@ class XYCsvDataset(Dataset):
             x.csv
             x_2.csv
             y.csv
-        meta
-            num_y_classes.json
-            word_to_count.json
-            word_to_id.json
     """
     DATAPOINT_DIR_NAME = '*'
-
-    @staticmethod
-    def all_same(x: List):
-        return all(e == x[0] for e in x)
 
     @classmethod
     def _find_files_matching_patterns(cls, data_dir: Union[Path, str], patterns: List[str]):
@@ -61,8 +53,6 @@ class XYCsvDataset(Dataset):
             name = name.replace('.csv', '')
             d[this_file.parent][name] = this_file
         out = d.values()
-        # lens = [len(e) for e in out]
-        # assert cls.all_same(lens), f'Got mismatched numbers of input files in different directories.  Lens: {lens}'
         return out
 
     @staticmethod
@@ -168,77 +158,6 @@ class XYCsvDataset(Dataset):
     def __setstate__(self, state):
         self.__dict__.update(state)
 
-
-class TablestakesMetaCounts:
-    def __init__(self, word_to_count, word_to_id, num_y_classes, **kwargs):
-        self.word_to_count = word_to_count
-        self.word_to_id = word_to_id
-        self.num_y_classes = num_y_classes
-        self._others = kwargs
-
-    def save(self, target_dir: utils.DirtyPath):
-        target_dir = Path(target_dir)
-        utils.mkdir_if_not_exist(target_dir)
-
-        metas_dict = {
-            'word_to_count': self.word_to_count,
-            'word_to_id': self.word_to_id,
-            'num_y_classes': self.num_y_classes,
-            **self._others,
-        }
-
-        for meta_name, meta_obj in metas_dict.items():
-            utils.save_json(target_dir / f'{meta_name}.json', meta_obj)
-
-    @classmethod
-    def from_metas_dir(cls, docs_dir: Path):
-        meta_dir = TablestakesDataset.get_meta_dir(docs_dir)
-
-        metas_dict = {
-            meta_name: utils.load_json(meta_dir / f'{meta_name}.json')
-            for meta_name in ['word_to_count', 'word_to_id', 'num_y_classes']
-        }
-        return cls(**metas_dict)
-
-    @classmethod
-    def from_metas_dict(cls, metas_dict: Dict[str, Union[Dict, List, str, int, float]]):
-        return cls(**metas_dict)
-
-    @classmethod
-    def from_dict(cls, d):
-        o = cls({}, {}, {})
-        o.__dict__.update(d)
-        return o
-
-    def __getstate__(self):
-        return self.__dict__
-
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-
-
-class TablestakesDataset(XYCsvDataset):
-    def __init__(
-            self,
-            docs_dir: Union[Path, str],
-            meta: Optional[TablestakesMetaCounts] = None,
-            x_pattern: Path = Path('**') / f'{X_PREFIX}*.csv',
-            y_pattern: Path = Path('**') / f'{Y_PREFIX}*.csv',
-    ):
-        super().__init__(docs_dir, x_pattern, y_pattern)
-        # self.meta = meta or TablestakesMetaCounts.from_metas_dir(self.get_default_meta_dir())
-        self.docs_dir = self.data_dir
-
-    # def get_num_vocab(self) -> int:
-    #     return len(self.word_to_id)
-    #
-    # @classmethod
-    # def get_meta_dir(cls, docs_dir: str) -> Path:
-    #     return Path(docs_dir) / constants.META_DIR_NAME
-    #
-    # def get_default_meta_dir(self) -> Path:
-    #     return self.get_meta_dir(self.data_dir)
-
     def save(self, filename: str):
         utils.save_cloudpickle(filename, self)
 
@@ -246,14 +165,14 @@ class TablestakesDataset(XYCsvDataset):
     def load(cls, filename: str):
         return utils.load_cloudpickle(filename)
 
-    # def __getstate__(self):
-    #     d =  self.__dict__
-    #     d['meta'] = self.meta.__dict__
-    #     return d
-    #
-    # def __setstate__(self, state):
-    #     self.__dict__.update(state)
-    #     self.meta = TablestakesMetaCounts.from_dict(state['meta'])
+
+class TablestakesDataset(XYCsvDataset):
+    def __init__(
+            self,
+            docs_dir: Union[Path, str],
+    ):
+        super().__init__(docs_dir)
+        self.docs_dir = self.data_dir
 
 
 if __name__ == '__main__':

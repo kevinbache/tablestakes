@@ -1,5 +1,4 @@
 import abc
-import html
 
 import copy
 from functools import partial
@@ -10,7 +9,8 @@ import pandas as pd
 from lxml.cssselect import CSSSelector
 from lxml import etree
 
-from tablestakes import html_css as hc, utils
+from tablestakes import utils, constants
+from tablestakes.create_fake_data import html_css as hc
 
 
 class EtreeModifier(abc.ABC):
@@ -198,7 +198,7 @@ class ConvertParentClassNamesToWordAttribsModifier(EtreeModifier):
 
     # prefix assigned to parent class names when they're set on each word.
     # currenttly, this class is being used to propagate the id of the kv that this word came from so name it for that.
-    TAG_PREFIX = 'kv_is_'
+    TAG_PREFIX = constants.TAG_PREFIX
 
     def __init__(self):
         self._seen_parent_classes = []

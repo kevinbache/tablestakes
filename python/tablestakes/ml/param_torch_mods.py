@@ -2,15 +2,17 @@ import glob
 from argparse import Namespace
 from typing import *
 
-from tablestakes import utils
 from torch import nn as nn
 from torch.nn import functional as F
-from chillpill import params
 
 import transformers
 
 import pytorch_lightning as pl
 from pytorch_lightning import loggers as pl_loggers
+
+from chillpill import params
+
+from tablestakes import utils
 
 
 PS = TypeVar('PS', bound=params.ParameterSet)
@@ -134,10 +136,8 @@ class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.Params']):
             num_input_features: int,
             neuron_counts: List[int],
             do_error_if_group_div_off=False,
-            hp: Optional[Params] = None,
+            hp: Optional[Params] = Params(),
     ):
-        if hp is None:
-            hp = self.Params.default()
 
         super().__init__(hp)
         self.neuron_counts = neuron_counts
@@ -233,7 +233,7 @@ class ConvBlock(nn.Module, Parametrized['ConvBlock.Params']):
             do_error_if_group_div_off: bool = False,
     ):
         if hp is None:
-            hp = self.Params.default()
+            hp = self.Params()
 
         super().__init__()
         self.hp = hp
@@ -318,7 +318,7 @@ class SlabNet(FullyConv1Resnet):
     def __init__(
             self,
             num_input_features: int,
-            hp: Params = Params.default(),
+            hp: Params = Params(),
     ):
         super().__init__(
             num_input_features=num_input_features,
@@ -334,7 +334,7 @@ class HeadedSlabNet(SlabNet):
             self,
             num_input_features: int,
             num_output_features: int,
-            hp: Optional[SlabNet.Params] = SlabNet.Params.default(),
+            hp: Optional[SlabNet.Params] = SlabNet.Params(),
     ):
         super().__init__(
             num_input_features=num_input_features,

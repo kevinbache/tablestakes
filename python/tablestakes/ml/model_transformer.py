@@ -41,11 +41,11 @@ class RectTransformerModule(pl.LightningModule):
         self.hp.num_vocab = len(self.word_to_id)
 
         num_example_words = 200
-        num_x_basic_dims = self.ds.num_x_dims[constants.X_BASIC_BASE_NAME]
+        num_x_basic_dims = self.ds.num_x_dims[constants.X_BASE_BASE_NAME]
         num_x_vocab_dims = self.ds.num_x_dims[constants.X_VOCAB_BASE_NAME]
 
         self.example_input_array = {
-            constants.X_BASIC_BASE_NAME: torch.tensor(np.random.rand(1, num_example_words, num_x_basic_dims)).float(),
+            constants.X_BASE_BASE_NAME: torch.tensor(np.random.rand(1, num_example_words, num_x_basic_dims)).float(),
             constants.X_VOCAB_BASE_NAME: torch.tensor(np.random.rand(1, num_example_words, num_x_vocab_dims)).long(),
         }
 
@@ -57,7 +57,7 @@ class RectTransformerModule(pl.LightningModule):
         #############
         # expand embedding_dim so that embedding_dim + meta_dim is divisible by hp.num_trans_heads
         # (attention requirement)
-        num_x_basic_dims = self.hp.num_x_dims[constants.X_BASIC_BASE_NAME]
+        num_x_basic_dims = self.hp.num_x_dims[constants.X_BASE_BASE_NAME]
 
         num_basic_plus_embed_dims = num_x_basic_dims
         if hp.do_include_embeddings:
@@ -350,7 +350,7 @@ class RectTransformerModule(pl.LightningModule):
         xs = {k: [d[k] for d in xs] for k in xs[0]}
         ys = {k: [d[k] for d in ys] for k in ys[0]}
 
-        xs[constants.X_BASIC_BASE_NAME][0] = xs[constants.X_BASIC_BASE_NAME][0].float()
+        xs[constants.X_BASE_BASE_NAME][0] = xs[constants.X_BASE_BASE_NAME][0].float()
         xs[constants.X_VOCAB_BASE_NAME][0] = xs[constants.X_VOCAB_BASE_NAME][0].long()
         ys[constants.Y_KORV_BASE_NAME][0] = ys[constants.Y_KORV_BASE_NAME][0].long()
         ys[constants.Y_WHICH_KV_BASE_NAME][0] = ys[constants.Y_WHICH_KV_BASE_NAME][0].long()

@@ -23,9 +23,9 @@ Y_WHICH_KV_NAME = Y_PREFIX + Y_WHICH_KV_BASE_NAME
 Y_BASE_NAMES = [Y_KORV_BASE_NAME, Y_WHICH_KV_BASE_NAME]
 
 X_PREFIX = 'x_'
-X_BASIC_BASE_NAME = 'basics'
+X_BASE_BASE_NAME = 'base'
 X_VOCAB_BASE_NAME = 'vocab'
-X_BASIC_NAME = X_PREFIX + X_BASIC_BASE_NAME
+X_BASE_NAME = X_PREFIX + X_BASE_BASE_NAME
 X_VOCAB_NAME = X_PREFIX + X_VOCAB_BASE_NAME
 
 META_DIR_NAME = 'meta'
@@ -35,6 +35,9 @@ NEPTUNE_USERNAME = 'kevinbache'
 
 SOURCES_GLOB_STR = str(THIS_DIR / '**/*.py')
 
+# prefix assigned to parent class names when they're set on each word.
+# currenttly, this class is being used to propagate the id of the kv that this word came from so name it for that.
+TAG_PREFIX = 'kv_is_'
 
 class ColNames:
     """DataFrame column names for input data matrices"""""
@@ -77,7 +80,20 @@ class ColNames:
 
     HAS_LEADING_ZERO = f'has_leading_zero'
 
+    CHAR_COUNT_COLS = [
+        LOWER_COUNT,
+        UPPER_COUNT,
+        NUMBER_COUNT,
+        OTHER_COUNT,
+        TOTAL_COUNT,
+        UNICODE_NORM_CHANGED_COUNT,
+        NONASCII_COUNT,
+        HAS_LEADING_ZERO,
+    ]
 
-class SpecialTokens:
-    NUMBER = '<num>'
-    UNKNOWN = '<unk>'
+
+# class SpecialTokens:
+#     NUMBER = '<num>'
+#     UNKNOWN = '<unk>'
+
+

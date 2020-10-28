@@ -1,6 +1,5 @@
 import abc
 import collections
-import unicodedata
 from typing import List, Dict
 import re
 
@@ -10,7 +9,7 @@ import pandas as pd
 
 import ray
 
-from tablestakes import ocr, utils, constants
+from tablestakes import utils, constants
 
 from transformers import BertTokenizerFast
 
@@ -66,6 +65,10 @@ class CharCounter(DfModifier):
 
         df.loc[:, constants.ColNames.NONASCII_COUNT] = \
             df.apply(lambda row: sum(c not in self.ASCII_CHARS for c in row[constants.ColNames.TOKEN_RAW]), axis=1)
+
+        df.loc[:, constants.ColNames.LOWER_COUNT] = \
+            df.apply(lambda row: sum(c.islower() for c in row[constants.ColNames.TOKEN_RAW]), axis=1)
+        totals += df[constants.ColNames.LOWER_COUNT].copy()
 
         df.loc[:, constants.ColNames.UPPER_COUNT] = \
             df.apply(lambda row: sum(c.isupper() for c in row[constants.ColNames.TOKEN_RAW]), axis=1)
@@ -277,6 +280,7 @@ class MyBertTokenizer(DfModifier):
         non_nan_rows = df[constants.ColNames.TEXT].isna().apply(lambda x: not x)
         df = df[non_nan_rows].copy()
 
+        # throw out rows with bad data
         keep_rows = df[constants.ColNames.TEXT].apply(lambda t: re.match(r'\s+', t) is None and t != '')
         df = df[keep_rows].copy()
 

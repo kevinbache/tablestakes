@@ -1,6 +1,7 @@
 import random
 
-from tablestakes import creators, kv_styles, html_css as hc, utils
+from tablestakes import utils
+from tablestakes.create_fake_data import kv_styles, html_css as hc, creators
 from tablestakes.ml.hyperparams import DocGenParams
 
 
@@ -8,7 +9,7 @@ def make_doc(
         seed: int,
         doc_config: DocGenParams,
 ) -> hc.Document:
-    utils.set_seed(seed)
+    utils.set_seeds(seed)
 
     doc_config = doc_config.sample()
     assert isinstance(doc_config, DocGenParams) # for pycharm autocomplete

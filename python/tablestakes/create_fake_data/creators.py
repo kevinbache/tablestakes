@@ -6,8 +6,8 @@ from faker.providers import internet, phone_number
 
 import numpy as np
 
-from tablestakes import chunks, kv, utils
-from tablestakes import html_css as hc
+from tablestakes import utils
+from tablestakes.create_fake_data import kv, html_css as hc
 
 
 class Creator(abc.ABC):
@@ -393,22 +393,6 @@ if __name__ == '__main__':
 
     kvcssc = KvCssCreator(kv.KLoc.A)
     doc.add_style(kvcssc())
-
-    global_css_creator = ParallelCreators(
-        creators=[
-            CssProbCreator(chunks.Keys.bold, prob=2. / 3),
-            CssProbCreator(chunks.Keys.add_colon, prob=0.5),
-            ChoiceCreator({
-                chunks.Body.font_sans_serif: 1. / 3,
-                chunks.Body.font_serif: 1. / 3,
-                chunks.Body.font_mono: 1. / 3,
-            }),
-        ],
-        combiner=CssCombiner(),
-    )
-
-    global_css = global_css_creator()
-    doc.add_style(global_css)
 
     print(str(doc))
     hc.open_html_str(str(doc))

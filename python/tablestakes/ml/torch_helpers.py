@@ -138,7 +138,7 @@ TIME_PROCESS_NAME = 'train_time_process'
 #     @staticmethod
 #     def _count_params(pl_module):
 #         return sum(p.numel() for p in pl_module.parameters() if p.requires_grad)
-#c
+#
 #     def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
 #         d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
 #         d[CURRENT_EPOCH_NAME] = trainer.current_epoch

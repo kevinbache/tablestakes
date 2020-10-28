@@ -1,3 +1,7 @@
+
+
+
+
 new macbook cpu
 batch size = 32 (isn't accum)
 
