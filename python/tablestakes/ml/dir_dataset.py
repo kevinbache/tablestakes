@@ -33,10 +33,8 @@ class FileReference:
 
 DirtyReference = Union[FileReference, Path, str]
 
-
 FileSelectorFn = Callable[[FileReference], bool]
 FileHandlerFn = Callable[[FileReference], Any]
-
 
 T = TypeVar('T')
 
@@ -72,6 +70,7 @@ class RayExtHandler(RayFileHandler[pd.DataFrame]):
     def __init__(self, ext: str, remote_handle_fn: remote_function.RemoteFunction):
         def _ext_eq(f: FileReference):
             return f.ext == self.ext
+
         super().__init__(should_handle_fn=_ext_eq, remote_handle_fn=remote_handle_fn)
         self.ext = ext
 
@@ -210,4 +209,3 @@ def wait_for_dir_crawl_outs(outs: Dict[str, Union[ray.ObjectRef, Any]]):
         return ray.get(refs)
     else:
         return refs
-

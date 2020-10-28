@@ -20,6 +20,7 @@ PS = TypeVar('PS', bound=params.ParameterSet)
 
 class Parametrized(Generic[PS]):
     def __init__(self, hp: PS):
+        super().__init__()
         self.hp = hp
 
 
@@ -74,7 +75,7 @@ def resnet_conv1_block(
     return SizedSequential(layers, num_output_features=num_output_features)
 
 
-class BertEmbedder(ParametrizedModule['BertEmbedder.Params']):
+class BertEmbedder(ParametrizedModule['BertEmbedder.DataParams']):
     class Params(params.ParameterSet):
         dim = 64
         max_seq_len = 1024
@@ -102,7 +103,7 @@ class BertEmbedder(ParametrizedModule['BertEmbedder.Params']):
         return self.e.forward(x)
 
 
-class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.Params']):
+class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.DataParams']):
     """
     Would be a normal resnet but I don't want to force a known input size input size constant.
 
@@ -123,7 +124,7 @@ class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.Params']):
         do_include_first_norm = True
 
         @classmethod
-        def search_default(cls) -> "FullyConv1Resnet.Params":
+        def search_default(cls) -> "FullyConv1Resnet.DataParams":
             return cls(
                 num_groups=params.Discrete([8, 16, 32, 64]),
                 num_blocks_per_residual=params.Integer(1, 5),
@@ -212,7 +213,7 @@ class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.Params']):
         return self._num_output_features
 
 
-class ConvBlock(nn.Module, Parametrized['ConvBlock.Params']):
+class ConvBlock(nn.Module, Parametrized['ConvBlock.DataParams']):
     SKIP_SUFFIX = '_skip'
 
     class Params(params.ParameterSet):
@@ -306,7 +307,7 @@ class SlabNet(FullyConv1Resnet):
         do_include_first_norm = True
 
         @classmethod
-        def search_default(cls) -> "SlabNet.Params":
+        def search_default(cls) -> "SlabNet.DataParams":
             return cls(
                 num_neurons=params.Categorical([16, 32, 64, 128, 256]),
                 num_layers=params.Integer(1, 5),

@@ -3,8 +3,6 @@ from pathlib import Path
 from typing import *
 
 import ray
-from tablestakes import utils
-from tablestakes.ml import data as ts_data
 
 T = TypeVar('T')
 
@@ -48,17 +46,3 @@ class RayLoadMaker(LoadMaker, abc.ABC, Generic[T]):
     def _makesave(self, *args, **kwargs) -> T:
         pass
 
-
-class TablestakesDatasetLoadMaker(LoadMaker[ts_data.TablestakesDataset]):
-    def __init__(self, saved_dataset_file: str, input_docs_directory_for_maker: str):
-        super().__init__([saved_dataset_file])
-        self.input_docs_directory_for_maker = input_docs_directory_for_maker
-
-    def _load(self) -> ts_data.TablestakesDataset:
-        return utils.load_cloudpickle(self.files_to_check[0])
-
-    @ray.remote
-    def _makesave(self, *args, **kwargs) -> ts_data.TablestakesDataset:
-        ds = ts_data.TablestakesDataset(self.input_docs_directory_for_maker)
-        utils.save_cloudpickle(self.files_to_check[0], ds)
-        return ds

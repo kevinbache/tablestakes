@@ -55,7 +55,7 @@ class ArtlessSmasher(nn.Module):
         return 8 * self.num_input_channels
 
 
-# class ReachAroundTransformer(nn.Module):
+# class ReachAroundEncoder(nn.Module):
 #     """x_base and x_vocab are inputs to the transformer and a raw x_base is also appended to the output"""
 #     def __init__(self, blah):
 #         super().__init__()
@@ -172,6 +172,8 @@ class CounterTimerCallback(pl.Callback):
         return sum(p.numel() for p in pl_module.parameters() if p.requires_grad)
 
     def on_fit_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule, ):
+        if trainer.logger is None:
+            return
         d = {
             PARAM_COUNT_NAME: self._count_params(pl_module),
             TRAINABLE_PARAM_COUNT_NAME: self._count_trainable_params(pl_module),
@@ -183,6 +185,8 @@ class CounterTimerCallback(pl.Callback):
         self._train_start_process = time.process_time()
 
     def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
+        if trainer.logger is None:
+            return
         d = {
             TIME_PERF_NAME: time.perf_counter() - self._train_start_perf,
             TIME_PROCESS_NAME: time.process_time() - self._train_start_process,
@@ -193,7 +197,9 @@ class CounterTimerCallback(pl.Callback):
 class BetterAccuracy(pl.metrics.Accuracy):
     """PyTorch Lightning's += lines cause warnings about transferring lots of scalars between cpu / gpu"""
     def update(self, preds: torch.Tensor, target: torch.Tensor):
-        preds, target = self._input_format(preds, target)
+        print("torch_helpers.BetterAccuracy preds target shapes:", preds.shape, target.shape)
+        # preds, target = self._input_format(preds, target)
+        preds = preds.argmax(dim=2)
         assert preds.shape == target.shape,  f"preds.shape: {preds.shape}, target.shape: {target.shape}"
         self.correct = self.correct + torch.sum(preds.eq(target))
         self.total = self.total + target.numel()

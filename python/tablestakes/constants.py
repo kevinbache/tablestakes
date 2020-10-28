@@ -40,6 +40,9 @@ SOURCES_GLOB_STR = str(THIS_DIR / '**/*.py')
 TAG_PREFIX = 'kv_is_'
 
 
+Y_VALUE_TO_IGNORE = -100
+
+
 class ColNames:
     """DataFrame column names for input data matrices"""""
 

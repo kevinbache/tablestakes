@@ -39,7 +39,7 @@
 #     do_include_embeddings = True
 #     num_embedding_base_dim = 64
 #     num_extra_embedding_dim = None
-#     # embed = param_torch_mods.BertEmbedder.Params()
+#     # embed = param_torch_mods.BertEmbedder.DataParams()
 #     # embed.dim = None
 #     # embed.requires_grad = True
 #
@@ -60,7 +60,7 @@
 #     # log2num_neurons_end = 5
 #     # num_fc_blocks_per_resid = 2
 #
-#     # fc = param_torch_mods.SlabNet.Params(
+#     # fc = param_torch_mods.SlabNet.DataParams(
 #     #     num_neurons=32,
 #     #     num_layers=2,
 #     #     num_groups=32,
@@ -77,7 +77,7 @@
 #     # log2num_head_neurons = 4
 #     # num_head_blocks_per_resid = 1
 #
-#     # heads = param_torch_mods.HeadedSlabNet.Params(
+#     # heads = param_torch_mods.HeadedSlabNet.DataParams(
 #     #     num_neurons=32,
 #     #     num_layers=2,
 #     #     num_groups=32,
@@ -261,7 +261,7 @@ class LearningParams(params.ParameterSet):
     do_include_embeddings = True
     num_embedding_base_dim = 64
     num_extra_embedding_dim = None
-    # embed = param_torch_mods.BertEmbedder.Params()
+    # embed = param_torch_mods.BertEmbedder.DataParams()
     # embed.dim = None
     # embed.requires_grad = True
 
@@ -282,7 +282,7 @@ class LearningParams(params.ParameterSet):
     # log2num_neurons_end = 5
     # num_fc_blocks_per_resid = 2
 
-    # fc = param_torch_mods.SlabNet.Params(
+    # fc = param_torch_mods.SlabNet.DataParams(
     #     num_neurons=32,
     #     num_layers=2,
     #     num_groups=32,
@@ -299,7 +299,7 @@ class LearningParams(params.ParameterSet):
     # log2num_head_neurons = 4
     # num_head_blocks_per_resid = 1
 
-    # heads = param_torch_mods.HeadedSlabNet.Params(
+    # heads = param_torch_mods.HeadedSlabNet.DataParams(
     #     num_neurons=32,
     #     num_layers=2,
     #     num_groups=32,

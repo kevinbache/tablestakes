@@ -1,3 +1,4 @@
+import abc
 from typing import *
 
 import torch
@@ -7,13 +8,19 @@ import pytorch_lightning as pl
 
 from chillpill import params
 
-from tablestakes import constants as ts_constants
+from tablestakes import constants
 from tablestakes.ml import torch_helpers, param_torch_mods
 
 
 # noinspection PyProtectedMember
+from torch.utils.data import DataLoader
+
+
+Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
+
+
 class OptimizersMaker(param_torch_mods.Parametrized):
-    class Params(params.ParameterSet):
+    class OptParams(params.ParameterSet):
         lr = 0.001
         min_lr = 1e-6
         cos_half_period = 10
@@ -21,7 +28,7 @@ class OptimizersMaker(param_torch_mods.Parametrized):
         lr_reduction_factor = 0.5
         batch_size = 32
 
-    def __init__(self, hp: Params):
+    def __init__(self, hp: OptParams):
         super().__init__(hp)
         self.pl_module = None
 
@@ -60,6 +67,7 @@ class OptimizersMaker(param_torch_mods.Parametrized):
 
 
 class MetricTracker(param_torch_mods.Parametrized):
+
     TRAIN_PHASE_NAME = 'train'
     VALID_PHASE_NAME = 'valid'
     TEST_PHASE_NAME = 'test'
@@ -108,7 +116,7 @@ class MetricTracker(param_torch_mods.Parametrized):
     @classmethod
     def get_all_metric_names_for_phase(cls, phase_name: str):
         metrics_names = [m for m in cls.METRICS.keys()] + [cls.LOSS_VAL_NAME]
-        output_names = ts_constants.Y_BASE_NAMES
+        output_names = constants.Y_BASE_NAMES
 
         out = []
         for metric_name in metrics_names:
@@ -141,9 +149,11 @@ class MetricTracker(param_torch_mods.Parametrized):
                 y_hat = y_hats_dict[output_name]
                 y = ys_dict[output_name]
                 full_metric_name = self._get_phase_name(phase_name, metric_name, output_name)
-                y_hat = y_hat.squeeze(1)
-                y = y.argmax(dim=1)
-
+                # y_hat = y_hat.squeeze(1)
+                # y = y.argmax(dim=1)
+                print()
+                print(f'doing metric now : {metric}')
+                print('factored.metrictracker log_losses_and_metrics yhat y shapes: ', y_hat.shape, y.shape)
                 metric_value = metric(y_hat, y)
 
                 self.pl_module.log(full_metric_name, metric_value, prog_bar=prog_bar, on_epoch=on_epoch)
@@ -178,10 +188,17 @@ class MetricTracker(param_torch_mods.Parametrized):
         xs_dict, ys_dict = batch
         y_hats_dict = self.pl_module(**xs_dict)
 
+        for k, v in ys_dict.items():
+            print(k, v.shape)
+
+        for k, v in y_hats_dict.items():
+            print(k, v.shape)
+
         losses = torch.stack([
             F.cross_entropy(
-                input=y_hat.squeeze(1),
-                target=y.argmax(dim=1),
+                input=y_hat.permute(0, 2, 1),
+                target=y,
+                ignore_index=Y_VALUE_TO_IGNORE,
             )
             for y, y_hat in zip(ys_dict.values(), y_hats_dict.values())
         ])
@@ -210,7 +227,7 @@ class FactoredLightningModule(pl.LightningModule, param_torch_mods.Parametrized[
     def __init__(
             self,
             hp: param_torch_mods.PS,
-            dm: pl.LightningDataModule,
+            # dm: pl.LightningDataModule,
             metrics_tracker: MetricTracker,
             opt: OptimizersMaker,
             *args,
@@ -218,7 +235,7 @@ class FactoredLightningModule(pl.LightningModule, param_torch_mods.Parametrized[
     ):
         super().__init__(*args, **kwargs)
         self.hp = hp
-        self.dm = dm
+        # self.dm = dm
         self.metrics_tracker = metrics_tracker
         self.opt = opt
 
