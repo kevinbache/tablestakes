@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import List, Union, Dict
+import warnings
 
 from tablestakes import utils, constants
 from tablestakes.create_fake_data import etree_modifiers
@@ -90,6 +91,15 @@ class WordColorMatcher:
 
         ocr_df[CLOSEST_WORD_ID] = word_ids
         ocr_df[CLOSEST_DIST] = dists
+
+        # ensure there was a good color match.  other words will be ignored
+        # bad_rows = ocr_df[ocr_df[CLOSEST_DIST] < 1.0]
+        # warnings.warn(
+        #     RuntimeWarning(f"Dropping {len(bad_rows)} rows from ocr_dr for having bad color matching distance.  "
+        #                    f"Here they are: {bad_rows}.  This means there are words that aren't getting colored.  "
+        #                    f"I bet they're colons, huh.")
+        # )
+        ocr_df.drop(ocr_df.index[ocr_df[CLOSEST_DIST] > 1.0], inplace=True)
 
         for page_num, page_array in enumerate(colored_page_image_arrays):
             this_page_rows_selector = ocr_df[constants.ColNames.PAGE_NUM] == page_num

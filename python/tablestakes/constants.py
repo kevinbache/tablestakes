@@ -39,6 +39,7 @@ SOURCES_GLOB_STR = str(THIS_DIR / '**/*.py')
 # currenttly, this class is being used to propagate the id of the kv that this word came from so name it for that.
 TAG_PREFIX = 'kv_is_'
 
+
 class ColNames:
     """DataFrame column names for input data matrices"""""
 
@@ -90,10 +91,4 @@ class ColNames:
         NONASCII_COUNT,
         HAS_LEADING_ZERO,
     ]
-
-
-# class SpecialTokens:
-#     NUMBER = '<num>'
-#     UNKNOWN = '<unk>'
-
 
