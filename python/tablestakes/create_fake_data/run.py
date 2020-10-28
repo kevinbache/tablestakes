@@ -9,8 +9,8 @@ os.environ["OMP_THREAD_LIMIT"] = f'{num_jobs}'
 
 import ray
 
-from tablestakes import utils, ocr, df_modifiers, constants
-from tablestakes.create_fake_data import basic_document, color_matcher, etree_modifiers
+from tablestakes import utils, ocr, constants
+from tablestakes.create_fake_data import basic_document, color_matcher, etree_modifiers, df_modifiers
 from tablestakes.ml import hyperparams
 from tablestakes.ml import data
 

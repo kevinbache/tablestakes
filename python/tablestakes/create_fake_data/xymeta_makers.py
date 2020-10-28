@@ -1,8 +1,3 @@
-import pandas as pd
-
-from tablestakes import df_modifiers
-
-
 # def make_xymeta(joined_df: pd.DataFrame):
 #     # Tokenizer change the number of rows of the DF if there are any rows with multi-word text
 #     joined_df = df_modifiers.DfModifierStack([
