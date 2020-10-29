@@ -353,8 +353,14 @@ class XYDocumentDataModule(pl.LightningDataModule):
 
     def transfer_batch_to_device(self, batch: Any, device: torch.device) -> Any:
         if isinstance(batch, (list, tuple)):
+            outs = []
             for e in batch:
-                e.to(device)
+                if isinstance(batch, MutableMapping):
+                    for k, v in e.items():
+                        e[k] = v.to(device)
+                else:
+                    raise ValueError()
+                outs.append(e)
         elif isinstance(batch, MutableMapping):
             for k, v in batch.items():
                 batch[k] = v.to(device)
