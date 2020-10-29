@@ -373,6 +373,7 @@ class ExperimentParams(params.ParameterSet):
     sources_glob_str = '*.py'
 
 
+# noinspection PyProtectedMember
 class MyLightningNeptuneLogger(pl_loggers.NeptuneLogger):
     def __init__(self, hp: ExperimentParams, version: str = ''):
         source_files = glob.glob(str(hp.sources_glob_str), recursive=True)
@@ -394,38 +395,13 @@ class MyLightningNeptuneLogger(pl_loggers.NeptuneLogger):
         params = self._convert_params(params)
         params = self._flatten_dict(params)
         params = self._sanitize_params(params)
+        return self.set_properties(params)
 
-        properties = {
-            p.key: p.value
-            for p in self.experiment._backend.get_experiment(self.experiment.internal_id).properties
-        }
-        properties.update({k: str(v) for k, v in params.items()})
-
+    def set_properties(self, new_properties: Dict):
+        properties = self.experiment._backend.get_experiment(self.experiment.internal_id).properties
+        properties = {p.key: p.value for p in properties}
+        properties.update({k: str(v) for k, v in new_properties.items()})
         return self.experiment._backend.update_experiment(
-            experiment=self.experiment,
-            properties=properties
-        )
-
-    def set_property(self, key, value):
-        """Set `key-value` pair as an experiment property.
-
-        If property with given ``key`` does not exist, it adds a new one.
-
-        Args:
-            key (:obj:`str`): Property key.
-            value (:obj:`obj`): New value of a property.
-
-        Examples:
-            Assuming that `experiment` is an instance of :class:`~neptune.experiments.Experiment`:
-
-            .. code:: python3
-
-                experiment.set_property('model', 'LightGBM')
-                experiment.set_property('magic-number', 7)
-        """
-        properties = {p.key: p.value for p in self._backend.get_experiment(self.internal_id).properties}
-        properties[key] = str(value)
-        return self._backend.update_experiment(
             experiment=self,
             properties=properties
         )

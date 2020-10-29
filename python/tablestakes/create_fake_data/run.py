@@ -28,7 +28,7 @@ def make_and_ocr_docs(doc_ind, doc_set_params: hyperparams.DocSetParams):
     this_doc_dir = doc_set_params.docs_dir / f'doc_{doc_ind:02d}'
     utils.mkdir_if_not_exist(this_doc_dir)
 
-    utils.save_json(this_doc_dir / 'params.txt', doc_gen_params.to_dict())
+    utils.save_json(this_doc_dir / 'new_properties.txt', doc_gen_params.to_dict())
 
     ########################################
     # postproc doc to add word_ids, labels #

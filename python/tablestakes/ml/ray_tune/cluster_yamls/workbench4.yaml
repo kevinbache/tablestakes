@@ -1,0 +1,94 @@
+cluster_name: workbench-4x
+
+provider:
+    type: aws
+    region: us-west-2
+    availability_zone: us-west-2a,us-west-2b
+auth:
+    ssh_user: ubuntu
+
+min_workers: 0
+initial_workers: 0
+max_workers: 0
+
+autoscaling_mode: default
+target_utilization_fraction: 0.8
+idle_timeout_minutes: 20
+
+# m4.large $0.0342 per Hour
+# 2020.07.22: 'latest_dlami'. Using 'ami-09f2f73141c83d4fe', which is the default AWS Deep Learning AMI (Ubuntu 18.04) V26.0 for your region (us-west-1).
+# todo: create AMI containing all needed packages for quick cluster startup
+head_node:
+    InstanceType: g4dn.4xlarge
+   # AMI ID : ami-0c322afdce03ef272 dlami 35.0 ubuntu 18.04
+    ImageId: latest_dlami
+    BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+              VolumeSize: 200
+    InstanceMarketOptions:
+        MarketType: spot
+        SpotOptions:
+            MaxPrice: "0.70"
+
+# https://aws.amazon.com/ec2/instance-types/g4/
+# https://aws.amazon.com/ec2/spot/pricing/
+#    spot instance prices:
+#    g4dn.xlarge	$0.1578 per Hour
+#    g4dn.2xlarge	$0.2256 per Hour
+#    g4dn.4xlarge	$0.3612 per Hour
+#    g4dn.8xlarge	$0.6528 per Hour
+#    g4dn.12xlarge	$1.304 per Hour
+#    g4dn.16xlarge	$1.3056 per Hour
+
+# Remote -> Local
+}file_mounts: {
+    "/tmp/chillpill_current_branch_sha": "~/projects/chillpill/.git/refs/heads/master",
+    "/tmp/tablestakes_current_branch_sha": "~/projects/tablestakes/.git/refs/heads/master",
+    ~/.logger_api_key: ~/.logger_api_key,
+    "~/lib/": "~/projects/tablestakes/python/lib/",
+    "~/data/tablestakes/datasets/": "~/data/tablestakes/datasets/",
+}
+
+setup_commands:
+    - rm -rf /home/anaconda3/lib/python3.7/site-packages/s3transfer*
+
+    # deep learning stuff.  custom torch.
+    - conda install -y -c anaconda openmpi s3transfer
+    - pip install /home//lib/torch-1.8.0a0-cp37-cp37m-linux_x86_64.whl \
+        torchvision tabulate tensorboard tensorboardX \
+        pytorch-lightning \
+        hyperopt neptune-client neptune-contrib[viz] mlflow hiplot \
+        jupyter ipywidgets bokeh "boto3>=1.10.44"
+
+    # ray
+    - pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-1.1.0.dev0-cp37-cp37m-manylinux1_x86_64.whl
+    - pip install ray[all]
+    #  for https://docs.ray.io/en/stable/webui.html
+    - jupyter nbextension enable --py --sys-prefix widgetsnbextension
+
+    # my stuff
+    - mkdir -p ~/projects
+
+    #  fast transformers
+    - pip install lib/pytorch_fast_transformers-0.3.0-cp37-cp37m-linux_x86_64.whl
+    - pip install --upgrade "cloudpickle>=1.6.0"
+
+    #  dotfiles
+    - test -e projects/dotfiles || git clone https://github.com/kevinbache/dotfiles.git ~/projects/dotfiles
+    - cd projects/dotfiles && git fetch && git checkout `cat /tmp/dotfiles_current_branch_sha`
+    - python ~/projects/dotfiles/link_files.py
+
+    #  chillpill
+    - test -e projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
+    - cd projects/chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
+    - pip install --editable ~/projects/chillpill/
+
+    #  tablestakes
+    - test -e projects/tablestakes/python || git clone https://github.com/kevinbache/tablestakes.git ~/projects/tablestakes
+    - cd projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
+    - pip install --editable ~/projects/tablestakes/python/
+
+head_start_ray_commands:
+    - ray stop
+    - ulimit -n 65536; ray start --head --port=6379 --object-manager-port=8076 --autoscaling-config=~/ray_bootstrap_config.yaml

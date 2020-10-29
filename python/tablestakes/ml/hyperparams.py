@@ -3,13 +3,13 @@
 #
 # import numpy as np
 #
-# from chillpill import params
+# from chillpill import new_properties
 #
 # from tablestakes import constants, kv_styles, utils
 # from tablestakes import html_css as hc
 #
 #
-# class LearningParams(params.ParameterSet):
+# class LearningParams(new_properties.ParameterSet):
 #     def __init__(
 #             self,
 #             dataset_name: str,
@@ -140,34 +140,34 @@
 #         return f'{self.experiment_name}_{self.group_name}'
 #
 #
-# class DocGenParams(params.ParameterSet):
+# class DocGenParams(new_properties.ParameterSet):
 #     margin = '0.5in'
 #     page_size = hc.PageSize.LETTER
-#     dpi = params.Discrete.from_prob_dict({
+#     dpi = new_properties.Discrete.from_prob_dict({
 #         300: 1,
 #         250: 1,
 #     })
 #
 #     do_randomize_field_order = True
 #
-#     group_offset_in = params.Float(0.0, 3.0)
-#     do_set_invisible_border = params.Boolean(p_true=0.9)
-#     num_extra_fields = params.Discrete.from_prob_dict({
+#     group_offset_in = new_properties.Float(0.0, 3.0)
+#     do_set_invisible_border = new_properties.Boolean(p_true=0.9)
+#     num_extra_fields = new_properties.Discrete.from_prob_dict({
 #         0: 1,
 #         1: 1,
 #     })
-#     font_size_px = params.Integer(8, 19)
-#     val_font_size_px = params.Integer(8, 19)
-#     do_regen_font_val_size = params.Boolean(0.4)
-#     table_cell_padding_px = params.Integer(1, 7)
-#     do_bold_keys = params.Boolean(p_true=0.2)
-#     do_add_colon_to_keys = params.Boolean(p_true=0.2)
-#     vert_alignment = params.Categorical.from_prob_dict({
+#     font_size_px = new_properties.Integer(8, 19)
+#     val_font_size_px = new_properties.Integer(8, 19)
+#     do_regen_font_val_size = new_properties.Boolean(0.4)
+#     table_cell_padding_px = new_properties.Integer(1, 7)
+#     do_bold_keys = new_properties.Boolean(p_true=0.2)
+#     do_add_colon_to_keys = new_properties.Boolean(p_true=0.2)
+#     vert_alignment = new_properties.Categorical.from_prob_dict({
 #         kv_styles.KvAlign.TT: 2,
 #         kv_styles.KvAlign.BB: 1,
 #         kv_styles.KvAlign.TB: 1,
 #     })
-#     horz_alignment = params.Categorical.from_prob_dict({
+#     horz_alignment = new_properties.Categorical.from_prob_dict({
 #         kv_styles.KvAlign.LL: 2,
 #         kv_styles.KvAlign.RL: 1,
 #         kv_styles.KvAlign.LR: 1,
@@ -179,11 +179,11 @@
 #         return [self.dpi * self.page_size.width, self.dpi * self.page_size.height]
 #
 #
-# class DocPrepParams(params.ParameterSet):
+# class DocPrepParams(new_properties.ParameterSet):
 #     min_count_to_keep_word = 4
 #
 #
-# class DocSetParams(params.ParameterSet):
+# class DocSetParams(new_properties.ParameterSet):
 #     def __init__(
 #             self,
 #             doc_gen_params: DocGenParams = DocGenParams(),

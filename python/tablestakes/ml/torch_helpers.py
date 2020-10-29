@@ -134,28 +134,28 @@ TIME_PERF_NAME = 'train_time_perf'
 TIME_PROCESS_NAME = 'train_time_process'
 
 
-# class LogCopierCallback(pl.Callback):
-#     @staticmethod
-#     def _count_params(pl_module):
-#         return sum(p.numel() for p in pl_module.parameters() if p.requires_grad)
-#
-#     def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-#         d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
-#         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
-#         d[PARAM_COUNT_NAME] = self._count_params(pl_module)
-#         tune.report(**d)
-#
-#     def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-#         d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
-#         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
-#         d[PARAM_COUNT_NAME] = self._count_params(pl_module)
-#         tune.report(**d)
-#
-#     def on_test_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-#         d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
-#         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
-#         d[PARAM_COUNT_NAME] = self._count_params(pl_module)
-#         tune.report(**d)
+class LogCopierCallback(pl.Callback):
+    @staticmethod
+    def _count_params(pl_module):
+        return sum(p.numel() for p in pl_module.parameters() if p.requires_grad)
+
+    def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
+        d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        d[CURRENT_EPOCH_NAME] = trainer.current_epoch
+        d[PARAM_COUNT_NAME] = self._count_params(pl_module)
+        tune.report(**d)
+
+    def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
+        d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        d[CURRENT_EPOCH_NAME] = trainer.current_epoch
+        d[PARAM_COUNT_NAME] = self._count_params(pl_module)
+        tune.report(**d)
+
+    def on_test_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
+        d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        d[CURRENT_EPOCH_NAME] = trainer.current_epoch
+        d[PARAM_COUNT_NAME] = self._count_params(pl_module)
+        tune.report(**d)
 
 
 class CounterTimerCallback(pl.Callback):
@@ -178,6 +178,7 @@ class CounterTimerCallback(pl.Callback):
             PARAM_COUNT_NAME: self._count_params(pl_module),
             TRAINABLE_PARAM_COUNT_NAME: self._count_trainable_params(pl_module),
         }
+        # noinspection PyTypeChecker
         trainer.logger.log_hyperparams(params=d)
 
     def on_train_epoch_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
