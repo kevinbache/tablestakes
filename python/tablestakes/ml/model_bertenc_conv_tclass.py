@@ -128,6 +128,8 @@ if __name__ == '__main__':
     hp.data.do_ignore_cached_dataset = False
     hp.data.seed = 42
     hp.data.num_workers = 4
+    hp.data.num_gpus = 1
+    hp.data.num_cpus = 4
 
     hp.opt.search_metric = 'valid_loss_total'
     hp.opt.search_mode = 'min'
