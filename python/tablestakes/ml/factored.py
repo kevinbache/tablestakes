@@ -19,11 +19,11 @@ from torch.utils.data import DataLoader
 Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
 
 
-class OptimizersMaker(param_torch_mods.Parametrized):
+class OptimizersMaker(param_torch_mods.Parametrized['OptimizationMaker.OptParams']):
     class OptParams(params.ParameterSet):
         lr = 0.001
         min_lr = 1e-6
-        cos_half_period = 10
+        patience = 10
         search_mode = 'max'
         lr_reduction_factor = 0.5
         batch_size = 32
@@ -38,19 +38,19 @@ class OptimizersMaker(param_torch_mods.Parametrized):
     def get_optimizers(self) -> Tuple[List[optim.Optimizer], List[optim.lr_scheduler._LRScheduler]]:
         optimizer = optim.AdamW(self.pl_module.parameters(), lr=self.hp.lr)
 
-        coser = optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max=self.hp.cos_half_period,
-            eta_min=self.hp.min_lr,
-            verbose=True,
-        )
+        # coser = optim.lr_scheduler.CosineAnnealingLR(
+        #     optimizer,
+        #     T_max=self.hp.patience // 2,
+        #     eta_min=self.hp.min_lr,
+        #     verbose=True,
+        # )
 
         reducer = {
             'scheduler': optim.lr_scheduler.ReduceLROnPlateau(
                 optimizer=optimizer,
                 mode=self.hp.search_mode,
                 factor=self.hp.lr_reduction_factor,
-                patience=self.hp.cos_half_period * 2,
+                patience=self.hp.patience,
                 min_lr=self.hp.min_lr,
                 verbose=True,
             ),
@@ -88,6 +88,7 @@ class MetricTracker(param_torch_mods.Parametrized):
     class Params(params.ParameterSet):
         num_steps_per_histogram_log = 10
         num_steps_per_metric_log = 10
+        output_dir = 'output'
 
     def __init__(self, hp: Params):
         super().__init__(hp)
@@ -149,11 +150,7 @@ class MetricTracker(param_torch_mods.Parametrized):
                 y_hat = y_hats_dict[output_name]
                 y = ys_dict[output_name]
                 full_metric_name = self._get_phase_name(phase_name, metric_name, output_name)
-                # y_hat = y_hat.squeeze(1)
-                # y = y.argmax(dim=1)
-                print()
-                print(f'doing metric now : {metric}')
-                print('factored.metrictracker log_losses_and_metrics yhat y shapes: ', y_hat.shape, y.shape)
+                y_hat = y_hat.argmax(dim=2)
                 metric_value = metric(y_hat, y)
 
                 self.pl_module.log(full_metric_name, metric_value, prog_bar=prog_bar, on_epoch=on_epoch)
@@ -187,12 +184,6 @@ class MetricTracker(param_torch_mods.Parametrized):
     def inner_forward_step(self, batch):
         xs_dict, ys_dict = batch
         y_hats_dict = self.pl_module(**xs_dict)
-
-        for k, v in ys_dict.items():
-            print(k, v.shape)
-
-        for k, v in y_hats_dict.items():
-            print(k, v.shape)
 
         losses = torch.stack([
             F.cross_entropy(

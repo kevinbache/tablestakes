@@ -119,7 +119,7 @@
 #     num_steps_per_metric_log = 100
 #     num_steps_per_histogram_log = 500
 #
-#     logs_dir = constants.LOGS_DIR
+#     logs_dir = constants.OUTPUT_DIR
 #     upload_dir = 's3://kb-tester-2020-10-14'
 #     # neptune won't let you create projects from its api so this has to already exist
 #     project_name = 'tablestakes'
@@ -341,7 +341,7 @@ class LearningParams(params.ParameterSet):
     num_steps_per_metric_log = 100
     num_steps_per_histogram_log = 500
 
-    logs_dir = constants.LOGS_DIR
+    logs_dir = constants.OUTPUT_DIR
     upload_dir = 's3://kb-tester-2020-10-14'
     # neptune won't let you create projects from its api so this has to already exist
     project_name = 'tablestakes'

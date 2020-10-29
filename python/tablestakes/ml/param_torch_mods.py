@@ -224,8 +224,10 @@ class ConvBlock(nn.Module, Parametrized['ConvBlock.DataParams']):
         pool_size = 2
         num_groups = 32
         num_blocks_per_pool = 2
+        num_blocks_per_skip = 2
         activation = nn.LeakyReLU
         do_include_first_norm = True
+        requires_grad = True
 
     def __init__(
             self,
@@ -253,7 +255,7 @@ class ConvBlock(nn.Module, Parametrized['ConvBlock.DataParams']):
         all_counts = [c + e for c, e in zip(all_counts, self._extra_counts)]
 
         blocks = OrderedDict()
-        num_prev_features = all_counts[0]
+        num_old_x_features = num_prev_features = all_counts[0]
         self._num_output_features = all_counts[-1]
         for block_ind, num_features in enumerate(all_counts[1:]):
             blocks[f'{block_ind}'] = resnet_conv1_block(
@@ -264,13 +266,23 @@ class ConvBlock(nn.Module, Parametrized['ConvBlock.DataParams']):
                 kernel_size=self.hp.kernel_size,
                 stride=self.hp.stride,
             )
-            num_prev_features = num_features
             if (block_ind + 1) % self.hp.num_blocks_per_pool == 0:
                 blocks[f'{block_ind}_pool'] = nn.MaxPool1d(kernel_size=self.hp.pool_size)
-                if num_prev_features != num_features:
-                    blocks[f'{block_ind}{self.SKIP_SUFFIX}'] = nn.Conv1d(num_features, num_prev_features, kernel_size=1)
+
+            if (block_ind + 1) % self.hp.num_blocks_per_skip == 0:
+                if num_old_x_features == num_features:
+                    layer = nn.Identity()
+                else:
+                    layer = nn.Conv1d(num_old_x_features, num_features, kernel_size=1)
+
+                blocks[f'{block_ind}{self.SKIP_SUFFIX}'] = layer
+                num_old_x_features = num_features
+            num_prev_features = num_features
 
         self.blocks = nn.ModuleDict(blocks)
+        for block in self.blocks.values():
+            for name, param in block.named_parameters():
+                param.requires_grad = self.hp.requires_grad
 
     def forward(self, x):
         if self._extra_counts[0] > 0:
@@ -283,7 +295,7 @@ class ConvBlock(nn.Module, Parametrized['ConvBlock.DataParams']):
                 x = F.pad(x, pad=(0, 0, 0, extra_count), mode='constant', value=0)
 
             if name.endswith(self.SKIP_SUFFIX):
-                # this block is a resizer for the skip connection
+                # this block is a resizer (or identity) for the skip connection
                 x += block(old_x)
                 old_x = x
             else:
@@ -296,7 +308,7 @@ class ConvBlock(nn.Module, Parametrized['ConvBlock.DataParams']):
 
 
 class SlabNet(FullyConv1Resnet):
-    class Params(FullyConv1Resnet.Params):
+    class Params(params.ParameterSet):
         num_neurons = 32
         num_layers = 4
         num_groups = 32
@@ -305,9 +317,10 @@ class SlabNet(FullyConv1Resnet):
         dropout_p = 0.5
         activation = nn.LeakyReLU
         do_include_first_norm = True
+        requires_grad = True
 
         @classmethod
-        def search_default(cls) -> "SlabNet.DataParams":
+        def search_default(cls) -> "SlabNet.Params":
             return cls(
                 num_neurons=params.Categorical([16, 32, 64, 128, 256]),
                 num_layers=params.Integer(1, 5),
@@ -357,12 +370,12 @@ class ExperimentParams(params.ParameterSet):
     project_name = 'my_project'
     experiment_name = 'my_experiment'
     experiment_tags = ['testing']
-    sources_glob_str = './**/*.py'
+    sources_glob_str = '*.py'
 
 
 class MyLightningNeptuneLogger(pl_loggers.NeptuneLogger):
     def __init__(self, hp: ExperimentParams, version: str = ''):
-        source_files = glob.glob(str(hp.sources_glob_str))
+        source_files = glob.glob(str(hp.sources_glob_str), recursive=True)
 
         super().__init__(
             api_key=utils.get_logger_api_key(),
@@ -381,9 +394,42 @@ class MyLightningNeptuneLogger(pl_loggers.NeptuneLogger):
         params = self._convert_params(params)
         params = self._flatten_dict(params)
         params = self._sanitize_params(params)
-        for key, val in params.items():
-            # self.experiment.set_property(f'param__{key}', val)
-            self.experiment.set_property(key, val)
+
+        properties = {
+            p.key: p.value
+            for p in self.experiment._backend.get_experiment(self.experiment.internal_id).properties
+        }
+        properties.update({k: str(v) for k, v in params.items()})
+
+        return self.experiment._backend.update_experiment(
+            experiment=self.experiment,
+            properties=properties
+        )
+
+    def set_property(self, key, value):
+        """Set `key-value` pair as an experiment property.
+
+        If property with given ``key`` does not exist, it adds a new one.
+
+        Args:
+            key (:obj:`str`): Property key.
+            value (:obj:`obj`): New value of a property.
+
+        Examples:
+            Assuming that `experiment` is an instance of :class:`~neptune.experiments.Experiment`:
+
+            .. code:: python3
+
+                experiment.set_property('model', 'LightGBM')
+                experiment.set_property('magic-number', 7)
+        """
+        properties = {p.key: p.value for p in self._backend.get_experiment(self.internal_id).properties}
+        properties[key] = str(value)
+        return self._backend.update_experiment(
+            experiment=self,
+            properties=properties
+        )
+
 
 
 def get_pl_logger(hp: ExperimentParams, tune=None):

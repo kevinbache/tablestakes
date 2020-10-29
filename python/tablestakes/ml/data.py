@@ -170,6 +170,7 @@ class XYCsvDataset(Dataset):
             '_datapoints': self._datapoints,
             'num_x_dims': self.num_x_dims,
             'num_y_dims': self.num_y_dims,
+            'num_y_classes': self.num_y_classes,
             'x_names': self.x_names,
             'y_names': self.y_names,
         }
@@ -301,9 +302,7 @@ class XYDocumentDataModule(pl.LightningDataModule):
         xs = {k: [d[k] for d in xs] for k in xs[0]}
         ys = {k: [d[k] for d in ys] for k in ys[0]}
 
-        print('In XYDocumentDataModule._collate_fn. ABout to run transform_xs')
         xs = self._transform_xs(xs)
-        print('In XYDocumentDataModule._collate_fn. ABout to run transform_xs')
         ys = self._transform_ys(ys)
 
         new_xs = {}

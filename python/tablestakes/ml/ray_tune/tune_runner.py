@@ -313,11 +313,11 @@ if __name__ == '__main__':
         # ray_auto_init=True,
     )
 
-    analysis_file = constants.LOGS_DIR / f'tune_analysis_{search_params.get_short_hash(num_chars=8)}.pkl'
+    analysis_file = constants.OUTPUT_DIR / f'tune_analysis_{search_params.get_short_hash(num_chars=8)}.pkl'
     print(f"Saving {analysis_file}")
     utils.save_pickle(analysis_file, analysis)
 
-    best_trial = analysis.get_best_trial(search_params.search_metric, "max", "last-5-avg")
+    best_trial = analysis.get_best_trial(search_params.search_metric, search_params.search_mode, "last-5-avg")
 
     print(f'best_trial.last_result: {best_trial.last_result}')
 

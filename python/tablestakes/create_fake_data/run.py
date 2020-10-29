@@ -34,7 +34,7 @@ def make_and_ocr_docs(doc_ind, doc_set_params: hyperparams.DocSetParams):
     # postproc doc to add word_ids, labels #
     ########################################
     df_saver = etree_modifiers.SaveWordAttribsToDataFrame()
-    post_proc_stack = etree_modifiers.EtreeModifierStack(
+    doc = etree_modifiers.EtreeModifierStack(
         modifiers=[
             etree_modifiers.WordWrapper(),
             etree_modifiers.SetIsKeyOnWordsModifier(),
@@ -45,8 +45,7 @@ def make_and_ocr_docs(doc_ind, doc_set_params: hyperparams.DocSetParams):
             df_saver,
         ],
         do_use_timers=False,
-    )
-    doc = post_proc_stack(doc)
+    )(doc)
 
     #####################################
     # 0.save html, pdf, words.csv files #
@@ -202,8 +201,8 @@ if __name__ == '__main__':
         doc_gen_params=doc_gen_params,
         doc_prep_params=doc_prep_params,
     )
-    doc_settings.num_docs = 100
-    doc_settings.doc_gen_params.num_extra_fields = 0
+    doc_settings.num_docs = 101
+    # doc_settings.doc_gen_params.num_extra_fields = 0
 
     fast_test = False
     if fast_test:

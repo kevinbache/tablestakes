@@ -197,9 +197,6 @@ class CounterTimerCallback(pl.Callback):
 class BetterAccuracy(pl.metrics.Accuracy):
     """PyTorch Lightning's += lines cause warnings about transferring lots of scalars between cpu / gpu"""
     def update(self, preds: torch.Tensor, target: torch.Tensor):
-        print("torch_helpers.BetterAccuracy preds target shapes:", preds.shape, target.shape)
-        # preds, target = self._input_format(preds, target)
-        preds = preds.argmax(dim=2)
         assert preds.shape == target.shape,  f"preds.shape: {preds.shape}, target.shape: {target.shape}"
         self.correct = self.correct + torch.sum(preds.eq(target))
         self.total = self.total + target.numel()
