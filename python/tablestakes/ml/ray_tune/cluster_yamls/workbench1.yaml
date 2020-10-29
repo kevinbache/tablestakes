@@ -29,7 +29,7 @@ head_node:
     InstanceMarketOptions:
         MarketType: spot
         SpotOptions:
-            MaxPrice: "0.30"
+            MaxPrice: "0.40"
 
 # https://aws.amazon.com/ec2/instance-types/g4/
 # https://aws.amazon.com/ec2/spot/pricing/
@@ -61,8 +61,9 @@ setup_commands:
     - pip install /home/ubuntu/lib/torch-1.8.0a0-cp37-cp37m-linux_x86_64.whl \
         torchvision tabulate tensorboard tensorboardX \
         pytorch-lightning \
+        transformers \
         hyperopt neptune-client neptune-contrib[viz] mlflow hiplot \
-        jupyter ipywidgets bokeh "boto3>=1.10.44"
+        jupyter ipywidgets bokeh
 
     # ray
     - pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-1.1.0.dev0-cp37-cp37m-manylinux1_x86_64.whl

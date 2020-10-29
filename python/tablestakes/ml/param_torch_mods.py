@@ -402,8 +402,8 @@ class MyLightningNeptuneLogger(pl_loggers.NeptuneLogger):
         properties = {p.key: p.value for p in properties}
         properties.update({k: str(v) for k, v in new_properties.items()})
         return self.experiment._backend.update_experiment(
-            experiment=self,
-            properties=properties
+            experiment=self.experiment,
+            properties=properties,
         )
 
 

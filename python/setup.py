@@ -56,6 +56,7 @@ setup(
         'cloudpickle>=1.6.0',
         'gputil',
         'psutil',
+        'transformers',
     ],
 
     classifiers=[
