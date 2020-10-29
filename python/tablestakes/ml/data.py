@@ -356,11 +356,11 @@ class XYDocumentDataModule(pl.LightningDataModule):
         if isinstance(batch, (list, tuple)):
             outs = []
             for e in batch:
-                if isinstance(batch, MutableMapping):
+                if isinstance(e, MutableMapping):
                     for k, v in e.items():
                         e[k] = v.to(device)
                 else:
-                    raise ValueError()
+                    raise ValueError(f'unknwon type: {type(e)}')
                 outs.append(e)
             batch = outs
         elif isinstance(batch, MutableMapping):
