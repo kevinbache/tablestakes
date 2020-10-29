@@ -75,7 +75,7 @@ def resnet_conv1_block(
     return SizedSequential(layers, num_output_features=num_output_features)
 
 
-class BertEmbedder(ParametrizedModule['BertEmbedder.DataParams']):
+class BertEmbedder(ParametrizedModule['BertEmbedder.Params']):
     class Params(params.ParameterSet):
         dim = 64
         max_seq_len = 1024
