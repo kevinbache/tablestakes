@@ -125,7 +125,8 @@ if __name__ == '__main__':
         batch_size=32,
     )
 
-    hp.data.dataset_name = 'num=1000_02b7'
+    # hp.data.dataset_name = 'num=1000_02b7'
+    hp.data.dataset_name = 'num=4000_9b9f'
     hp.data.do_ignore_cached_dataset = False
     hp.data.seed = 42
     hp.data.num_workers = 4
