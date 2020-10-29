@@ -102,6 +102,7 @@ def run(hp: ModelBertEncConvTClass.Params, fast_dev_run=False):
         default_root_dir=hp.metrics.output_dir,
         callbacks=[torch_helpers.CounterTimerCallback()],
         max_epochs=hp.opt.num_epochs,
+        gpus=hp.data.num_gpus,
         weights_summary='full',
         fast_dev_run=fast_dev_run,
         accumulate_grad_batches=1,
