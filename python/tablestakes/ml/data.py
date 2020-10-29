@@ -369,7 +369,7 @@ class TablestakesDataModule(XYDocumentDataModule):
         do_ignore_cached_dataset = False
         num_workers = 4
         num_cpus = 4
-        num_gpus = 0
+        num_gpus = 1
         max_seq_length = 1024
         batch_size = 32
 
