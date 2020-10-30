@@ -87,7 +87,7 @@ class TrapezoidConv1Module(pl.LightningModule):
 
         self.train_dataset, self.valid_dataset, self.test_dataset = None, None, None
 
-        # self.net = nn.Linear(self.hp.num_x_dims[0], self.num_y_classes['korv'])
+        # self.net = nn.Linear(self.search_params.num_x_dims[0], self.num_y_classes['korv'])
 
         #############
         # emb
@@ -119,8 +119,8 @@ class TrapezoidConv1Module(pl.LightningModule):
             conv_layers.append(nn.LeakyReLU())
             prev_num_filters = num_filters
 
-            # if not conv_ind % hp.num_conv_layers_per_pool:
-            #     conv_layers.append(nn.MaxPool1d(hp.pool_size))
+            # if not conv_ind % search_params.num_conv_layers_per_pool:
+            #     conv_layers.append(nn.MaxPool1d(search_params.pool_size))
 
         # so torch can find your parameters
         self.conv_layers = nn.ModuleList(conv_layers)
@@ -141,8 +141,8 @@ class TrapezoidConv1Module(pl.LightningModule):
             fc_layers.append(nn.LeakyReLU())
             prev_num_neurons = num_neurons
 
-            # if not fc_ind % hp.num_fc_layers_per_dropout:
-            #     fc_layers.append(nn.Dropout(p=hp.dropout_p))
+            # if not fc_ind % search_params.num_fc_layers_per_dropout:
+            #     fc_layers.append(nn.Dropout(p=search_params.dropout_p))
 
         self.fc_layers = nn.ModuleList(fc_layers)
 

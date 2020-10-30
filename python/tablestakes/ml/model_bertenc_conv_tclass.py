@@ -11,16 +11,16 @@ from tablestakes.ml import torch_helpers, param_torch_mods, factored, data
 
 
 class ModelBertEncConvTClass(factored.FactoredLightningModule):
-    class Params(params.ParameterSet):
+    class Params(factored.FactoredLightningModule.FactoredParams):
         data = data.TablestakesDataModule.DataParams()
         opt = factored.OptimizersMaker.OptParams()
-        metrics = factored.MetricTracker.Params()
+        metrics = factored.MetricsTracker.MetricParams()
         exp = param_torch_mods.ExperimentParams()
 
-        embed = param_torch_mods.BertEmbedder.Params()
-        conv = param_torch_mods.ConvBlock.Params()
-        fc = param_torch_mods.SlabNet.Params()
-        heads = param_torch_mods.HeadedSlabNet.Params()
+        embed = param_torch_mods.BertEmbedder.ModelParams()
+        conv = param_torch_mods.ConvBlock.ModelParams()
+        fc = param_torch_mods.SlabNet.ModelParams()
+        heads = param_torch_mods.HeadedSlabNet.ModelParams()
 
         def __init__(self, max_seq_len=1024, batch_size=32):
             super().__init__()
@@ -31,7 +31,7 @@ class ModelBertEncConvTClass(factored.FactoredLightningModule):
             self,
             hp: Params,
             data_module: data.XYDocumentDataModule,
-            metrics_tracker: factored.MetricTracker,
+            metrics_tracker: factored.MetricsTracker,
             opt: factored.OptimizersMaker,
     ):
         super().__init__(hp, metrics_tracker, opt)
@@ -88,15 +88,7 @@ class ModelBertEncConvTClass(factored.FactoredLightningModule):
         return y_hats
 
 
-def run(hp: ModelBertEncConvTClass.Params, fast_dev_run=False):
-    dm = data.TablestakesDataModule(hp.data)
-    net = ModelBertEncConvTClass(
-        hp=hp,
-        data_module=dm,
-        metrics_tracker=factored.MetricTracker(hp.metrics),
-        opt=factored.OptimizersMaker(hp.opt),
-    )
-
+def run(net: pl.LightningModule, dm: pl.LightningDataModule, hp: ModelBertEncConvTClass.Params, fast_dev_run=False):
     trainer = pl.Trainer(
         logger=True if fast_dev_run else param_torch_mods.get_pl_logger(hp.exp),
         default_root_dir=hp.metrics.output_dir,
@@ -125,7 +117,7 @@ if __name__ == '__main__':
         batch_size=32,
     )
 
-    # hp.data.dataset_name = 'num=1000_02b7'
+    # search_params.data.dataset_name = 'num=1000_02b7'
     hp.data.dataset_name = 'num=4000_9b9f'
     hp.data.do_ignore_cached_dataset = False
     hp.data.seed = 42
@@ -135,7 +127,7 @@ if __name__ == '__main__':
 
     hp.opt.search_metric = 'valid_loss_total'
     hp.opt.search_mode = 'min'
-    hp.opt.num_epochs = 1000
+    hp.opt.num_epochs = 100
     hp.opt.lr = 0.001
     hp.opt.patience = 10
 
@@ -158,18 +150,26 @@ if __name__ == '__main__':
     hp.conv.num_blocks_per_pool = 20
     hp.conv.requires_grad = True
 
-    hp.fc.num_neurons = 128
+    hp.fc.num_features = 128
     hp.fc.num_layers = 2
     hp.fc.num_groups = 16
     hp.fc.num_blocks_per_residual = 2
     hp.fc.num_blocks_per_dropout = 2
     hp.fc.requires_grad = True
 
-    hp.heads.num_neurons = 128
+    hp.heads.num_features = 128
     hp.heads.num_layers = 4
     hp.heads.num_groups = 16
     hp.heads.num_blocks_per_residual = 2
     hp.heads.num_blocks_per_dropout = 2
     hp.heads.requires_grad = True
 
-    run(hp, fast_dev_run)
+    dm = data.TablestakesDataModule(hp.data)
+    net = ModelBertEncConvTClass(
+        hp=hp,
+        data_module=dm,
+        metrics_tracker=factored.MetricsTracker(hp.metrics),
+        opt=factored.OptimizersMaker(hp.opt),
+    )
+
+    run(net, dm, hp, fast_dev_run)

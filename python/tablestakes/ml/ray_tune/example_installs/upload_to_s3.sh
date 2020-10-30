@@ -1,0 +1,1 @@
+aws s3 cp --recursive ${HOME}/projects/tablestakes/python/lib s3://tablestakes-lib/

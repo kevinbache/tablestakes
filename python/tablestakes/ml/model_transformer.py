@@ -55,7 +55,7 @@ class RectTransformerModule(pl.LightningModule):
         self.train_dataset, self.valid_dataset, self.test_dataset = None, None, None
 
         #############
-        # expand embedding_dim so that embedding_dim + meta_dim is divisible by hp.num_trans_heads
+        # expand embedding_dim so that embedding_dim + meta_dim is divisible by search_params.num_trans_heads
         # (attention requirement)
         num_x_basic_dims = self.hp.num_x_dims[constants.X_BASE_BASE_NAME]
 
@@ -412,7 +412,7 @@ if __name__ == '__main__':
         max_epochs=hp.num_epochs,
         weights_summary='full',
         # fast_dev_run=False,
-        # accumulate_grad_batches=utils.pow2int(hp.log2_batch_size),
+        # accumulate_grad_batches=utils.pow2int(search_params.log2_batch_size),
         accumulate_grad_batches=1,
         profiler=True,
         auto_lr_find=False,

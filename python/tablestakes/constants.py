@@ -43,6 +43,17 @@ TAG_PREFIX = 'kv_is_'
 Y_VALUE_TO_IGNORE = -100
 
 
+TRAIN_PHASE_NAME = 'train'
+VALID_PHASE_NAME = 'valid'
+TEST_PHASE_NAME = 'test'
+
+PHASE_NAMES = [
+    TRAIN_PHASE_NAME,
+    VALID_PHASE_NAME,
+    TEST_PHASE_NAME,
+]
+
+
 class ColNames:
     """DataFrame column names for input data matrices"""""
 

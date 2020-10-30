@@ -61,7 +61,7 @@
 #     # num_fc_blocks_per_resid = 2
 #
 #     # fc = param_torch_mods.SlabNet.DataParams(
-#     #     num_neurons=32,
+#     #     num_features=32,
 #     #     num_layers=2,
 #     #     num_groups=32,
 #     #     num_blocks_per_residual=2,
@@ -78,7 +78,7 @@
 #     # num_head_blocks_per_resid = 1
 #
 #     # heads = param_torch_mods.HeadedSlabNet.DataParams(
-#     #     num_neurons=32,
+#     #     num_features=32,
 #     #     num_layers=2,
 #     #     num_groups=32,
 #     #     num_blocks_per_residual=1,
@@ -94,7 +94,7 @@
 #     num_epochs = 4
 #
 #     ##############
-#     # hp search
+#     # search_params search
 #     num_hp_samples = 100
 #     search_metric = 'valid_acc_which_kv'
 #     search_mode = 'max'
@@ -230,136 +230,136 @@ from chillpill import params
 from tablestakes import constants, utils
 from tablestakes.create_fake_data import kv_styles, html_css as hc
 
-
-class LearningParams(params.ParameterSet):
-    def __init__(
-            self,
-            dataset_name: str,
-            docs_dir_base=constants.DOCS_DIR,
-            datasets_dir=constants.DATASETS_DIR,
-            **kwargs,
-    ):
-        super().__init__(**kwargs)
-        self.dataset_name = dataset_name
-        self.docs_dir_base = docs_dir_base
-        self.datasets_dir = datasets_dir
-
-        self.docs_dir = None
-        self.dataset_file = None
-        self.update_files()
-
-    def update_files(self):
-        self.docs_dir = self.docs_dir_base / self.dataset_name
-        self.dataset_file = self.datasets_dir / f'{self.dataset_name}.cloudpickle'
-
-    def get_batch_size(self):
-        return utils.pow2int(self.log2_batch_size)
-
-    # data
-
-    #  embedder
-    do_include_embeddings = True
-    num_embedding_base_dim = 64
-    num_extra_embedding_dim = None
-    # embed = param_torch_mods.BertEmbedder.DataParams()
-    # embed.dim = None
-    # embed.requires_grad = True
-
-    #  transformer
-    pre_trans_linear_dim = None
-
-    num_trans_enc_layers = 4
-    num_trans_heads = 8
-    num_trans_fc_dim_mult = 4
-
-    trans_encoder_type = 'torch'
-
-    do_cat_x_base_before_fc = True
-
-    #  fully connected
-    # num_fc_blocks = 4
-    # log2num_neurons_start = 5
-    # log2num_neurons_end = 5
-    # num_fc_blocks_per_resid = 2
-
-    # fc = param_torch_mods.SlabNet.DataParams(
-    #     num_neurons=32,
-    #     num_layers=2,
-    #     num_groups=32,
-    #     num_blocks_per_residual=2,
-    #     do_include_first_norm=True,
-    # )
-
-    # num_fc_layers_per_dropout = 10
-    # # prob of dropping each unit
-    # dropout_p = 0.5
-
-    #  head_nets
-    # num_head_blocks = 2
-    # log2num_head_neurons = 4
-    # num_head_blocks_per_resid = 1
-
-    # heads = param_torch_mods.HeadedSlabNet.DataParams(
-    #     num_neurons=32,
-    #     num_layers=2,
-    #     num_groups=32,
-    #     num_blocks_per_residual=1,
-    # )
-
-    ##############
-    # optimization
-    lr = 0.001
-
-    # korv, which_kv
-    korv_loss_weight = 0.5
-
-    num_epochs = 4
-
-    ##############
-    # hp search
-    num_hp_samples = 100
-    search_metric = 'valid_acc_which_kv'
-    search_mode = 'max'
-    asha_grace_period = 4
-    asha_reduction_factor = 2
-
-    ##############
-    # data
-    # batch size must be 1
-    log2_batch_size = 5
-    p_valid = 0.1
-    p_test = 0.1
-    dataset_name = 'num=10_c145'
-
-    max_seq_length = int(np.power(2, 14))
-
-    # for data loading
-    num_workers = 4
-
-    ##############
-    # extra
-    num_steps_per_metric_log = 100
-    num_steps_per_histogram_log = 500
-
-    logs_dir = constants.OUTPUT_DIR
-    upload_dir = 's3://kb-tester-2020-10-14'
-    # neptune won't let you create projects from its api so this has to already exist
-    project_name = 'tablestakes'
-    experiment_name = 'trans_v0.1.3'
-    group_name = 'log2_batch'
-
-    experiment_tags = ['default', 'testing']
-
-    num_cpus = 2
-    num_gpus = 1
-
-    seed = 42
-
-    def get_project_exp_name(self):
-        return f'{self.project_name}_{self.experiment_name}'
-
-    def get_exp_group_name(self):
-        return f'{self.experiment_name}_{self.group_name}'
+#
+# class LearningParams(params.ParameterSet):
+#     def __init__(
+#             self,
+#             dataset_name: str,
+#             docs_dir_base=constants.DOCS_DIR,
+#             datasets_dir=constants.DATASETS_DIR,
+#             **kwargs,
+#     ):
+#         super().__init__(**kwargs)
+#         self.dataset_name = dataset_name
+#         self.docs_dir_base = docs_dir_base
+#         self.datasets_dir = datasets_dir
+#
+#         self.docs_dir = None
+#         self.dataset_file = None
+#         self.update_files()
+#
+#     def update_files(self):
+#         self.docs_dir = self.docs_dir_base / self.dataset_name
+#         self.dataset_file = self.datasets_dir / f'{self.dataset_name}.cloudpickle'
+#
+#     def get_batch_size(self):
+#         return utils.pow2int(self.log2_batch_size)
+#
+#     # data
+#
+#     #  embedder
+#     do_include_embeddings = True
+#     num_embedding_base_dim = 64
+#     num_extra_embedding_dim = None
+#     # embed = param_torch_mods.BertEmbedder.DataParams()
+#     # embed.dim = None
+#     # embed.requires_grad = True
+#
+#     #  transformer
+#     pre_trans_linear_dim = None
+#
+#     num_trans_enc_layers = 4
+#     num_trans_heads = 8
+#     num_trans_fc_dim_mult = 4
+#
+#     trans_encoder_type = 'torch'
+#
+#     do_cat_x_base_before_fc = True
+#
+#     #  fully connected
+#     # num_fc_blocks = 4
+#     # log2num_neurons_start = 5
+#     # log2num_neurons_end = 5
+#     # num_fc_blocks_per_resid = 2
+#
+#     # fc = param_torch_mods.SlabNet.DataParams(
+#     #     num_features=32,
+#     #     num_layers=2,
+#     #     num_groups=32,
+#     #     num_blocks_per_residual=2,
+#     #     do_include_first_norm=True,
+#     # )
+#
+#     # num_fc_layers_per_dropout = 10
+#     # # prob of dropping each unit
+#     # dropout_p = 0.5
+#
+#     #  head_nets
+#     # num_head_blocks = 2
+#     # log2num_head_neurons = 4
+#     # num_head_blocks_per_resid = 1
+#
+#     # heads = param_torch_mods.HeadedSlabNet.DataParams(
+#     #     num_features=32,
+#     #     num_layers=2,
+#     #     num_groups=32,
+#     #     num_blocks_per_residual=1,
+#     # )
+#
+#     ##############
+#     # optimization
+#     lr = 0.001
+#
+#     # korv, which_kv
+#     korv_loss_weight = 0.5
+#
+#     num_epochs = 4
+#
+#     ##############
+#     # search_params search
+#     num_hp_samples = 100
+#     search_metric = 'valid_acc_which_kv'
+#     search_mode = 'max'
+#     asha_grace_period = 4
+#     asha_reduction_factor = 2
+#
+#     ##############
+#     # data
+#     # batch size must be 1
+#     log2_batch_size = 5
+#     p_valid = 0.1
+#     p_test = 0.1
+#     dataset_name = 'num=10_c145'
+#
+#     max_seq_length = int(np.power(2, 14))
+#
+#     # for data loading
+#     num_workers = 4
+#
+#     ##############
+#     # extra
+#     num_steps_per_metric_log = 100
+#     num_steps_per_histogram_log = 500
+#
+#     logs_dir = constants.OUTPUT_DIR
+#     upload_dir = 's3://kb-tester-2020-10-14'
+#     # neptune won't let you create projects from its api so this has to already exist
+#     project_name = 'tablestakes'
+#     experiment_name = 'trans_v0.1.3'
+#     group_name = 'log2_batch'
+#
+#     experiment_tags = ['default', 'testing']
+#
+#     num_cpus = 2
+#     num_gpus = 1
+#
+#     seed = 42
+#
+#     def get_project_exp_name(self):
+#         return f'{self.project_name}_{self.experiment_name}'
+#
+#     def get_exp_group_name(self):
+#         return f'{self.experiment_name}_{self.group_name}'
 
 
 class DocGenParams(params.ParameterSet):

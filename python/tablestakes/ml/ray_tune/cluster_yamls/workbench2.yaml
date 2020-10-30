@@ -1,12 +1,11 @@
-cluster_name: workbench-g4dn4
+cluster_name: workbench-2x
 
 provider:
     type: aws
-    region: us-west-2
-    availability_zone: us-west-2a,us-west-2b
+    region: us-west-1
+    availability_zone: us-west-1a,us-west-1b,us-west-1c
 auth:
-    ssh_user: linux
-   # AMI ID : ami-0c322afdce03ef272 dlami 35.0 ubuntu 18.04
+    ssh_user: ubuntu
 
 min_workers: 0
 initial_workers: 0
@@ -20,17 +19,17 @@ idle_timeout_minutes: 20
 # 2020.07.22: 'latest_dlami'. Using 'ami-09f2f73141c83d4fe', which is the default AWS Deep Learning AMI (Ubuntu 18.04) V26.0 for your region (us-west-1).
 # todo: create AMI containing all needed packages for quick cluster startup
 head_node:
-    InstanceType: g4dn.4xlarge
-    ImageId: latest_dlami
+    InstanceType: g4dn.2xlarge
    # AMI ID : ami-0c322afdce03ef272 dlami 35.0 ubuntu 18.04
+    ImageId: latest_dlami
     BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
               VolumeSize: 200
-    InstanceMarketOptions:
-        MarketType: spot
-        SpotOptions:
-            MaxPrice: "0.70"
+#    InstanceMarketOptions:
+#        MarketType: spot
+#        SpotOptions:
+#            MaxPrice: "0.40"
 
 # https://aws.amazon.com/ec2/instance-types/g4/
 # https://aws.amazon.com/ec2/spot/pricing/
@@ -42,7 +41,6 @@ head_node:
 #    g4dn.12xlarge	$1.304 per Hour
 #    g4dn.16xlarge	$1.3056 per Hour
 
-
 # Remote -> Local
 file_mounts: {
     "/tmp/chillpill_current_branch_sha": "~/projects/chillpill/.git/refs/heads/master",
@@ -53,12 +51,16 @@ file_mounts: {
 }
 
 setup_commands:
-    # deep learning stuff
-    - conda install -y -c anaconda openmpi
-    - pip install torch torchvision tabulate tensorboard tensorboardX \
+    - rm -rf /home/ubuntu/anaconda3/lib/python3.7/site-packages/s3transfer*
+
+    # deep learning stuff.  custom torch.
+    - conda install -y -c anaconda openmpi=4.0.2 s3transfer=0.3.3 docutils=0.15.2 boto3=1.16.0 botocore=1.19.1
+    - pip install /home/ubuntu/lib/torch-1.8.0a0-cp37-cp37m-linux_x86_64.whl \
+        torchvision tabulate tensorboard tensorboardX \
         pytorch-lightning \
+        transformers \
         hyperopt neptune-client neptune-contrib[viz] mlflow hiplot \
-        jupyter ipywidgets bokeh "boto3>=1.10.44"
+        jupyter ipywidgets bokeh
 
     # ray
     - pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-1.1.0.dev0-cp37-cp37m-manylinux1_x86_64.whl
@@ -69,9 +71,6 @@ setup_commands:
     # my stuff
     - mkdir -p ~/projects
 
-    #  locally built pytorch
-    - pip install lib/torch-1.8.0a0-cp37-cp37m-linux_x86_64.whl
-
     #  fast transformers
     - pip install lib/pytorch_fast_transformers-0.3.0-cp37-cp37m-linux_x86_64.whl
     - pip install --upgrade "cloudpickle>=1.6.0"
@@ -79,7 +78,6 @@ setup_commands:
     #  dotfiles
     - test -e projects/dotfiles || git clone https://github.com/kevinbache/dotfiles.git ~/projects/dotfiles
     - cd projects/dotfiles && git fetch && git checkout `cat /tmp/dotfiles_current_branch_sha`
-    - pip install --editable ~/projects/dotfiles/
     - python ~/projects/dotfiles/link_files.py
 
     #  chillpill
@@ -92,18 +90,6 @@ setup_commands:
     - cd projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
     - pip install --editable ~/projects/tablestakes/python/
 
-
-# Custom commands that will be run on the head node after common setup.
-head_setup_commands: []
-#    - conda install pytorch torchvision cpuonly -c pytorch
-
-worker_setup_commands: []
-#    - conda install pytorch torchvision cudatoolkit=10.2 -c pytorch
-
 head_start_ray_commands:
     - ray stop
     - ulimit -n 65536; ray start --head --port=6379 --object-manager-port=8076 --autoscaling-config=~/ray_bootstrap_config.yaml
-
-worker_start_ray_commands:
-    - ray stop
-    - ulimit -n 65536; ray start --address=$RAY_HEAD_IP:6379 --object-manager-port=8076

@@ -1,4 +1,3 @@
-import abc
 from typing import *
 
 import torch
@@ -9,11 +8,7 @@ import pytorch_lightning as pl
 from chillpill import params
 
 from tablestakes import constants
-from tablestakes.ml import torch_helpers, param_torch_mods
-
-
-# noinspection PyProtectedMember
-from torch.utils.data import DataLoader
+from tablestakes.ml import torch_helpers, param_torch_mods, data
 
 
 Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
@@ -21,12 +16,14 @@ Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
 
 class OptimizersMaker(param_torch_mods.Parametrized['OptimizationMaker.OptParams']):
     class OptParams(params.ParameterSet):
+        num_epochs = 10
+        batch_size = 32
         lr = 0.001
         min_lr = 1e-6
         patience = 10
+        search_metric = 'valid_loss_total'
         search_mode = 'max'
         lr_reduction_factor = 0.5
-        batch_size = 32
 
     def __init__(self, hp: OptParams):
         super().__init__(hp)
@@ -35,13 +32,14 @@ class OptimizersMaker(param_torch_mods.Parametrized['OptimizationMaker.OptParams
     def set_pl_module(self, pl_module: pl.LightningModule):
         self.pl_module = pl_module
 
+    # noinspection PyProtectedMember
     def get_optimizers(self) -> Tuple[List[optim.Optimizer], List[optim.lr_scheduler._LRScheduler]]:
         optimizer = optim.AdamW(self.pl_module.parameters(), lr=self.hp.lr)
 
         # coser = optim.lr_scheduler.CosineAnnealingLR(
         #     optimizer,
-        #     T_max=self.hp.patience // 2,
-        #     eta_min=self.hp.min_lr,
+        #     T_max=self.search_params.patience // 2,
+        #     eta_min=self.search_params.min_lr,
         #     verbose=True,
         # )
 
@@ -66,8 +64,7 @@ class OptimizersMaker(param_torch_mods.Parametrized['OptimizationMaker.OptParams
         return optimizers, schedulers
 
 
-class MetricTracker(param_torch_mods.Parametrized):
-
+class MetricsTracker(param_torch_mods.Parametrized):
     TRAIN_PHASE_NAME = 'train'
     VALID_PHASE_NAME = 'valid'
     TEST_PHASE_NAME = 'test'
@@ -85,12 +82,12 @@ class MetricTracker(param_torch_mods.Parametrized):
         'acc': torch_helpers.BetterAccuracy(),
     }
 
-    class Params(params.ParameterSet):
+    class MetricParams(params.ParameterSet):
         num_steps_per_histogram_log = 10
         num_steps_per_metric_log = 10
         output_dir = 'output'
 
-    def __init__(self, hp: Params):
+    def __init__(self, hp: MetricParams):
         super().__init__(hp)
         self.hp = hp
         self.pl_module = None
@@ -162,11 +159,10 @@ class MetricTracker(param_torch_mods.Parametrized):
         lr = lrs[0]
         self.pl_module.log('lrs_opt', lr, prog_bar=False, on_epoch=on_epoch)
 
-        # d['lrs_opt'] = lr
-        # self.metrics_to_log_for_tune = d
+        # self.metrics_to_log = d
 
     def on_pretrain_routine_start(self) -> None:
-        self.pl_module.logger.log_hyperparams(self.pl_module.hp.to_dict())
+        self.pl_module.logger.log_hyperparams(self.pl_module.search_params.to_dict())
 
     def on_after_backward(self):
         if self.hp.num_steps_per_histogram_log \
@@ -214,19 +210,23 @@ class MetricTracker(param_torch_mods.Parametrized):
 
 class FactoredLightningModule(pl.LightningModule, param_torch_mods.Parametrized[param_torch_mods.PS]):
     """A Lightning Module which has been factored into distinct parts."""
+    class FactoredParams(params.ParameterSet):
+        data = data.TablestakesDataModule.DataParams()
+        opt = OptimizersMaker.OptParams()
+        metrics = MetricsTracker.MetricParams()
+        exp = param_torch_mods.ExperimentParams()
 
+    # TODO: gets params?
     def __init__(
             self,
-            hp: param_torch_mods.PS,
-            # dm: pl.LightningDataModule,
-            metrics_tracker: MetricTracker,
+            hp: FactoredParams,
+            metrics_tracker: MetricsTracker,
             opt: OptimizersMaker,
             *args,
             **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.hp = hp
-        # self.dm = dm
         self.metrics_tracker = metrics_tracker
         self.opt = opt
 
@@ -250,3 +250,16 @@ class FactoredLightningModule(pl.LightningModule, param_torch_mods.Parametrized[
 
     def on_after_backward(self):
         self.metrics_tracker.on_after_backward()
+
+    @staticmethod
+    def get_metrics_tracker_class():
+        return MetricsTracker
+
+    @classmethod
+    def from_hp(cls, hp: FactoredParams):
+        return cls(
+            hp=hp,
+            data_module= data.TablestakesDataModule(hp.data),
+            metrics_tracker=cls.get_metrics_tracker_class()(hp.metrics),
+            opt=OptimizersMaker(hp.opt),
+        )

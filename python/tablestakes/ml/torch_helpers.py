@@ -60,8 +60,13 @@ class ArtlessSmasher(nn.Module):
 #     def __init__(self, blah):
 #         super().__init__()
 
+class TransformerModuleParams(params.ParameterSet):
+    num_layers = 4
+    num_heads = 8
+    fc_dim_mult = 2
 
-def get_fast_linear_attention_encoder(hp: hyperparams.LearningParams, num_trans_input_dims: int, feature_map=None):
+
+def get_fast_linear_attention_encoder(hp: TransformerModuleParams, num_trans_input_dims: int, feature_map=None):
     """https://github.com/idiap/fast-transformers"""
     from fast_transformers import builders, feature_maps
 
@@ -74,11 +79,11 @@ def get_fast_linear_attention_encoder(hp: hyperparams.LearningParams, num_trans_
 
     # Create the builder for our transformers
     builder = builders.TransformerEncoderBuilder.from_kwargs(
-        n_layers=hp.num_trans_enc_layers,
-        n_heads=hp.num_trans_heads,
-        query_dimensions=num_trans_input_dims // hp.num_trans_heads,
-        value_dimensions=num_trans_input_dims // hp.num_trans_heads,
-        feed_forward_dimensions=num_trans_input_dims * hp.num_trans_fc_dim_mult,
+        n_layers=hp.num_layers,
+        n_heads=hp.num_heads,
+        query_dimensions=num_trans_input_dims // hp.num_heads,
+        value_dimensions=num_trans_input_dims // hp.num_heads,
+        feed_forward_dimensions=num_trans_input_dims * hp.fc_dim_mult,
         attention_type='linear',
         activation='gelu',
         feature_map=feature_map,
@@ -88,41 +93,41 @@ def get_fast_linear_attention_encoder(hp: hyperparams.LearningParams, num_trans_
     return builder.get()
 
 
-def get_performer_encoder(hp: hyperparams.LearningParams, num_trans_input_dims: int):
+def get_performer_encoder(hp: TransformerModuleParams, num_trans_input_dims: int):
     """https://github.com/lucidrains/performer-pytorch"""
     from performer_pytorch import Performer
     return Performer(
         dim=num_trans_input_dims,
-        depth=hp.num_trans_enc_layers,
-        heads=hp.num_trans_heads,
-        ff_mult=hp.num_trans_fc_dim_mult,
+        depth=hp.num_layers,
+        heads=hp.num_heads,
+        ff_mult=hp.fc_dim_mult,
     )
 
 
-def get_pytorch_transformer_encoder(hp: hyperparams.LearningParams, num_trans_input_dims: int):
+def get_pytorch_transformer_encoder(hp: TransformerModuleParams, num_trans_input_dims: int):
     enc_layer = nn.TransformerEncoderLayer(
         d_model=num_trans_input_dims,
-        nhead=hp.num_trans_heads,
-        dim_feedforward=hp.num_trans_fc_dim_mult * num_trans_input_dims,
+        nhead=hp.num_heads,
+        dim_feedforward=hp.fc_dim_mult * num_trans_input_dims,
         activation='gelu'
     )
 
     return nn.TransformerEncoder(
         encoder_layer=enc_layer,
-        num_layers=hp.num_trans_enc_layers,
+        num_layers=hp.num_layers,
     )
 
 
 def get_simple_ablatable_transformer_encoder(
-        hp: hyperparams.LearningParams,
+        hp: TransformerModuleParams,
         num_trans_input_dims: int,
         do_drop_k=True,
 ):
     return ablation.Encoder(
         d_model=num_trans_input_dims,
-        num_layers=hp.num_trans_enc_layers,
-        num_heads=hp.num_trans_heads,
-        d_ff_mult=hp.num_trans_fc_dim_mult,
+        num_layers=hp.num_layers,
+        num_heads=hp.num_heads,
+        d_ff_mult=hp.fc_dim_mult,
         do_drop_k=do_drop_k,
     )
 
@@ -135,26 +140,19 @@ TIME_PROCESS_NAME = 'train_time_process'
 
 
 class LogCopierCallback(pl.Callback):
-    @staticmethod
-    def _count_params(pl_module):
-        return sum(p.numel() for p in pl_module.parameters() if p.requires_grad)
-
     def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
         d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
-        d[PARAM_COUNT_NAME] = self._count_params(pl_module)
         tune.report(**d)
 
     def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
         d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
-        d[PARAM_COUNT_NAME] = self._count_params(pl_module)
         tune.report(**d)
 
     def on_test_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
         d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
-        d[PARAM_COUNT_NAME] = self._count_params(pl_module)
         tune.report(**d)
 
 

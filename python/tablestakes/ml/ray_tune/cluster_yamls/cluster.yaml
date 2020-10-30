@@ -1,4 +1,4 @@
-cluster_name: cluster-1
+cluster_name: cluster-ami
 
 provider:
     type: aws
@@ -17,19 +17,21 @@ idle_timeout_minutes: 20
 
 head_node:
     InstanceType: g4dn.xlarge
-    ImageId: latest_dlami
+#    ImageId: latest_dlami
+    ImageId: ami-0c528fc50c922876d
     BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
               VolumeSize: 200
-    InstanceMarketOptions:
-        MarketType: spot
-        SpotOptions:
-            MaxPrice: "0.30"
+#    InstanceMarketOptions:
+#        MarketType: spot
+#        SpotOptions:
+#            MaxPrice: "0.30"
 
 worker_nodes:
     InstanceType: g4dn.xlarge
-    ImageId: latest_dlami
+#    ImageId: latest_dlami
+    ImageId: ami-0539bf2eed8e613a3
     InstanceMarketOptions:
         MarketType: spot
         SpotOptions:
@@ -40,7 +42,7 @@ file_mounts: {
     "/tmp/chillpill_current_branch_sha": "~/projects/chillpill/.git/refs/heads/master",
     "/tmp/tablestakes_current_branch_sha": "~/projects/tablestakes/.git/refs/heads/master",
     ~/.logger_api_key: ~/.logger_api_key,
-    "~/lib/": "~/projects/tablestakes/python/lib/",
+#    "~/lib/": "~/projects/tablestakes/python/lib/",
     "~/data/tablestakes/datasets/": "~/data/tablestakes/datasets/",
 }
 
@@ -80,46 +82,53 @@ file_mounts: {
 #    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/tablestakes/python/
 
 
-setup_commands:
-#    - conda install pytorch torchvision cudatoolkit=10.2 -c pytorch
-
-    - rm -rf /home/ubuntu/anaconda3/lib/python3.7/site-packages/s3transfer*
-
-    # deep learning stuff
-    - source /home/ubuntu/.dlamirc && conda install -y -c anaconda openmpi=4.0.2 s3transfer=0.3.3 docutils=0.15.2 boto3=1.16.0 botocore=1.19.1
-    - source /home/ubuntu/.dlamirc && pip install /home/ubuntu/lib/torch-1.8.0a0-cp37-cp37m-linux_x86_64.whl \
-        torchvision tabulate tensorboard tensorboardX \
-        pytorch-lightning \
-        hyperopt neptune-client neptune-contrib[viz] mlflow hiplot \
-        jupyter ipywidgets bokeh "boto3>=1.10.44"
-
-    # ray
-    - source /home/ubuntu/.dlamirc && pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-1.1.0.dev0-cp37-cp37m-manylinux1_x86_64.whl
-    - source /home/ubuntu/.dlamirc && pip install ray[all]
-    #  for https://docs.ray.io/en/stable/webui.html
-    - source /home/ubuntu/.dlamirc && jupyter nbextension enable --py --sys-prefix widgetsnbextension
-
-    # my stuff
-    - mkdir -p ~/projects
-
-    #  fast transformers
-    - source /home/ubuntu/.dlamirc && pip install lib/pytorch_fast_transformers-0.3.0-cp37-cp37m-linux_x86_64.whl
-    - source /home/ubuntu/.dlamirc && pip install --upgrade "cloudpickle>=1.6.0"
-
-    #  dotfiles
-    - test -e projects/dotfiles || git clone https://github.com/kevinbache/dotfiles.git ~/projects/dotfiles
-    - cd projects/dotfiles && git fetch && git checkout `cat /tmp/dotfiles_current_branch_sha`
-    - source /home/ubuntu/.dlamirc && python ~/projects/dotfiles/link_files.py
-
-    #  chillpill
-    - test -e projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
-    - cd projects/chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
-    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/chillpill/
-
-    #  tablestakes
-    - test -e projects/tablestakes/python || git clone https://github.com/kevinbache/tablestakes.git ~/projects/tablestakes
-    - cd projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
-    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/tablestakes/python/
+setup_commands: []
+#    - rm -rf /home/ubuntu/anaconda3/lib/python3.7/site-packages/s3transfer*
+#
+#    # lib.  after awscli
+#    - mkdir ~/lib/
+##    - aws s3 cp s3://tablestakes-lib/torch-1.8.0a0-cp37-cp37m-linux_x86_64.whl ./lib/
+#    - aws s3 cp s3://tablestakes-lib/pytorch_fast_transformers-0.3.0-cp37-cp37m-linux_x86_64.whl ./lib/
+#
+#    # install torch
+#    - source /home/ubuntu/.dlamirc && conda install -y pytorch torchvision cudatoolkit=10.2 s3transfer -c pytorch -c anaconda
+#
+#    # deep learning stuff
+#    - source /home/ubuntu/.dlamirc && conda install -y -c anaconda openmpi=4.0.2 s3transfer=0.3.3 docutils=0.15.2 boto3=1.16.0 botocore=1.19.1
+#    - source /home/ubuntu/.dlamirc && pip install \
+##    - source /home/ubuntu/.dlamirc && pip install /home/ubuntu/lib/torch-1.8.0a0-cp37-cp37m-linux_x86_64.whl \
+#        torchvision tabulate tensorboard tensorboardX \
+#        pytorch-lightning \
+#        hyperopt neptune-client neptune-contrib[viz] mlflow hiplot \
+#        jupyter ipywidgets bokeh "boto3>=1.15"
+#
+#    # ray
+#    - source /home/ubuntu/.dlamirc && pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-1.1.0.dev0-cp37-cp37m-manylinux1_x86_64.whl
+#    - source /home/ubuntu/.dlamirc && pip install ray[all]
+#    #  for https://docs.ray.io/en/stable/webui.html
+#    - source /home/ubuntu/.dlamirc && jupyter nbextension enable --py --sys-prefix widgetsnbextension
+#
+#    # my stuff
+#    - mkdir -p ~/projects
+#
+#    #  fast transformers
+#    - source /home/ubuntu/.dlamirc && pip install lib/pytorch_fast_transformers-0.3.0-cp37-cp37m-linux_x86_64.whl
+#    - source /home/ubuntu/.dlamirc && pip install --upgrade "cloudpickle>=1.6.0"
+#
+#    #  dotfiles
+#    - test -e projects/dotfiles || git clone https://github.com/kevinbache/dotfiles.git ~/projects/dotfiles
+#    - cd projects/dotfiles && git fetch && git checkout `cat /tmp/dotfiles_current_branch_sha`
+#    - source /home/ubuntu/.dlamirc && python ~/projects/dotfiles/link_files.py
+#
+#    #  chillpill
+#    - test -e projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
+#    - cd projects/chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
+#    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/chillpill/
+#
+#    #  tablestakes
+#    - test -e projects/tablestakes/python || git clone https://github.com/kevinbache/tablestakes.git ~/projects/tablestakes
+#    - cd projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
+#    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/tablestakes/python/
 
 
 head_start_ray_commands:

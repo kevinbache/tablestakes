@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 import torch
-from tablestakes.ml import param_torch_mods, factored
+# noinspection PyProtectedMember
 from torch.utils.data import Dataset, DataLoader
 import pytorch_lightning as pl
 
@@ -220,7 +220,7 @@ class TablestakesDatasetLoadMaker(load_makers.LoadMaker[TablestakesDataset]):
 class XYDocumentDataModule(pl.LightningDataModule):
     class DataParams(params.ParameterSet):
         dataset_name = None
-        docs_root_dir =  None
+        docs_root_dir = None
         dataset_root_dir = None
         p_valid = 0.1
         p_test = 0.1
@@ -371,9 +371,24 @@ class XYDocumentDataModule(pl.LightningDataModule):
         return batch
 
 
+class DataParams(params.ParameterSet):
+    # dataset_name = 'num=1000_7cda'
+    dataset_name = 'num=100_d861'
+    docs_root_dir = constants.DOCS_DIR
+    dataset_root_dir = constants.DATASETS_DIR
+    p_valid = 0.1
+    p_test = 0.1
+    seed = 42
+    do_ignore_cached_dataset = False
+    num_workers = 4
+    num_cpus = 4
+    num_gpus = 1
+    max_seq_length = 1024
+    batch_size = 32
+
+
 class TablestakesDataModule(XYDocumentDataModule):
     class DataParams(params.ParameterSet):
-        # dataset_name = 'num=1000_7cda'
         dataset_name = 'num=100_d861'
         docs_root_dir = constants.DOCS_DIR
         dataset_root_dir = constants.DATASETS_DIR
@@ -420,4 +435,5 @@ class TablestakesDataModule(XYDocumentDataModule):
         ys[constants.Y_KORV_BASE_NAME] = [y.long().squeeze(1) for y in ys[constants.Y_KORV_BASE_NAME]]
         return ys
 
-
+    def prepare_data(self, *args, **kwargs):
+        pass

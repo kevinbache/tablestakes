@@ -1,4 +1,5 @@
 import argparse
+import os
 import socket
 from typing import *
 
@@ -13,329 +14,339 @@ from ray.tune.integration import pytorch_lightning as tune_pl
 
 from chillpill import params
 
-from tablestakes import constants, utils, load_makers
-from tablestakes.ml import hyperparams, model_transformer, torch_helpers, model_bertenc_conv_tclass, data
-
-model_class = model_bertenc_conv_tclass.ModelBertEncConvTClass
-param_class = model_class.Params
+from tablestakes import constants, utils
+from tablestakes.ml import torch_helpers, data, param_torch_mods, factored, model_bertenc_conv_tclass
 
 
-
-def tune_run(search_params: param_class):
-    pass
-
-
-def train_fn(config: Dict, checkpoint_dir=None):
-    hp = param_class.from_dict(config)
-    assert isinstance(hp, param_class)
-
-    utils.set_seeds(hp.data.seed)
-
-    phase_names = model_transformer.RectTransformerModule.PHASE_NAMES
-    phase_to_metric_names = {
-        pn: model_class.metric.get_all_metric_names_for_phase(pn) for pn in phase_names
-    }
-
-    pl_callbacks = [
-        torch_helpers.CounterTimerCallback(),
-        tune_pl.TuneReportCallback(
-            metrics=phase_to_metric_names[model_transformer.RectTransformerModule.TRAIN_PHASE_NAME],
-            on='train_end',
-        ),
-        tune_pl.TuneReportCheckpointCallback(
-            metrics=phase_to_metric_names[model_transformer.RectTransformerModule.VALID_PHASE_NAME],
-            filename=checkpoint_dir or constants.CHECKPOINT_FILE_BASENAME,
-            on='validation_end',
-        ),
-        tune_pl.TuneReportCallback(
-            metrics=phase_to_metric_names[model_transformer.RectTransformerModule.TEST_PHASE_NAME],
-            on='test_end',
-        ),
-    ]
-    trainer = pl.Trainer(
-        callbacks=pl_callbacks,
-        logger=torch_helpers.get_pl_logger(hp, tune),
-        max_epochs=hp.num_epochs,
-        gpus=None if is_local_run else hp.num_gpus,
-        weights_summary='full',
-        profiler=True,
-        deterministic=True,
-        log_every_n_steps=hp.num_steps_per_metric_log,
-    )
-    net = model_transformer.RectTransformerModule(hp)
-
-    fit_out = trainer.fit(net)
-    print('Done with this fit run')
-
-    return fit_out
-
-
-def create_bucket_if_not_exist(upload_dir: str):
-    assert upload_dir.startswith('s3://')
-    bucket_name = upload_dir.replace('s3://', '')
-    s3_res = boto3.resource('s3')
-    s3_client = boto3.client('s3')
-    if s3_res.Bucket(bucket_name) not in s3_client.list_buckets():
-        s3_client.create_bucket(Bucket=bucket_name)
-
-
-if __name__ == '__main__':
-    # dataset_name = 'num=10_40db'
-    # dataset_name = 'num=1000_4d8d'
-    # dataset_name = 'num=2000_56d2'
-    # dataset_name = 'num=10000_99e0'
-    # search_params = hyperparams.LearningParams(dataset_name)
-
-    # this is required because different types of trial results either do or don't get certain metrics
-    import os
-    os.environ['TUNE_DISABLE_STRICT_METRIC_CHECKING'] = '1'
-
-    # ##############
-    # # model
-    # #  embedder
-    # search_params.num_embedding_base_dim = new_properties.Discrete([20, 20 + 16, 20 + 32])
-    # search_params.do_include_embeddings = new_properties.Boolean(p_true=0.9)
-    #
-    # #  transformer
-    # search_params.pre_trans_linear_dim = None
-    #
-    # search_params.num_trans_enc_layers = new_properties.Discrete([4, 6, 8, 12, 16])
-    # search_params.num_trans_heads = new_properties.Discrete([2, 4, 8, 16])
-    # search_params.num_trans_fc_dim_mult = new_properties.Discrete([2, 3, 4, 6])
-    #
-    # search_params.trans_encoder_type = 'torch'
-    #
-    # search_params.do_cat_x_base_before_fc = new_properties.Boolean(p_true=0.9)
-    #
-    # #  fully connected
-    # search_params.num_fc_blocks = new_properties.Discrete([4, 6, 8, 12, 16])
-    # search_params.log2num_neurons_start = new_properties.Integer(3, 10)
-    # search_params.log2num_neurons_end = new_properties.Integer(3, 10)
-    # search_params.num_fc_blocks_per_resid = new_properties.Integer(1, 4)
-    #
-    # search_params.num_fc_layers_per_dropout = new_properties.Discrete([1, 2, 4, 8])
-    # # prob of dropping each unit
-    # search_params.dropout_p = new_properties.Float(0.1, 0.7)
-    #
-    # search_params.num_head_blocks = new_properties.Discrete([1, 2, 4, 8])
-    # search_params.log2num_head_neurons = new_properties.Integer(3, 8)
-    # search_params.num_head_blocks_per_resid = new_properties.Integer(1, 3)
-    #
-    # search_params.num_groups_for_gn = new_properties.Discrete([16, 32])
-    #
-    # ##############
-    # # optimization
-    # search_params.lr = new_properties.Discrete([3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2])
-    # search_params.log2_batch_size = new_properties.Integer(0, 11)
-    #
-    # # korv, which_kv
-    # search_params.korv_loss_weight = new_properties.Discrete([0.1, 0.5, 1.0])
-    #
-    # search_params.num_epochs = 100
-    #
-    # ##############
-    # # hp search
-    # search_params.num_hp_samples = 100
-    # search_params.search_metric = model_transformer.RectTransformerModule.get_valid_metric_name('acc', 'which_kv')
-    # search_params.search_mode = 'max'
-    # search_params.asha_grace_period = 4
-    # search_params.asha_reduction_factor = 2
-    #
-    # ##############
-    # # data
-    # # batch size must be 1
-    # search_params.p_valid = 0.1
-    # search_params.p_test = 0.1
-    #
-    # # for data loading
-    # search_params.num_workers = 4
-    #
-    # ##############
-    # # extra
-    # search_params.num_steps_per_histogram_log = 200
-    # search_params.num_steps_per_metric_log = 100
-    # search_params.upload_dir = 's3://kb-tester-2020-10-14'
-    # search_params.project_name = 'tablestakes'
-    # search_params.experiment_name = 'trans_v0.1.3'
-    # search_params.group_name = 'new_group'
-    # search_params.experiment_tags = ['tune', 'search', 'v0.0.3']
-    #
-    # search_params.num_cpus = 2
-    # search_params.num_gpus = 1
-    # search_params.seed = 42
-    #
-    # do_test_one = False
-    # if do_test_one:
-    #     dataset_name = 'num=1000_4d8d'
-    #     search_params = hyperparams.LearningParams(dataset_name)
-    #     search_params.num_hp_samples = 4
-    #     search_params.num_epochs = 10
-    #     search_params.num_cpus = 0.5
-    #     search_params.num_gpus = 0.5
-    #     search_params.experiment_tags.append('do_test_one')
-    #     print("=======================================")
-    #     print("=======================================")
-    #     print("============ TESTING ON 1 =============")
-    #     print("=======================================")
-    #     print("=======================================")
-    #
-
-
-
+class TuneRunner(param_torch_mods.Parametrized['factored.FactoredLightningModule.FactoredParams']):
     class TuneParams(params.ParameterSet):
         asha_grace_period = 4
         asha_reduction_factor = 2
         num_hp_samples = 10
 
-    ray_local_mode = False
+    def __init__(
+            self,
+            search_params: "TuneFactoredParams",
+            factored_lightning_module_class: type,
+            callbacks: Optional[List[pl.callbacks.Callback]] = None,
+            ray_sequential_mode=False,
+    ):
+        os.environ['TUNE_DISABLE_STRICT_METRIC_CHECKING'] = '1'
 
-    search_params = param_class()
-    search_params.tune = TuneParams()
+        self.ensure_hp_is_factored(search_params)
+        super().__init__(search_params)
+        self.search_params = self.hp
 
+        self._param_class = search_params.__class__
 
-    create_bucket_if_not_exist(search_params.metrics.output_dir)
+        assert issubclass(factored_lightning_module_class, factored.FactoredLightningModule)
+        self._factored_lightning_module_class = factored_lightning_module_class
 
-    def add_local_cluster_tag(search_params: param_class):
+        self._metrics_tracker_class = self._factored_lightning_module_class.get_metrics_tracker_class()
+
+        if callbacks is None:
+            callbacks = [
+                torch_helpers.CounterTimerCallback(),
+                torch_helpers.LogCopierCallback(),
+            ]
+        self.callbacks = callbacks
+
+        self.create_bucket_if_not_exist(search_params.metrics.output_dir)
+
+        # True if running on macbook laptop, False if running on cluster
+        is_running_on_local_machine = self.add_local_cluster_tag(search_params)
+
+        ################
+        #   init ray   #
+        ################
+        ray.init(
+            address=None if is_running_on_local_machine else 'auto',
+            ignore_reinit_error=True,
+            include_dashboard=True,
+            local_mode=ray_sequential_mode,
+        )
+
+    @staticmethod
+    def add_local_cluster_tag(search_params: "TuneFactoredParams"):
         hostname = socket.gethostname()
         is_local_run = hostname.endswith('.local')
         search_params.exp.experiment_tags.append('local' if is_local_run else 'cluster')
         return is_local_run
 
-    is_local_run = add_local_cluster_tag(search_params)
-
+    @staticmethod
     def get_address_str_from_args():
         parser = argparse.ArgumentParser()
         parser.add_argument("--address", default='auto')
         args = parser.parse_args()
         return str(args.address)
 
-    ray.shutdown()
-    ray.init(
-        address=None if is_local_run else get_address_str_from_args(),
-        ignore_reinit_error=True,
-        include_dashboard=True,
-        local_mode=ray_local_mode,
-    )
+    @staticmethod
+    def ensure_hp_is_factored(hp: "TuneFactoredParams"):
+        assert isinstance(hp, factored.FactoredLightningModule.FactoredParams)
+        assert isinstance(hp.data, data.TablestakesDataModule.DataParams)
+        assert isinstance(hp.opt, factored.OptimizersMaker.OptParams)
+        assert isinstance(hp.metrics, factored.MetricsTracker.MetricParams)
+        assert isinstance(hp.exp, param_torch_mods.ExperimentParams)
+        assert isinstance(hp.tune, TuneRunner.TuneParams)
 
-    tune_scheduler = tune.schedulers.ASHAScheduler(
-        metric=search_params.metrics.search_metric,
-        mode=search_params.metrics.search_mode,
-        grace_period=search_params.tune.asha_grace_period,
-        reduction_factor=search_params.tune.asha_reduction_factor,
-    )
+    def get_tune_callbacks(self):
+        return [
+            tune_pl.TuneReportCallback(
+                metrics=self._metrics_tracker_class.metric_tracker.get_all_metric_names_for_phase(
+                    constants.TRAIN_PHASE_NAME),
+                on='train_end',
+            ),
+            tune_pl.TuneReportCheckpointCallback(
+                metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.VALID_PHASE_NAME),
+                filename=constants.CHECKPOINT_FILE_BASENAME,
+                on='validation_end',
+            ),
+            tune_pl.TuneReportCallback(
+                metrics=self._metrics_tracker_class.metric.get_all_metric_names_for_phase(constants.TEST_PHASE_NAME),
+                on='test_end',
+            ),
+        ]
 
-    train_loss_name = \
-        model_transformer.RectTransformerModule.get_train_metric_name(metric_name='loss', output_name='total')
-    valid_loss_name = \
-        model_transformer.RectTransformerModule.get_valid_metric_name(metric_name='loss', output_name='total')
+    @staticmethod
+    def create_bucket_if_not_exist(upload_dir: str):
+        assert upload_dir.startswith('s3://')
+        bucket_name = upload_dir.replace('s3://', '')
+        s3_res = boto3.resource('s3')
+        s3_client = boto3.client('s3')
+        if s3_res.Bucket(bucket_name) not in s3_client.list_buckets():
+            s3_client.create_bucket(Bucket=bucket_name)
 
-    assert train_loss_name == 'train_loss_total'
+    def _train_fn(self, config: Dict, checkpoint_dir=None, fast_dev_run=False):
+        hp = self._param_class.from_dict(config)
+        assert isinstance(hp, self._param_class)
 
-    cli_reporter_metric_cols = [
-        torch_helpers.PARAM_COUNT_NAME,
-        torch_helpers.CURRENT_EPOCH_NAME,
-        'time_this_iter_s',
-        'time_total_s',
-        train_loss_name,
-        valid_loss_name,
-        search_params.metrics.search_metric,
-    ]
+        if checkpoint_dir:
+            # see https://docs.ray.io/en/master/tune/user-guide.html#checkpointing
+            raise NotImplementedError(f"Got checkpoint_dir in trian_fn: {checkpoint_dir}")
 
-    cli_reporter_param_cols = search_params.get_samplable_param_names()
-    reporter = tune.CLIReporter(
-        max_progress_rows=search_params.tune.num_hp_samples,
-        parameter_columns=cli_reporter_param_cols,
-        metric_columns=cli_reporter_metric_cols,
-    )
+        net = self._factored_lightning_module_class.from_hp(hp=hp)
 
-    search_dict = search_params.to_ray_tune_search_dict()
+        utils.set_seeds(hp.data.seed)
 
-    # see tune.utils.UtilMonitor
-    LOG_SYS_USAGE = 'log_sys_usage'
-    # util_keys = [
-    #     LOG_SYS_USAGE,
-    # ]
-    search_dict[LOG_SYS_USAGE] = True
+        # noinspection PyTypeChecker
+        trainer = pl.Trainer(
+            logger=True if fast_dev_run else param_torch_mods.get_pl_logger(hp.exp),
+            default_root_dir=hp.metrics.output_dir,
+            callbacks=self.callbacks + self.get_tune_callbacks(),
+            max_epochs=hp.opt.num_epochs,
+            # gpus=None if is_local_run else search_params.data.num_gpus,
+            gpus=hp.data.num_gpus,
+            weights_summary='full',
+            fast_dev_run=fast_dev_run,
+            accumulate_grad_batches=1,
+            profiler=True,
+            deterministic=True,
+            log_every_n_steps=hp.metrics.num_steps_per_metric_log,
+        )
+        fit_out = trainer.fit(net, datamodule=net.dm)
 
-    from ray import tune
+        return fit_out
 
-    tune_loggers = list(tune_logger.DEFAULT_LOGGERS)
-    # if not is_local_run:
-    #     tune_loggers.append(torch_helpers.TuneNeptuneLogger)
+    def get_train_fn(self, fast_dev_run):
+        """Just a closure"""
 
-    # blocks until done.  create dataset once to make sure it's downloaded and available for workers
-    print('loading or making data')
-    # ds = load_makers.TablestakesDatasetLoadMaker(
-    #     saved_dataset_file=search_params.dataset_file,
-    #     input_docs_directory_for_maker=search_params.docs_dir,
-    # )
-    dm = data.TablestakesDataModule(search_params.data)
+        def train_fn(config: Dict, checkpoint_dir: str):
+            return self._train_fn(
+                config=config,
+                checkpoint_dir=checkpoint_dir,
+                fast_dev_run=fast_dev_run,
+            )
 
+        return train_fn
 
-    def get_resources_per_trial(search_params: param_class):
+    @staticmethod
+    def get_resources_per_trial(search_params: "TuneFactoredParams", include_gpu=False):
         resources_per_trial = {
             "cpu": search_params.data.num_cpus,
         }
-        if not is_local_run:
+        if not include_gpu:
             resources_per_trial['gpu'] = search_params.data.num_gpus
         return resources_per_trial
 
-    def do_stop(trial_id, result):
-        if torch_helpers.CURRENT_EPOCH_NAME in result:
-            return result[torch_helpers.CURRENT_EPOCH_NAME] > search_params.num_epochs
-        else:
-            return False
-    stopper = tune.stopper.FunctionStopper(do_stop)
+    @staticmethod
+    def get_tune_stopper(num_epochs: int):
+        def do_stop(_, result):
+            if torch_helpers.CURRENT_EPOCH_NAME in result:
+                return result[torch_helpers.CURRENT_EPOCH_NAME] > num_epochs
+            else:
+                return False
 
-    analysis = tune.run(
-        run_or_experiment=train_fn,
-        name=search_params.get_project_exp_name(),
-        stop=stopper,
-        config=search_dict,
-        resources_per_trial=resources_per_trial,
-        num_samples=search_params.num_hp_samples,
-        # local_dir=None,
-        # upload_dir=search_params.upload_dir,
-        # trial_name_creator=,
-        sync_config=sync_config,
-        loggers=tune_loggers,
-        log_to_file=False,
-        # sync_to_cloud=None,
-        # sync_to_driver=None,
-        checkpoint_freq=0,
-        checkpoint_at_end=False,
-        # sync_on_checkpoint=True,
-        keep_checkpoints_num=2,
-        checkpoint_score_attr=search_params.search_metric,
-        # global_checkpoint_period=10,
-        # export_formats=None,
-        # max_failures=0,
-        fail_fast=False,
-        # restore=None,
-        # search_alg=search_alg,
-        scheduler=tune_scheduler,
-        # with_server=False,
-        # server_port=TuneServer.DEFAULT_PORT,
-        verbose=2,
-        progress_reporter=reporter,
-        # resume='REMOTE',
-        queue_trials=False,
-        # reuse_actors=False,
-        # trial_executor=None,
-        # raise_on_failed_trial=True,
-        # return_trials=False,
-        # ray_auto_init=True,
+        return tune.stopper.FunctionStopper(do_stop)
+
+    @staticmethod
+    def get_tune_loggers():
+        tune_loggers = list(tune_logger.DEFAULT_LOGGERS)
+        # if not is_local_run:
+        #     tune_loggers.append(torch_helpers.TuneNeptuneLogger)
+        return tune_loggers
+
+    def get_cli_reporter(self, extra_metric_cols: Optional[List[str]] = None):
+        if extra_metric_cols is None:
+            extra_metric_cols = []
+
+        default_cli_reporter_metric_cols = [
+            torch_helpers.PARAM_COUNT_NAME,
+            torch_helpers.CURRENT_EPOCH_NAME,
+            'time_this_iter_s',
+            'time_total_s',
+            'train_loss_total',
+            'valid_loss_total',
+            self.search_params.opt.search_metric,
+        ]
+
+        # unique
+        metric_cols_set = set()  # a temporary lookup set
+        metric_cols = [
+            x
+            for x in default_cli_reporter_metric_cols if x not in metric_cols_set and metric_cols_set.add(x) is None
+        ]
+
+        return tune.CLIReporter(
+            max_progress_rows=self.search_params.tune.num_hp_samples,
+            parameter_columns=self.search_params.get_samplable_param_names(),
+            metric_columns=metric_cols + extra_metric_cols,
+        )
+
+    @staticmethod
+    def get_tune_scheduler(search_params: "TuneFactoredParams") -> tune.schedulers.TrialScheduler:
+        return tune.schedulers.ASHAScheduler(
+            metric=search_params.opt.search_metric,
+            mode=search_params.opt.search_mode,
+            grace_period=search_params.tune.asha_grace_period,
+            reduction_factor=search_params.tune.asha_reduction_factor,
+        )
+
+    def run(self, fast_dev_run=False, include_gpu=False):
+
+        search_dict = self.search_params.to_ray_tune_search_dict()
+        # see tune.utils.UtilMonitor
+        search_dict['log_sys_usage'] = True
+
+        analysis = tune.run(
+            run_or_experiment=self.get_train_fn(fast_dev_run=fast_dev_run),
+            name=self.search_params.exp.get_project_exp_name(),
+            stop=self.get_tune_stopper(self.search_params.opt.num_epochs),
+            config=search_dict,
+            resources_per_trial=self.get_resources_per_trial(self.search_params, include_gpu=include_gpu),
+            num_samples=self.search_params.tune.num_hp_samples,
+            sync_config=tune.SyncConfig(upload_dir=self.search_params.metrics.output_dir),
+            loggers=self.get_tune_loggers(),
+            log_to_file=True,
+            keep_checkpoints_num=2,
+            checkpoint_score_attr=f'{self.search_params.opt.search_mode}-{self.search_params.opt.search_metric}',
+            fail_fast=False,
+            scheduler=self.get_tune_scheduler(self.search_params),
+            verbose=2,
+            progress_reporter=self.get_cli_reporter(),
+            queue_trials=False,
+        )
+
+        param_hash = self.search_params.get_short_hash(num_chars=8)
+        analysis_file = self.search_params.metrics.output_dir / f'tune_analysis_{param_hash}.pkl'
+        print(f"Saving {analysis_file}")
+        utils.save_pickle(analysis_file, analysis)
+
+        best_trial = analysis.get_best_trial(
+            self.search_params.opt.search_metric,
+            self.search_params.opt.search_mode,
+            "last-5-avg"
+        )
+
+        print(f'best_trial.last_result: {best_trial.last_result}')
+
+        print("Best trial config: {}".format(best_trial.config))
+        print("Best trial final search_metric: {}".format(best_trial.last_result[self.search_params.opt.search_metric]))
+
+
+class TuneFactoredParams(factored.FactoredLightningModule.FactoredParams):
+    data = data.TablestakesDataModule.DataParams()
+    opt = factored.OptimizersMaker.OptParams()
+    metrics = factored.MetricsTracker.MetricParams()
+    exp = param_torch_mods.ExperimentParams()
+    tune = TuneRunner.TuneParams()
+
+    # noinspection PyTypeChecker
+    @classmethod
+    def from_factored_params(
+            cls,
+            hp: factored.FactoredLightningModule.FactoredParams,
+            tune_params: TuneRunner.TuneParams = TuneRunner.TuneParams(),
+    ) -> "TuneFactoredParams":
+        # oh god this is dirty
+        hp.tune = tune_params
+        return hp
+
+
+# noinspection DuplicatedCode
+if __name__ == '__main__':
+    fast_dev_run = False
+
+    hp = model_bertenc_conv_tclass.ModelBertEncConvTClass.Params(
+        max_seq_len=2 ** 11,
+        batch_size=32,
     )
 
-    analysis_file = constants.OUTPUT_DIR / f'tune_analysis_{search_params.get_short_hash(num_chars=8)}.pkl'
-    print(f"Saving {analysis_file}")
-    utils.save_pickle(analysis_file, analysis)
+    hp.data.dataset_name = 'num=4000_9b9f'
+    hp.data.do_ignore_cached_dataset = False
+    hp.data.seed = 42
+    hp.data.num_workers = 4
+    hp.data.num_gpus = 1
+    hp.data.num_cpus = 4
 
-    best_trial = analysis.get_best_trial(search_params.search_metric, search_params.search_mode, "last-5-avg")
+    hp.opt.search_metric = 'valid_loss_total'
+    hp.opt.search_mode = 'min'
+    hp.opt.num_epochs = 10
+    hp.opt.lr = params.Discrete([1e-4, 1e-3, 1e-2, 1e-1, 1e0])
+    hp.opt.min_lr = 1e-6
+    hp.opt.patience = 10
 
-    print(f'best_trial.last_result: {best_trial.last_result}')
+    hp.metrics.num_steps_per_histogram_log = 5
+    hp.metrics.num_steps_per_metric_log = 5
+    hp.metrics.output_dir = constants.OUTPUT_DIR
 
-    print("Best trial config: {}".format(best_trial.config))
-    print("Best trial final validation loss: {}".format(best_trial.last_result[valid_loss_name]))
-    print("Best trial final search_metric: {}".format(best_trial.last_result[search_params.search_metric]))
+    hp.exp.project_name = 'tablestakes'
+    hp.exp.experiment_name = 'korv which'
+    hp.exp.experiment_tags = ['korv_which', 'conv', 'sharp', 'testing']
+    hp.exp.sources_glob_str = constants.THIS_DIR.parent.parent / '**/*.py'
 
+    hp.embed.dim = 16
+    hp.embed.requires_grad = True
+
+    hp.conv.num_features = params.Discrete([32, 64, 128, 256])
+    hp.conv.num_layers = params.Integer(2, 11)
+    hp.conv.kernel_size = 3
+    hp.conv.num_groups = params.Discrete([8, 16, 32, 64])
+    hp.conv.num_blocks_per_pool = 20
+    hp.conv.num_blocks_per_skip = 2
+    hp.conv.requires_grad = True
+
+    hp.fc.num_features = params.Discrete([32, 64, 128, 256])
+    hp.fc.num_layers = params.Integer(2, 7)
+    hp.fc.num_groups = params.Discrete([8, 16, 32, 64])
+    hp.fc.num_blocks_per_residual = params.Integer(1, 5)
+    hp.fc.num_blocks_per_dropout = params.Integer(1, 8)
+    hp.fc.requires_grad = True
+
+    hp.heads.num_features = params.Discrete([32, 64, 128, 256])
+    hp.heads.num_layers = params.Integer(2, 5)
+    hp.heads.num_groups = params.Discrete([8, 16, 32, 64])
+    hp.heads.num_blocks_per_residual = params.Integer(1, 5)
+    hp.heads.num_blocks_per_dropout = params.Integer(1, 5)
+    hp.heads.requires_grad = True
+
+    # noinspection PyTypeChecker
+    tune_runner = TuneRunner(
+        search_params=hp,
+        factored_lightning_module_class=model_bertenc_conv_tclass.ModelBertEncConvTClass,
+        callbacks=[],
+        ray_sequential_mode=False,
+    )
+    tune_runner.run(
+        fast_dev_run=False,
+        include_gpu=True
+    )

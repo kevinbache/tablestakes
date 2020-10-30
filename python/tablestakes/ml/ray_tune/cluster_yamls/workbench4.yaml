@@ -2,8 +2,8 @@ cluster_name: workbench-4x
 
 provider:
     type: aws
-    region: us-west-2
-    availability_zone: us-west-2a,us-west-2b
+    region: us-west-1
+    availability_zone: us-west-1a,us-west-1b,us-west-1c
 auth:
     ssh_user: ubuntu
 
@@ -42,7 +42,7 @@ head_node:
 #    g4dn.16xlarge	$1.3056 per Hour
 
 # Remote -> Local
-}file_mounts: {
+file_mounts: {
     "/tmp/chillpill_current_branch_sha": "~/projects/chillpill/.git/refs/heads/master",
     "/tmp/tablestakes_current_branch_sha": "~/projects/tablestakes/.git/refs/heads/master",
     ~/.logger_api_key: ~/.logger_api_key,
@@ -51,15 +51,16 @@ head_node:
 }
 
 setup_commands:
-    - rm -rf /home/anaconda3/lib/python3.7/site-packages/s3transfer*
+    - rm -rf /home/ubuntu/anaconda3/lib/python3.7/site-packages/s3transfer*
 
     # deep learning stuff.  custom torch.
-    - conda install -y -c anaconda openmpi s3transfer
-    - pip install /home//lib/torch-1.8.0a0-cp37-cp37m-linux_x86_64.whl \
+    - conda install -y -c anaconda openmpi=4.0.2 s3transfer=0.3.3 docutils=0.15.2 boto3=1.16.0 botocore=1.19.1
+    - pip install /home/ubuntu/lib/torch-1.8.0a0-cp37-cp37m-linux_x86_64.whl \
         torchvision tabulate tensorboard tensorboardX \
         pytorch-lightning \
+        transformers \
         hyperopt neptune-client neptune-contrib[viz] mlflow hiplot \
-        jupyter ipywidgets bokeh "boto3>=1.10.44"
+        jupyter ipywidgets bokeh
 
     # ray
     - pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-1.1.0.dev0-cp37-cp37m-manylinux1_x86_64.whl

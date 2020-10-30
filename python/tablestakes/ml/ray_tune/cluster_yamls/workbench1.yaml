@@ -2,8 +2,8 @@ cluster_name: workbench-1x
 
 provider:
     type: aws
-    region: us-west-2
-    availability_zone: us-west-2a,us-west-2b
+    region: us-west-1
+    availability_zone: us-west-1a,us-west-1b,us-west-1c
 auth:
     ssh_user: ubuntu
 
@@ -26,10 +26,10 @@ head_node:
         - DeviceName: /dev/sda1
           Ebs:
               VolumeSize: 200
-    InstanceMarketOptions:
-        MarketType: spot
-        SpotOptions:
-            MaxPrice: "0.40"
+#    InstanceMarketOptions:
+#        MarketType: spot
+#        SpotOptions:
+#            MaxPrice: "0.40"
 
 # https://aws.amazon.com/ec2/instance-types/g4/
 # https://aws.amazon.com/ec2/spot/pricing/
@@ -41,7 +41,6 @@ head_node:
 #    g4dn.12xlarge	$1.304 per Hour
 #    g4dn.16xlarge	$1.3056 per Hour
 
-
 # Remote -> Local
 file_mounts: {
     "/tmp/chillpill_current_branch_sha": "~/projects/chillpill/.git/refs/heads/master",
@@ -52,8 +51,6 @@ file_mounts: {
 }
 
 setup_commands:
-    - source /home/ubuntu/.dlamirc
-
     - rm -rf /home/ubuntu/anaconda3/lib/python3.7/site-packages/s3transfer*
 
     # deep learning stuff.  custom torch.
@@ -96,4 +93,3 @@ setup_commands:
 head_start_ray_commands:
     - ray stop
     - ulimit -n 65536; ray start --head --port=6379 --object-manager-port=8076 --autoscaling-config=~/ray_bootstrap_config.yaml
-
