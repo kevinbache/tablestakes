@@ -393,30 +393,36 @@ if __name__ == '__main__':
 
     hp.exp.project_name = 'tablestakes'
     hp.exp.experiment_name = 'korv_which'
-    hp.exp.experiment_tags = ['korv_which', 'conv', 'sharp', 'testing']
+    hp.exp.experiment_tags = ['korv_which', 'conv', 'sharp', 'testing', 'search']
     hp.exp.sources_glob_str = constants.THIS_DIR.parent.parent / '**/*.py'
 
     hp.embed.dim = 16
     hp.embed.requires_grad = True
 
-    hp.conv.num_features = params.Discrete([32, 64, 128, 256])
+    # hp.heads.num_features = params.Discrete([32, 64, 128, 256])
+    hp.heads.num_features = 32
     hp.conv.num_layers = params.Integer(2, 11)
     hp.conv.kernel_size = 3
-    hp.conv.num_groups = params.Discrete([8, 16, 32, 64])
+    # hp.conv.num_groups = params.Discrete([8, 16, 32, 64])
+    hp.conv.num_groups = 64
     hp.conv.num_blocks_per_pool = 20
     hp.conv.num_blocks_per_skip = 2
     hp.conv.requires_grad = True
 
-    hp.fc.num_features = params.Discrete([32, 64, 128, 256])
+    # hp.heads.num_features = params.Discrete([32, 64, 128, 256])
+    hp.heads.num_features = 32
     hp.fc.num_layers = params.Integer(2, 7)
-    hp.fc.num_groups = params.Discrete([8, 16, 32, 64])
+    # hp.fc.num_groups = params.Discrete([8, 16, 32, 64])
+    hp.fc.num_groups = 64
     hp.fc.num_blocks_per_residual = params.Integer(1, 5)
     hp.fc.num_blocks_per_dropout = params.Integer(1, 8)
     hp.fc.requires_grad = True
 
-    hp.heads.num_features = params.Discrete([32, 64, 128, 256])
+    # hp.heads.num_features = params.Discrete([32, 64, 128, 256])
+    hp.heads.num_features = 32
     hp.heads.num_layers = params.Integer(2, 5)
-    hp.heads.num_groups = params.Discrete([8, 16, 32, 64])
+    # hp.fc.num_groups = params.Discrete([8, 16, 32, 64])
+    hp.fc.num_groups = 64
     hp.heads.num_blocks_per_residual = params.Integer(1, 5)
     hp.heads.num_blocks_per_dropout = params.Integer(1, 5)
     hp.heads.requires_grad = True

@@ -82,7 +82,7 @@ file_mounts: {
 #    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/tablestakes/python/
 
 
-setup_commands: []
+setup_commands:
 #    - rm -rf /home/ubuntu/anaconda3/lib/python3.7/site-packages/s3transfer*
 #
 #    # lib.  after awscli
@@ -119,16 +119,16 @@ setup_commands: []
 #    - test -e projects/dotfiles || git clone https://github.com/kevinbache/dotfiles.git ~/projects/dotfiles
 #    - cd projects/dotfiles && git fetch && git checkout `cat /tmp/dotfiles_current_branch_sha`
 #    - source /home/ubuntu/.dlamirc && python ~/projects/dotfiles/link_files.py
-#
-#    #  chillpill
-#    - test -e projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
-#    - cd projects/chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
-#    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/chillpill/
-#
-#    #  tablestakes
-#    - test -e projects/tablestakes/python || git clone https://github.com/kevinbache/tablestakes.git ~/projects/tablestakes
-#    - cd projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
-#    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/tablestakes/python/
+
+    #  chillpill
+    - test -e projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
+    - cd projects/chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
+    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/chillpill/
+
+    #  tablestakes
+    - test -e projects/tablestakes/python || git clone https://github.com/kevinbache/tablestakes.git ~/projects/tablestakes
+    - cd projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
+    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/tablestakes/python/
 
 
 head_start_ray_commands:

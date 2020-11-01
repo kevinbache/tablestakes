@@ -155,7 +155,11 @@ class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.ModelParams']):
         # neurons which are added to each layer to ensure that layer sizes are divisible by num_groups
         self._extra_counts = [self.hp.num_groups - r if r else 0 for r in remainders]
 
+        print(f'fc setup remainders:   ',  remainders)
+        print(f'fc setup extra counts: ',  self._extra_counts)
+        print(f'fc setup all_counts pre: ',  all_counts)
         all_counts = [c + e for c, e in zip(all_counts, self._extra_counts)]
+        print(f'fc setup all_counts post:',  all_counts)
 
         self._num_output_features = all_counts[-1]
 
@@ -189,15 +193,13 @@ class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.ModelParams']):
 
     def forward(self, x):
         if self._extra_counts[0] > 0:
-            old_x = F.pad(x, pad=(0, 0, 0, self._extra_counts[0]), mode='constant', value=0)
-        else:
-            old_x = x
-
-        for (name, block), extra in zip(self.blocks.items(), self._extra_counts):
             # the remainders fixup to all_counts in __init__  doesn't account for the fact that the input x may
             # still be the wrong size.  pad it up if needed
-            x = F.pad(x, pad=(0, 0, 0, extra), mode='constant', value=0)
+            x = F.pad(x, pad=(0, 0, 0, self._extra_counts[0]), mode='constant', value=0)
 
+        old_x = x
+
+        for name, block in self.blocks.items():
             if name.endswith(self.SKIP_SUFFIX):
                 # this block is a resizer for the skip connection
                 x += block(old_x)
@@ -249,8 +251,11 @@ class ConvBlock(ParametrizedModule['ConvBlock.ModelParams']):
 
         # neurons which are added to each layer to ensure that layer sizes are divisible by num_groups
         self._extra_counts = [self.hp.num_groups - r if r else 0 for r in remainders]
-
+        print(f'conv setup remainders:   ',  remainders)
+        print(f'conv setup extra counts: ',  self._extra_counts)
+        print(f'conv setup all_counts pre: ',  all_counts)
         all_counts = [c + e for c, e in zip(all_counts, self._extra_counts)]
+        print(f'conv setup all_counts post:',  all_counts)
 
         blocks = OrderedDict()
         num_old_x_features = num_prev_features = all_counts[0]
@@ -284,14 +289,10 @@ class ConvBlock(ParametrizedModule['ConvBlock.ModelParams']):
 
     def forward(self, x):
         if self._extra_counts[0] > 0:
-            old_x = F.pad(x, pad=(0, 0, 0, self._extra_counts[0]), mode='constant', value=0)
-        else:
-            old_x = x
+            x = F.pad(x, pad=(0, 0, 0, self._extra_counts[0]), mode='constant', value=0)
 
-        for extra_count, (name, block) in zip(self._extra_counts, self.blocks.items()):
-            if extra_count > 0:
-                x = F.pad(x, pad=(0, 0, 0, extra_count), mode='constant', value=0)
-
+        old_x = x
+        for name, block in self.blocks.items():
             if name.endswith(self.SKIP_SUFFIX):
                 # this block is a resizer (or identity) for the skip connection
                 x += block(old_x)
