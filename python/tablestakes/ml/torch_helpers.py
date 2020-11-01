@@ -140,20 +140,48 @@ TIME_PROCESS_NAME = 'train_time_process'
 
 
 class LogCopierCallback(pl.Callback):
+    @staticmethod
+    def _get_metrics_dict(trainer):
+        utils.hprint('LogCopierCallback d:')
+        d = trainer.logged_metrics
+        d.update(trainer.callback_metrics)
+        d.update(trainer.progress_bar_metrics)
+
+        print(' logged metrics')
+        utils.print_dict(trainer.logged_metrics, indent_width=4)
+
+        print(' callback_metrics')
+        utils.print_dict(trainer.callback_metrics, indent_width=4)
+
+        print(' progress_bar_metrics')
+        utils.print_dict(trainer.progress_bar_metrics, indent_width=4)
+
+
+        for k, v in d.items():
+            if isinstance(v, torch.Tensor):
+                d[k] = v.item()
+        return d
+
     def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        d = self._get_metrics_dict(trainer)
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
+        print('about to report')
         tune.report(**d)
+        print('done reporting')
 
     def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        d = self._get_metrics_dict(trainer)
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
+        print('about to report')
         tune.report(**d)
+        print('done reporting')
 
     def on_test_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        d = {k: v.item() for k, v in pl_module.metrics_to_log.items()}
+        d = self._get_metrics_dict(trainer)
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
+        print('about to report')
         tune.report(**d)
+        print('done reporting')
 
 
 class CounterTimerCallback(pl.Callback):
@@ -172,10 +200,12 @@ class CounterTimerCallback(pl.Callback):
     def on_fit_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule, ):
         if trainer.logger is None:
             return
+
         d = {
             PARAM_COUNT_NAME: self._count_params(pl_module),
             TRAINABLE_PARAM_COUNT_NAME: self._count_trainable_params(pl_module),
         }
+
         # noinspection PyTypeChecker
         trainer.logger.log_hyperparams(params=d)
 
@@ -198,8 +228,7 @@ class BetterAccuracy(pl.metrics.Accuracy):
     def update(self, preds: torch.Tensor, target: torch.Tensor):
         assert preds.shape == target.shape,  f"preds.shape: {preds.shape}, target.shape: {target.shape}"
         self.correct = self.correct + torch.sum(preds.eq(target))
-        self.total = self.total + target.numel()
-
+        self.total = self.total + target.numel() - target.eq(constants.Y_VALUE_TO_IGNORE).sum()
 
 # ref: https://community.neptune.ai/t/neptune-and-hyperparameter-search-with-tune/567/3
 class TuneNeptuneLogger(TuneLogger):

@@ -6,7 +6,7 @@ import pytorch_lightning as pl
 
 from chillpill import params
 
-from tablestakes import constants
+from tablestakes import constants, utils
 from tablestakes.ml import torch_helpers, param_torch_mods, factored, data
 
 
@@ -117,17 +117,17 @@ if __name__ == '__main__':
         batch_size=32,
     )
 
-    # search_params.data.dataset_name = 'num=1000_02b7'
-    hp.data.dataset_name = 'num=4000_9b9f'
+    hp.data.dataset_name = 'num=1000_02b7'
+    # hp.data.dataset_name = 'num=4000_9b9f'
     hp.data.do_ignore_cached_dataset = False
     hp.data.seed = 42
     hp.data.num_workers = 4
-    hp.data.num_gpus = 1
+    hp.data.num_gpus = 0
     hp.data.num_cpus = 4
 
     hp.opt.search_metric = 'valid_loss_total'
     hp.opt.search_mode = 'min'
-    hp.opt.num_epochs = 100
+    hp.opt.num_epochs = 10
     hp.opt.lr = 0.001
     hp.opt.patience = 10
 
@@ -171,5 +171,8 @@ if __name__ == '__main__':
         metrics_tracker=factored.MetricsTracker(hp.metrics),
         opt=factored.OptimizersMaker(hp.opt),
     )
+
+    utils.hprint('About to start model run:')
+    utils.print_dict(hp.to_dict())
 
     run(net, dm, hp, fast_dev_run)

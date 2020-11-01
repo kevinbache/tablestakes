@@ -7,7 +7,7 @@ import pytorch_lightning as pl
 
 from chillpill import params
 
-from tablestakes import constants
+from tablestakes import constants, utils
 from tablestakes.ml import torch_helpers, param_torch_mods, data
 
 
@@ -38,8 +38,8 @@ class OptimizersMaker(param_torch_mods.Parametrized['OptimizationMaker.OptParams
 
         # coser = optim.lr_scheduler.CosineAnnealingLR(
         #     optimizer,
-        #     T_max=self.search_params.patience // 2,
-        #     eta_min=self.search_params.min_lr,
+        #     T_max=self.hp.opt.patience // 2,
+        #     eta_min=self.hp.opt.min_lr,
         #     verbose=True,
         # )
 
@@ -65,6 +65,7 @@ class OptimizersMaker(param_torch_mods.Parametrized['OptimizationMaker.OptParams
 
 
 class MetricsTracker(param_torch_mods.Parametrized):
+
     TRAIN_PHASE_NAME = 'train'
     VALID_PHASE_NAME = 'valid'
     TEST_PHASE_NAME = 'test'
@@ -162,20 +163,27 @@ class MetricsTracker(param_torch_mods.Parametrized):
         # self.metrics_to_log = d
 
     def on_pretrain_routine_start(self) -> None:
-        self.pl_module.logger.log_hyperparams(self.pl_module.search_params.to_dict())
+        if self.pl_module.logger is None:
+            return
+        self.pl_module.logger.log_hyperparams(self.pl_module.hp.to_dict())
 
     def on_after_backward(self):
+        if self.pl_module.logger is None:
+            return
+
         if self.hp.num_steps_per_histogram_log \
                 and (self.pl_module.global_step + 1) % self.hp.num_steps_per_histogram_log == 0:
-            d = {
-                f'gn/{k.replace("grad_1.0_norm_", "")}': v
-                for k, v in self.pl_module.logger._flatten_dict(self.pl_module.grad_norm(1)).items()
-            }
+            with utils.Timer('FACTORED on after bw getting grad norms'):
+                d = {
+                    f'gn/{k.replace("grad_1.0_norm_", "")}': v
+                    for k, v in self.pl_module.logger._flatten_dict(self.pl_module.grad_norm(1)).items()
+                }
 
-            self.pl_module.logger.log_metrics(
-                metrics=d,
-                step=self.pl_module.global_step,
-            )
+            with utils.Timer('FACTORED on after bw logging metrics'):
+                self.pl_module.logger.log_metrics(
+                    metrics=d,
+                    step=self.pl_module.global_step,
+                )
 
     def inner_forward_step(self, batch):
         xs_dict, ys_dict = batch
@@ -215,6 +223,7 @@ class FactoredLightningModule(pl.LightningModule, param_torch_mods.Parametrized[
         opt = OptimizersMaker.OptParams()
         metrics = MetricsTracker.MetricParams()
         exp = param_torch_mods.ExperimentParams()
+        Tune = None
 
     # TODO: gets params?
     def __init__(

@@ -57,6 +57,8 @@ setup(
         'gputil',
         'psutil',
         'transformers',
+        's3fs',
+        'neptune-client',
     ],
 
     classifiers=[

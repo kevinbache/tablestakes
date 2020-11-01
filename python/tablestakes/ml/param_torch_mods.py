@@ -83,11 +83,11 @@ class BertEmbedder(ParametrizedModule['BertEmbedder.ModelParams']):
         super().__init__(hp)
 
         config = transformers.BertConfig(
-            hidden_size=self.search_params.dim,
+            hidden_size=self.hp.dim,
             num_hidden_layers=0,
             num_attention_heads=1,
             intermediate_size=0,
-            max_position_embeddings=self.search_params.max_seq_len,
+            max_position_embeddings=self.hp.max_seq_len,
             output_attentions=False,
             output_hidden_states=False,
             return_dict=True,
@@ -95,7 +95,7 @@ class BertEmbedder(ParametrizedModule['BertEmbedder.ModelParams']):
 
         self.e = transformers.BertModel(config, add_pooling_layer=False)
         for name, param in self.e.named_parameters():
-            param.requires_grad = self.search_params.requires_grad
+            param.requires_grad = self.hp.requires_grad
 
     def forward(self, x):
         return self.e.forward(x)
@@ -147,13 +147,13 @@ class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.ModelParams']):
         all_counts = [num_input_features] + neuron_counts
 
         # round up counts so they're group divisible
-        remainders = [count % self.search_params.num_groups for count in all_counts]
+        remainders = [count % self.hp.num_groups for count in all_counts]
         if any(remainders) and do_error_if_group_div_off:
             raise ValueError(
-                f"Number of neurons ({all_counts}) must be divisible by number of groups ({self.search_params.num_groups})")
+                f"Number of neurons ({all_counts}) must be divisible by number of groups ({self.hp.num_groups})")
 
         # neurons which are added to each layer to ensure that layer sizes are divisible by num_groups
-        self._extra_counts = [self.search_params.num_groups - r if r else 0 for r in remainders]
+        self._extra_counts = [self.hp.num_groups - r if r else 0 for r in remainders]
 
         all_counts = [c + e for c, e in zip(all_counts, self._extra_counts)]
 
@@ -162,18 +162,18 @@ class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.ModelParams']):
         blocks = OrderedDict()
         prev_size = all_counts[0]
         for block_ind, (num_in, num_hidden) in enumerate(zip(all_counts, all_counts[1:])):
-            do_include_norm = block_ind > 0 or self.search_params.do_include_first_norm
+            do_include_norm = block_ind > 0 or self.hp.do_include_first_norm
 
             block = resnet_conv1_block(
                 num_input_features=num_in,
                 num_output_features=num_hidden,
-                num_gn_groups=self.search_params.num_groups,
-                activation=self.search_params.activation,
+                num_gn_groups=self.hp.num_groups,
+                activation=self.hp.activation,
                 do_include_group_norm=do_include_norm,
             )
             blocks[f'{block_ind}{self.BLOCK_SUFFIX}'] = block
 
-            if (block_ind + 1) % self.search_params.num_blocks_per_residual == 0:
+            if (block_ind + 1) % self.hp.num_blocks_per_residual == 0:
                 new_size = block.get_num_output_features()
                 if new_size == prev_size:
                     layer = nn.Identity()
@@ -182,8 +182,8 @@ class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.ModelParams']):
                 blocks[f'{block_ind}{self.SKIP_SUFFIX}'] = layer
                 prev_size = new_size
 
-            if (block_ind + 1) % self.search_params.num_blocks_per_dropout == 0:
-                blocks[f'{block_ind}{self.DROP_SUFFIX }'] = nn.Dropout(self.search_params.dropout_p)
+            if (block_ind + 1) % self.hp.num_blocks_per_dropout == 0:
+                blocks[f'{block_ind}{self.DROP_SUFFIX }'] = nn.Dropout(self.hp.dropout_p)
 
         self.blocks = nn.ModuleDict(blocks)
 
@@ -239,7 +239,7 @@ class ConvBlock(ParametrizedModule['ConvBlock.ModelParams']):
         super().__init__(hp)
         self.hp = hp
 
-        all_counts = [num_input_features] + [self.hp.num_features] * self.hp.num_layers
+        all_counts = [num_input_features] + ([self.hp.num_features] * int(self.hp.num_layers))
 
         # round up counts so they're group divisible
         remainders = [count % self.hp.num_groups for count in all_counts]
@@ -376,14 +376,14 @@ class ExperimentParams(params.ParameterSet):
 
 # noinspection PyProtectedMember
 class MyLightningNeptuneLogger(pl_loggers.NeptuneLogger):
-    def __init__(self, hp: ExperimentParams, version: str = ''):
+    def __init__(self, hp: ExperimentParams, version: str = '', offline_mode=False):
         source_files = glob.glob(str(hp.sources_glob_str), recursive=True)
 
         super().__init__(
             api_key=utils.get_logger_api_key(),
             project_name=utils.get_neptune_fully_qualified_project_name(hp.project_name),
             close_after_fit=True,
-            offline_mode=False,
+            offline_mode=offline_mode,
             experiment_name=f'pl_log-{version}',
             params=hp.to_dict(),
             tags=hp.experiment_tags,
@@ -408,8 +408,8 @@ class MyLightningNeptuneLogger(pl_loggers.NeptuneLogger):
         )
 
 
-def get_pl_logger(hp: ExperimentParams, tune=None):
+def get_pl_logger(hp: ExperimentParams, tune=None, offline_mode=False):
     version = 'local' if tune is None else tune.get_trial_id()
-    logger = MyLightningNeptuneLogger(hp, version),
+    logger = MyLightningNeptuneLogger(hp=hp, version=version, offline_mode=offline_mode),
 
     return logger
