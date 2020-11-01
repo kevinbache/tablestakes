@@ -2,7 +2,7 @@ import pytorch_lightning as pl
 
 import ray
 
-from tablestakes.ml import model_transformer, hyperparams, torch_helpers
+from tablestakes.ml import model_transformer, hyperparams, metrics_mod
 
 num_gpus = 1
 num_cpus = 2
@@ -18,11 +18,11 @@ def run_one(hp: hyperparams.LearningParams):
     net = model_transformer.RectTransformerModule(hp)
 
     pl_callbacks = [
-        torch_helpers.CounterTimerCallback(),
+        metrics_mod.CounterTimerCallback(),
     ]
 
     trainer = pl.Trainer(
-        logger=torch_helpers.get_pl_logger(hp),
+        logger=metrics_mod.get_pl_logger(hp),
         callbacks=pl_callbacks,
         max_epochs=hp.num_epochs,
         weights_summary='full',

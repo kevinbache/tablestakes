@@ -1,6 +1,7 @@
 from typing import *
 
 import numpy as np
+import tablestakes.ml.torch_mod
 
 import torch
 import torch.nn as nn
@@ -11,7 +12,7 @@ from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 
 from tablestakes import constants, utils, load_makers
-from tablestakes.ml import torch_helpers, hyperparams
+from tablestakes.ml import metrics_mod, hyperparams
 
 
 class RectTransformerModule(pl.LightningModule):
@@ -19,7 +20,7 @@ class RectTransformerModule(pl.LightningModule):
     TOTAL_NAME = 'total'
 
     METRICS = {
-        'acc': torch_helpers.BetterAccuracy(),
+        'acc': metrics_mod.BetterAccuracy(),
     }
 
     def __init__(self, hp: hyperparams.LearningParams):
@@ -86,23 +87,23 @@ class RectTransformerModule(pl.LightningModule):
         #############
         # trans
         if self.hp.trans_encoder_type == 'torch':
-            self.encoder = torch_helpers.get_pytorch_transformer_encoder(self.hp, num_trans_input_dims)
+            self.encoder = tablestakes.ml.torch_mod.get_pytorch_transformer_encoder(self.hp, num_trans_input_dims)
         elif self.hp.trans_encoder_type == 'fast_default':
-            self.encoder = torch_helpers.get_fast_linear_attention_encoder(self.hp, num_trans_input_dims, None)
+            self.encoder = tablestakes.ml.torch_mod.get_fast_linear_attention_encoder(self.hp, num_trans_input_dims, None)
         elif self.hp.trans_encoder_type == 'fast_favor':
-            self.encoder = torch_helpers.get_fast_linear_attention_encoder(self.hp, num_trans_input_dims, 'favor')
+            self.encoder = tablestakes.ml.torch_mod.get_fast_linear_attention_encoder(self.hp, num_trans_input_dims, 'favor')
         elif self.hp.trans_encoder_type == 'fast_grf':
-            self.encoder = torch_helpers.get_fast_linear_attention_encoder(self.hp, num_trans_input_dims, 'grf')
+            self.encoder = tablestakes.ml.torch_mod.get_fast_linear_attention_encoder(self.hp, num_trans_input_dims, 'grf')
         elif self.hp.trans_encoder_type == 'performer':
-            self.encoder = torch_helpers.get_performer_encoder(hp, num_trans_input_dims)
+            self.encoder = tablestakes.ml.torch_mod.get_performer_encoder(hp, num_trans_input_dims)
         elif self.hp.trans_encoder_type == 'ablatable_do_drop_k':
-            self.encoder = torch_helpers.get_simple_ablatable_transformer_encoder(
+            self.encoder = tablestakes.ml.torch_mod.get_simple_ablatable_transformer_encoder(
                 self.hp,
                 num_trans_input_dims,
                 do_drop_k=True,
             )
         elif self.hp.trans_encoder_type == 'ablatable_do_not_drop_k':
-            self.encoder = torch_helpers.get_simple_ablatable_transformer_encoder(
+            self.encoder = tablestakes.ml.torch_mod.get_simple_ablatable_transformer_encoder(
                 self.hp,
                 num_trans_input_dims,
                 do_drop_k=False,
@@ -124,7 +125,7 @@ class RectTransformerModule(pl.LightningModule):
             num=hp.num_fc_blocks,
             base=2,
         ).astype(np.int32))
-        self.fc_module = torch_helpers.FullyConv1Resnet(
+        self.fc_module = metrics_mod.FullyConv1Resnet(
             num_input_features=self.hp.num_fc_inputs,
             neuron_counts=num_fc_neurons,
             num_groups=self.hp.num_groups_for_gn,
@@ -138,7 +139,7 @@ class RectTransformerModule(pl.LightningModule):
         )
 
         self.heads = nn.ModuleList([
-            torch_helpers.HeadedSlabNet(
+            metrics_mod.HeadedSlabNet(
                 num_input_features=self.fc_module.get_num_outputs(),
                 num_output_features=num_classes,
                 num_neurons=utils.pow2int(self.hp.log2num_head_neurons),
@@ -408,7 +409,7 @@ if __name__ == '__main__':
     net = RectTransformerModule(hp)
 
     trainer = pl.Trainer(
-        logger=torch_helpers.get_pl_logger(hp),
+        logger=metrics_mod.get_pl_logger(hp),
         max_epochs=hp.num_epochs,
         weights_summary='full',
         # fast_dev_run=False,

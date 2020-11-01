@@ -1,6 +1,10 @@
+import abc
 import glob
 from argparse import Namespace
 from typing import *
+
+import torch
+from tablestakes.ml import ablation
 
 from torch import nn as nn
 from torch.nn import functional as F
@@ -13,7 +17,6 @@ from pytorch_lightning import loggers as pl_loggers
 from chillpill import params
 
 from tablestakes import utils
-
 
 PS = TypeVar('PS', bound=params.ParameterSet)
 
@@ -137,13 +140,8 @@ class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.ModelParams']):
             do_error_if_group_div_off=False,
             hp: Optional[ModelParams] = ModelParams(),
     ):
-
         super().__init__(hp)
         self.neuron_counts = neuron_counts
-
-        # self.num_blocks_per_residual = num_blocks_per_residual
-        # self.activation = activation
-
         all_counts = [num_input_features] + neuron_counts
 
         # round up counts so they're group divisible
@@ -183,7 +181,7 @@ class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.ModelParams']):
                 prev_size = new_size
 
             if (block_ind + 1) % self.hp.num_blocks_per_dropout == 0:
-                blocks[f'{block_ind}{self.DROP_SUFFIX }'] = nn.Dropout(self.hp.dropout_p)
+                blocks[f'{block_ind}{self.DROP_SUFFIX}'] = nn.Dropout(self.hp.dropout_p)
 
         self.blocks = nn.ModuleDict(blocks)
 
@@ -353,6 +351,14 @@ class HeadedSlabNet(SlabNet):
 
     def forward(self, x):
         x = super().forward(x)
+
+        class ModelParams(params.ParameterSet):
+            impl = 'fast-favor'
+            num_layers = 4
+            num_heads = 8
+            num_query_features = 32
+            fc_dim_mult = 2
+
         x = self.head(x)
         return x
 
@@ -406,3 +412,141 @@ def get_pl_logger(hp: ExperimentParams, tune=None, offline_mode=False):
     logger = MyLightningNeptuneLogger(hp=hp, version=version, offline_mode=offline_mode),
 
     return logger
+
+
+def artless_smash(input: torch.Tensor) -> torch.Tensor:
+    """
+    Smash all vectors in time dimension into a series of summary layers.  cat them and work with that.
+    This is about the simplest way you can move from O(n) time to O(1) time.
+    If you want, make it better by starting with some conv layers.
+    """
+    means = torch.mean(input, dim=1, keepdim=True)
+    vars = torch.var(input, dim=1, keepdim=True)
+    l1s = torch.norm(input, p=1, dim=1, keepdim=True)
+    l2s = torch.norm(input, p=2, dim=1, keepdim=True)
+    lse = torch.logsumexp(input, dim=1, keepdim=True)
+
+    maxs = torch.max(input, dim=1, keepdim=True)[0]
+    mins = torch.min(input, dim=1, keepdim=True)[0]
+    medians = torch.median(input, dim=1, keepdim=True)[0]
+
+    return torch.cat((means, vars, l1s, l2s, lse, maxs, mins, medians), dim=1).view(input.shape[0], 1, -1)
+
+
+class ArtlessSmasher(nn.Module):
+    def __init__(self, num_input_channels: int):
+        super().__init__()
+        self.num_input_channels = num_input_channels
+
+    @staticmethod
+    def forward(x):
+        return artless_smash(x)
+
+    def get_num_output_features(self):
+        return 8 * self.num_input_channels
+
+
+def build_fast_trans_block(hp: 'TransBlockBuilder.ModelParams', num_input_features: int) -> nn.Module:
+    from fast_transformers import builders, feature_maps
+    s = TransBlockBuilder.split(hp.impl)
+    feature_map_name = None if len(s) == 1 else s[1]
+
+    num_query_features = hp.num_query_features or num_input_features
+
+    if feature_map_name == 'favor':
+        feature_map = feature_maps.Favor.factory(n_dims=num_query_features)
+    elif feature_map_name == 'grf':
+        feature_map = feature_maps.GeneralizedRandomFeatures.factory(num_query_features)
+    else:
+        feature_map = None
+
+    # Create the builder for our transformers
+    builder = builders.TransformerEncoderBuilder.from_kwargs(
+        n_layers=hp.num_layers,
+        n_heads=hp.num_heads,
+        query_dimensions=num_query_features // hp.num_heads,
+        value_dimensions=num_input_features // hp.num_heads,
+        feed_forward_dimensions=num_input_features * hp.fc_dim_mult,
+        attention_type='linear',
+        activation='gelu',
+        feature_map=feature_map,
+    )
+
+    return builder.get()
+
+
+def build_performer_trans_block(hp: 'TransBlockBuilder.ModelParams', num_input_features: int) -> nn.Module:
+    """https://github.com/lucidrains/performer-pytorch"""
+    from performer_pytorch import Performer
+    return Performer(
+        dim=num_input_features,
+        depth=hp.num_layers,
+        heads=hp.num_heads,
+        ff_mult=hp.fc_dim_mult,
+        nb_features=hp.num_query_features,
+    )
+
+
+def build_pytorch_trans_block(hp: 'TransBlockBuilder.ModelParams', num_input_features: int) -> nn.Module:
+    enc_layer = nn.TransformerEncoderLayer(
+        d_model=num_input_features,
+        nhead=hp.num_heads,
+        dim_feedforward=hp.fc_dim_mult * num_input_features,
+        activation='gelu'
+    )
+
+    return nn.TransformerEncoder(
+        encoder_layer=enc_layer,
+        num_layers=hp.num_layers,
+    )
+
+
+def build_ablatable_trans_block(hp: 'TransBlockBuilder.ModelParams', num_input_features: int) -> nn.Module:
+    do_drop_k = False
+
+    return ablation.Encoder(
+        d_model=num_input_features,
+        num_layers=hp.num_layers,
+        num_heads=hp.num_heads,
+        d_ff_mult=hp.fc_dim_mult,
+        do_drop_k=do_drop_k,
+    )
+
+
+class TransBlockBuilder(abc.ABC):
+    class ModelParams(params.ParameterSet):
+        impl = 'fast-favor'
+        num_layers = 2
+        num_heads = 8
+        num_query_features = 32
+        fc_dim_mult = 2
+
+    IMPL_NAME_SPLIT_STR = '-'
+    name = None
+
+    KNOWN_ENCODER_BUILDERS = {
+        'fast': build_fast_trans_block,
+        'performer': build_performer_trans_block,
+        'pytorch': build_pytorch_trans_block,
+        'ablatable': build_ablatable_trans_block,
+    }
+
+    def __init__(self, name, hp: ModelParams):
+        super().__init__()
+        self.hp = hp
+        self.name = name
+
+    @classmethod
+    def split(cls, enc_name):
+        return enc_name.split(cls.IMPL_NAME_SPLIT_STR)
+
+    @classmethod
+    def build(cls, hp: ModelParams, num_input_features: int) -> nn.Module:
+        base_name = TransBlockBuilder.split(hp.impl)[0]
+
+        if base_name not in cls.KNOWN_ENCODER_BUILDERS:
+            raise ValueError(f"Couldn't find an encoder called {base_name}, "
+                             f"only have: {list(cls.KNOWN_ENCODER_BUILDERS.keys())}.")
+
+        return cls.KNOWN_ENCODER_BUILDERS[base_name](hp=hp, num_input_features=num_input_features)
+

@@ -8,6 +8,7 @@ import boto3
 import pytorch_lightning as pl
 
 import ray
+import tablestakes.ml.metrics_mod
 from ray import tune
 from ray.tune import logger as tune_logger
 from ray.tune.integration import pytorch_lightning as tune_pl
@@ -15,13 +16,13 @@ from ray.tune.integration import pytorch_lightning as tune_pl
 from chillpill import params
 
 from tablestakes import constants, utils
-from tablestakes.ml import torch_helpers, data, param_torch_mods, factored, model_bertenc_conv_tclass
+from tablestakes.ml import metrics_mod, data, torch_mod, factored, model_bertenc_conv_tclass
 
 
 REGION = 'us-west-2'
 
 
-class TuneRunner(param_torch_mods.Parametrized['factored.FactoredLightningModule.FactoredParams']):
+class TuneRunner(torch_mod.Parametrized['factored.FactoredLightningModule.FactoredParams']):
     class TuneParams(params.ParameterSet):
         asha_grace_period = 4
         asha_reduction_factor = 2
@@ -55,8 +56,8 @@ class TuneRunner(param_torch_mods.Parametrized['factored.FactoredLightningModule
 
         if extra_pl_callbacks is None:
             extra_pl_callbacks = [
-                torch_helpers.CounterTimerCallback(),
-                torch_helpers.LogCopierCallback(),
+                metrics_mod.CounterTimerCallback(),
+                metrics_mod.LogCopierCallback(),
             ]
         self.extra_pl_callbacks = extra_pl_callbacks
 
@@ -96,8 +97,8 @@ class TuneRunner(param_torch_mods.Parametrized['factored.FactoredLightningModule
         assert isinstance(hp, factored.FactoredLightningModule.FactoredParams)
         assert isinstance(hp.data, data.TablestakesDataModule.DataParams)
         assert isinstance(hp.opt, factored.OptimizersMaker.OptParams)
-        assert isinstance(hp.metrics, factored.MetricsTracker.MetricParams)
-        assert isinstance(hp.exp, param_torch_mods.ExperimentParams)
+        assert isinstance(hp.metrics, tablestakes.ml.metrics_mod.MetricsTracker.MetricParams)
+        assert isinstance(hp.exp, torch_mod.ExperimentParams)
         assert isinstance(hp.tune, TuneRunner.TuneParams)
 
     def get_tune_callbacks(self):
@@ -148,7 +149,7 @@ class TuneRunner(param_torch_mods.Parametrized['factored.FactoredLightningModule
 
         # noinspection PyTypeChecker
         trainer = pl.Trainer(
-            logger=param_torch_mods.get_pl_logger(hp=hp.exp, tune=tune, offline_mode=fast_dev_run),
+            logger=torch_mod.get_pl_logger(hp=hp.exp, tune=tune, offline_mode=fast_dev_run),
             default_root_dir=tune.get_trial_dir(),
             callbacks=self.extra_pl_callbacks + self.get_tune_callbacks(),
             max_epochs=hp.opt.num_epochs,
@@ -192,8 +193,8 @@ class TuneRunner(param_torch_mods.Parametrized['factored.FactoredLightningModule
     @staticmethod
     def get_tune_stopper(num_epochs: int):
         def do_stop(_, result):
-            if torch_helpers.CURRENT_EPOCH_NAME in result:
-                return result[torch_helpers.CURRENT_EPOCH_NAME] > num_epochs
+            if metrics_mod.CURRENT_EPOCH_NAME in result:
+                return result[metrics_mod.CURRENT_EPOCH_NAME] > num_epochs
             else:
                 return False
 
@@ -211,8 +212,8 @@ class TuneRunner(param_torch_mods.Parametrized['factored.FactoredLightningModule
             extra_metric_cols = []
 
         default_cli_reporter_metric_cols = [
-            torch_helpers.PARAM_COUNT_NAME,
-            torch_helpers.CURRENT_EPOCH_NAME,
+            metrics_mod.PARAM_COUNT_NAME,
+            metrics_mod.CURRENT_EPOCH_NAME,
             'time_this_iter_s',
             'time_total_s',
             'train_loss_total',
@@ -269,28 +270,26 @@ class TuneRunner(param_torch_mods.Parametrized['factored.FactoredLightningModule
 
         utils.hprint("done with tune.run")
 
-        # param_hash = self.search_params.get_short_hash(num_chars=8)
-        # analysis_file = self.search_params.metrics.output_dir / f'tune_analysis_{param_hash}.pkl'
-        # print(f"Saving {analysis_file}")
-        # utils.save_pickle(analysis_file, analysis)
-        #
-        # best_trial = analysis.get_best_trial(
-        #     self.search_params.opt.search_metric,
-        #     self.search_params.opt.search_mode,
-        #     "last-5-avg"
-        # )
-        #
-        # print(f'best_trial.last_result: {best_trial.last_result}')
-        #
-        # print("Best trial config: {}".format(best_trial.config))
-        # print("Best trial final search_metric: {}".format(best_trial.last_result[self.search_params.opt.search_metric]))
+        param_hash = self.search_params.get_short_hash(num_chars=8)
+        analysis_file = self.search_params.metrics.output_dir / f'tune_analysis_{param_hash}.pkl'
+        print(f"Saving {analysis_file}")
+        utils.save_pickle(analysis_file, analysis)
+
+        best_trial = analysis.get_best_trial(
+            self.search_params.opt.search_metric,
+            self.search_params.opt.search_mode,
+            "last-5-avg"
+        )
+        print(f'best_trial.last_result: {best_trial.last_result}')
+        print("Best trial config: {}".format(best_trial.config))
+        print("Best trial final search_metric: {}".format(best_trial.last_result[self.search_params.opt.search_metric]))
 
 
 class TuneFactoredParams(factored.FactoredLightningModule.FactoredParams):
     data = data.TablestakesDataModule.DataParams()
     opt = factored.OptimizersMaker.OptParams()
-    metrics = factored.MetricsTracker.MetricParams()
-    exp = param_torch_mods.ExperimentParams()
+    metrics = tablestakes.ml.metrics_mod.MetricsTracker.MetricParams()
+    exp = torch_mod.ExperimentParams()
     tune = TuneRunner.TuneParams()
 
     # noinspection PyTypeChecker
@@ -322,54 +321,47 @@ if __name__ == '__main__':
 
     hp.opt.search_metric = 'valid_loss_total'
     hp.opt.search_mode = 'min'
-    hp.opt.num_epochs = 10
+    hp.opt.num_epochs = 100
     hp.opt.lr = params.Discrete([1e-4, 1e-3, 1e-2, 1e-1])
     hp.opt.min_lr = 1e-6
-    hp.opt.patience = 10
+    hp.opt.patience = 16
 
-    hp.metrics.num_steps_per_histogram_log = 500
+    hp.metrics.num_steps_per_histogram_log = 20
     hp.metrics.num_steps_per_metric_log = 5
     hp.metrics.output_dir = 's3://kb-tester-2020-10-30'
-    # hp.metrics.output_dir = "~/logs"
 
     hp.exp.project_name = 'tablestakes'
     hp.exp.experiment_name = 'korv_which'
-    hp.exp.experiment_tags = ['korv_which', 'conv', 'sharp', 'testing', 'search']
+    hp.exp.experiment_tags = ['korv_which', 'conv', 'sharp', 'search', 'v0.0.1']
     hp.exp.sources_glob_str = constants.THIS_DIR.parent.parent / '**/*.py'
 
     hp.embed.dim = 16
     hp.embed.requires_grad = True
 
     hp.heads.num_features = params.Discrete([32, 64, 128, 256])
-    # hp.heads.num_features = 32
     hp.conv.num_layers = params.Integer(2, 11)
     hp.conv.kernel_size = 3
     hp.conv.num_groups = params.Discrete([8, 16, 32, 64])
-    # hp.conv.num_groups = 64
     hp.conv.num_blocks_per_pool = 20
     hp.conv.num_blocks_per_skip = 2
     hp.conv.requires_grad = True
 
     hp.heads.num_features = params.Discrete([32, 64, 128, 256])
-    # hp.heads.num_features = 32
     hp.fc.num_layers = params.Integer(2, 7)
     hp.fc.num_groups = params.Discrete([8, 16, 32, 64])
-    # hp.fc.num_groups = 64
     hp.fc.num_blocks_per_residual = params.Integer(1, 5)
     hp.fc.num_blocks_per_dropout = params.Integer(1, 8)
     hp.fc.requires_grad = True
 
     hp.heads.num_features = params.Discrete([32, 64, 128, 256])
-    # hp.heads.num_features = 32
     hp.heads.num_layers = params.Integer(2, 5)
     hp.fc.num_groups = params.Discrete([8, 16, 32, 64])
-    # hp.fc.num_groups = 64
     hp.heads.num_blocks_per_residual = params.Integer(1, 5)
     hp.heads.num_blocks_per_dropout = params.Integer(1, 5)
     hp.heads.requires_grad = True
 
     hp.tune = TuneRunner.TuneParams()
-    hp.tune.asha_grace_period = 4
+    hp.tune.asha_grace_period = 16
     hp.tune.asha_reduction_factor = 2
     hp.tune.num_hp_samples = 100
 

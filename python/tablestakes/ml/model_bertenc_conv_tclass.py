@@ -1,26 +1,27 @@
 import numpy as np
+import tablestakes.ml.metrics_mod
+import tablestakes.ml.torch_mod
 
 import torch
 import torch.nn as nn
 import pytorch_lightning as pl
 
-from chillpill import params
-
 from tablestakes import constants, utils
-from tablestakes.ml import torch_helpers, param_torch_mods, factored, data
+from tablestakes.ml import metrics_mod, torch_mod, factored, data
 
 
 class ModelBertEncConvTClass(factored.FactoredLightningModule):
     class Params(factored.FactoredLightningModule.FactoredParams):
         data = data.TablestakesDataModule.DataParams()
         opt = factored.OptimizersMaker.OptParams()
-        metrics = factored.MetricsTracker.MetricParams()
-        exp = param_torch_mods.ExperimentParams()
+        metrics = tablestakes.ml.metrics_mod.MetricsTracker.MetricParams()
+        exp = torch_mod.ExperimentParams()
 
-        embed = param_torch_mods.BertEmbedder.ModelParams()
-        conv = param_torch_mods.ConvBlock.ModelParams()
-        fc = param_torch_mods.SlabNet.ModelParams()
-        heads = param_torch_mods.HeadedSlabNet.ModelParams()
+        embed = torch_mod.BertEmbedder.ModelParams()
+        conv = torch_mod.ConvBlock.ModelParams()
+        trans = torch_mod.TransBlockBuilder.ModelParams()
+        fc = torch_mod.SlabNet.ModelParams()
+        heads = torch_mod.HeadedSlabNet.ModelParams()
 
         def __init__(self, max_seq_len=1024, batch_size=32):
             super().__init__()
@@ -31,31 +32,42 @@ class ModelBertEncConvTClass(factored.FactoredLightningModule):
             self,
             hp: Params,
             data_module: data.XYDocumentDataModule,
-            metrics_tracker: factored.MetricsTracker,
+            metrics_tracker: tablestakes.ml.metrics_mod.MetricsTracker,
             opt: factored.OptimizersMaker,
     ):
         super().__init__(hp, metrics_tracker, opt)
         self.dm = data_module
+        num_x_base_features = self.dm.num_x_base_dims
 
         self.num_y_classes = self.dm.num_y_classes
         self.example_input_array = self.dm.example_input_array
 
         ###############################################################
         # MODEL
-        self.embed = param_torch_mods.BertEmbedder(self.hp.embed)
+        self.embed = torch_mod.BertEmbedder(self.hp.embed)
 
-        self.conv = param_torch_mods.ConvBlock(
-            num_input_features=self.hp.embed.dim + self.dm.num_x_base_dims,
-            hp=self.hp.conv,
-        )
+        # cat here
+        num_features = self.hp.embed.dim + num_x_base_features
 
-        self.fc = param_torch_mods.SlabNet(
-            num_input_features=self.conv.get_num_output_features() + self.dm.num_x_base_dims,
+        # self.conv = torch_mod.ConvBlock(
+        #     num_input_features=num_features,
+        #     hp=self.hp.conv,
+        # )
+        # num_features = self.conv.get_num_output_features() + self.dm.num_x_base_dims
+
+        print('num features:', num_features)
+        print('hptrans:', hp.trans)
+        self.trans = torch_mod.TransBlockBuilder.build(hp=hp.trans, num_input_features=num_features)
+
+        # cat here
+        num_features = num_features + num_x_base_features
+        self.fc = torch_mod.SlabNet(
+            num_input_features=num_features,
             hp=self.hp.fc,
         )
 
         self.heads = nn.ModuleDict({
-            name: param_torch_mods.HeadedSlabNet(
+            name: torch_mod.HeadedSlabNet(
                 num_input_features=self.fc.get_num_outputs(),
                 num_output_features=num_classes,
                 hp=self.hp.heads,
@@ -68,17 +80,21 @@ class ModelBertEncConvTClass(factored.FactoredLightningModule):
         self.save_hyperparameters(self.hp.to_dict())
 
     def forward(self, base: torch.Tensor, vocab: torch.Tensor):
+
         x = self.embed(vocab)
+
         x = torch.cat([base, x.last_hidden_state], dim=-1)
 
-        x = x.permute(0, 2, 1)
-        x = self.conv(x)
+        x = self.trans(x)
+
+        # x = x.permute(0, 2, 1)
+        # x = self.conv(x)
+        # x = x.permute(0, 2, 1)
 
         # sharp
-        x = x.permute(0, 2, 1)
         x = torch.cat([base, x], dim=-1)
-        x = x.permute(0, 2, 1)
 
+        x = x.permute(0, 2, 1)
         x = self.fc(x)
 
         y_hats = {
@@ -90,9 +106,9 @@ class ModelBertEncConvTClass(factored.FactoredLightningModule):
 
 def run(net: pl.LightningModule, dm: pl.LightningDataModule, hp: ModelBertEncConvTClass.Params, fast_dev_run=False):
     trainer = pl.Trainer(
-        logger=True if fast_dev_run else param_torch_mods.get_pl_logger(hp.exp),
+        logger=True if fast_dev_run else torch_mod.get_pl_logger(hp.exp),
         default_root_dir=hp.metrics.output_dir,
-        callbacks=[torch_helpers.CounterTimerCallback()],
+        callbacks=[metrics_mod.CounterTimerCallback()],
         max_epochs=hp.opt.num_epochs,
         gpus=hp.data.num_gpus,
         weights_summary='full',
@@ -128,7 +144,7 @@ if __name__ == '__main__':
     hp.opt.search_metric = 'valid_loss_total'
     hp.opt.search_mode = 'min'
     hp.opt.num_epochs = 10
-    hp.opt.lr = 0.001
+    hp.opt.lr = 0.01
     hp.opt.patience = 10
 
     hp.metrics.num_steps_per_histogram_log = 5
@@ -140,15 +156,21 @@ if __name__ == '__main__':
     hp.exp.experiment_tags = ['korv_which', 'conv', 'sharp', 'testing']
     hp.exp.sources_glob_str = constants.THIS_DIR.parent.parent / '**/*.py'
 
-    hp.embed.dim = 16
+    hp.embed.dim = 47
     hp.embed.requires_grad = True
 
-    hp.conv.num_features = 128
-    hp.conv.num_layers = 8
-    hp.conv.kernel_size = 3
-    hp.conv.num_groups = 16
-    hp.conv.num_blocks_per_pool = 20
-    hp.conv.requires_grad = True
+    # hp.conv.num_features = 128
+    # hp.conv.num_layers = 8
+    # hp.conv.kernel_size = 3
+    # hp.conv.num_groups = 16
+    # hp.conv.num_blocks_per_pool = 20
+    # hp.conv.requires_grad = True
+
+    hp.trans.impl = 'fast'
+    hp.trans.num_heads = 8
+    hp.trans.num_layers = 2
+    hp.trans.num_query_features = None
+    hp.trans.fc_dim_mult = 2
 
     hp.fc.num_features = 128
     hp.fc.num_layers = 2
@@ -168,7 +190,7 @@ if __name__ == '__main__':
     net = ModelBertEncConvTClass(
         hp=hp,
         data_module=dm,
-        metrics_tracker=factored.MetricsTracker(hp.metrics),
+        metrics_tracker=tablestakes.ml.metrics_mod.MetricsTracker(hp.metrics),
         opt=factored.OptimizersMaker(hp.opt),
     )
 
