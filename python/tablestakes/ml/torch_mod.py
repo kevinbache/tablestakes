@@ -98,7 +98,11 @@ class BertEmbedder(ParametrizedModule['BertEmbedder.ModelParams']):
 
         self.e = transformers.BertModel(config, add_pooling_layer=False)
         for name, param in self.e.named_parameters():
-            param.requires_grad = self.hp.requires_grad
+            if name == 'position_embeddings':
+                requires_grad = False
+            else:
+                requires_grad = self.hp.requires_grad
+            param.requires_grad = requires_grad
 
     def forward(self, x):
         return self.e.forward(x)
@@ -186,6 +190,8 @@ class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.ModelParams']):
         self.blocks = nn.ModuleDict(blocks)
 
     def forward(self, x):
+        x = x.permute(0, 2, 1)
+
         if self._extra_counts[0] > 0:
             # the remainders fixup to all_counts in __init__  doesn't account for the fact that the input x may
             # still be the wrong size.  pad it up if needed
@@ -201,6 +207,7 @@ class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.ModelParams']):
             else:
                 x = block(x)
 
+        x = x.permute(0, 2, 1)
         return x
 
     def get_num_outputs(self):
@@ -278,6 +285,8 @@ class ConvBlock(ParametrizedModule['ConvBlock.ModelParams']):
                 param.requires_grad = self.hp.requires_grad
 
     def forward(self, x):
+        x = x.permute(0, 2, 1)
+
         if self._extra_counts[0] > 0:
             x = F.pad(x, pad=(0, 0, 0, self._extra_counts[0]), mode='constant', value=0)
 
@@ -289,6 +298,8 @@ class ConvBlock(ParametrizedModule['ConvBlock.ModelParams']):
                 old_x = x
             else:
                 x = block(x)
+
+        x = x.permute(0, 2, 1)
 
         return x
 
@@ -351,15 +362,9 @@ class HeadedSlabNet(SlabNet):
 
     def forward(self, x):
         x = super().forward(x)
-
-        class ModelParams(params.ParameterSet):
-            impl = 'fast-favor'
-            num_layers = 4
-            num_heads = 8
-            num_query_features = 32
-            fc_dim_mult = 2
-
+        x = x.permute(0, 2, 1)
         x = self.head(x)
+        x = x.permute(0, 2, 1)
         return x
 
 
