@@ -141,11 +141,12 @@ TIME_PROCESS_NAME = 'train_time_process'
 
 class LogCopierCallback(pl.Callback):
     @staticmethod
-    def _get_metrics_dict(trainer):
+    def _get_metrics_dict(trainer, pl_module):
         utils.hprint('LogCopierCallback d:')
         d = trainer.logged_metrics
         d.update(trainer.callback_metrics)
         d.update(trainer.progress_bar_metrics)
+        d.update(pl_module.metrics_tracker.metrics_to_log_for_tune)
 
         print(' logged metrics')
         utils.print_dict(trainer.logged_metrics, indent_width=4)
@@ -156,6 +157,8 @@ class LogCopierCallback(pl.Callback):
         print(' progress_bar_metrics')
         utils.print_dict(trainer.progress_bar_metrics, indent_width=4)
 
+        print(' metrics to log for tune')
+        utils.print_dict(pl_module.metrics_tracker.metrics_to_log_for_tune, indent_width=4)
 
         for k, v in d.items():
             if isinstance(v, torch.Tensor):
@@ -163,21 +166,21 @@ class LogCopierCallback(pl.Callback):
         return d
 
     def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        d = self._get_metrics_dict(trainer)
+        d = self._get_metrics_dict(trainer, pl_module)
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
         print('about to report')
         tune.report(**d)
         print('done reporting')
 
     def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        d = self._get_metrics_dict(trainer)
+        d = self._get_metrics_dict(trainer, pl_module)
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
         print('about to report')
         tune.report(**d)
         print('done reporting')
 
     def on_test_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        d = self._get_metrics_dict(trainer)
+        d = self._get_metrics_dict(trainer, pl_module)
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
         print('about to report')
         tune.report(**d)

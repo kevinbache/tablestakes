@@ -37,6 +37,8 @@ class TuneRunner(param_torch_mods.Parametrized['factored.FactoredLightningModule
 
         self.include_gpus = None
 
+        os.environ['TUNE_DISABLE_STRICT_METRIC_CHECKING'] = "1"
+
         self.ensure_hp_is_factored(search_params)
         super().__init__(search_params)
         self.search_params = self.hp
@@ -63,17 +65,17 @@ class TuneRunner(param_torch_mods.Parametrized['factored.FactoredLightningModule
         # True if running on macbook laptop, False if running on cluster
         is_running_on_local_machine = self.add_local_cluster_tag(search_params)
 
-        # ################
-        # #   init ray   #
-        # ################
-        # print("about to init ray")
-        # ray.init(
-        #     address=None if is_running_on_local_machine else 'auto',
-        #     ignore_reinit_error=True,
-        #     include_dashboard=True,
-        #     local_mode=ray_local_mode,
-        # )
-        # print("Done with ray init")
+        ################
+        #   init ray   #
+        ################
+        print("about to init ray")
+        ray.init(
+            address=None if is_running_on_local_machine else 'auto',
+            ignore_reinit_error=True,
+            include_dashboard=True,
+            local_mode=ray_local_mode,
+        )
+        print("Done with ray init")
 
     @staticmethod
     def add_local_cluster_tag(search_params: "TuneFactoredParams"):
@@ -100,23 +102,19 @@ class TuneRunner(param_torch_mods.Parametrized['factored.FactoredLightningModule
 
     def get_tune_callbacks(self):
         return [
-            # tune_pl.TuneReportCallback(
-            #     metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.TRAIN_PHASE_NAME),
-            #     on='train_end',
-            # ),
-            # tune_pl.TuneReportCheckpointCallback(
-            #     metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.VALID_PHASE_NAME),
-            #     filename=constants.CHECKPOINT_FILE_BASENAME,
-            #     on='validation_end',
-            # ),
-            # tune_pl.TuneReportCallback(
-            #     metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.VALID_PHASE_NAME),
-            #     on='validation_end',
-            # ),
-            # tune_pl.TuneReportCallback(
-            #     metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.TEST_PHASE_NAME),
-            #     on='test_end',
-            # ),
+            tune_pl.TuneReportCallback(
+                metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.TRAIN_PHASE_NAME),
+                on='train_end',
+            ),
+            tune_pl.TuneReportCheckpointCallback(
+                metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.VALID_PHASE_NAME),
+                filename=constants.CHECKPOINT_FILE_BASENAME,
+                on='validation_end',
+            ),
+            tune_pl.TuneReportCallback(
+                metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.TEST_PHASE_NAME),
+                on='test_end',
+            ),
         ]
 
     @staticmethod
@@ -150,12 +148,10 @@ class TuneRunner(param_torch_mods.Parametrized['factored.FactoredLightningModule
 
         # noinspection PyTypeChecker
         trainer = pl.Trainer(
-            logger=True,
-            # logger=param_torch_mods.get_pl_logger(hp=hp.exp, tune=tune, offline_mode=fast_dev_run),
+            logger=param_torch_mods.get_pl_logger(hp=hp.exp, tune=tune, offline_mode=fast_dev_run),
             default_root_dir=tune.get_trial_dir(),
             callbacks=self.extra_pl_callbacks + self.get_tune_callbacks(),
             max_epochs=hp.opt.num_epochs,
-            # gpus=None if is_local_run else search_params.data.num_gpus,
             gpus=hp.data.num_gpus if include_gpus else None,
             weights_summary='full',
             fast_dev_run=fast_dev_run,
@@ -167,7 +163,7 @@ class TuneRunner(param_torch_mods.Parametrized['factored.FactoredLightningModule
         fit_out = trainer.fit(net, datamodule=net.dm)
 
         utils.print_dict(config)
-        utils.hprint('Done')
+        utils.hprint('Done with tune_runner._train_fn')
 
         return fit_out
 
@@ -253,23 +249,22 @@ class TuneRunner(param_torch_mods.Parametrized['factored.FactoredLightningModule
 
         # noinspection PyTypeChecker
         analysis = tune.run(
-            # run_or_experiment=self._get_train_fn(fast_dev_run=fast_dev_run, include_gpus=include_gpus),
+            run_or_experiment=self._get_train_fn(fast_dev_run=fast_dev_run, include_gpus=include_gpus),
             name=self.search_params.exp.get_project_exp_name(),
             stop=self.get_tune_stopper(self.search_params.opt.num_epochs),
             config=search_dict,
             resources_per_trial=self.get_resources_per_trial(self.search_params, include_gpu=include_gpus),
             num_samples=self.search_params.tune.num_hp_samples,
-            # sync_config=tune.SyncConfig(upload_dir=self.search_params.metrics.output_dir),
-            # loggers=self.get_tune_loggers(),
-            # log_to_file=log_to_file,
-            # keep_checkpoints_num=2,
-            # checkpoint_score_attr=f'{self.search_params.opt.search_mode}-{self.search_params.opt.search_metric}',
+            sync_config=tune.SyncConfig(upload_dir=self.search_params.metrics.output_dir),
+            loggers=self.get_tune_loggers(),
+            log_to_file=log_to_file,
+            keep_checkpoints_num=2,
+            checkpoint_score_attr=f'{self.search_params.opt.search_mode}-{self.search_params.opt.search_metric}',
             fail_fast=False,
-            # scheduler=self.get_tune_scheduler(self.search_params),
+            scheduler=self.get_tune_scheduler(self.search_params),
             verbose=2,
             progress_reporter=self.get_cli_reporter(),
             reuse_actors=False,
-            # queue_trials=False,
         )
 
         utils.hprint("done with tune.run")
@@ -310,60 +305,6 @@ class TuneFactoredParams(factored.FactoredLightningModule.FactoredParams):
         return hp
 
 
-_param_class = model_bertenc_conv_tclass.ModelBertEncConvTClass.Params
-_factored_lightning_module_class = model_bertenc_conv_tclass.ModelBertEncConvTClass
-
-callbacks = [
-    # TODO: reenable when everything's settled down
-    torch_helpers.CounterTimerCallback(),
-    torch_helpers.LogCopierCallback(),
-]
-
-fast_dev_run = True
-include_gpus = False
-
-
-# noinspection DuplicatedCode
-def train_fn(config: Dict, checkpoint_dir=None):
-    utils.hprint('Starting train function with config:')
-    utils.print_dict(config)
-
-    del config['tune']
-    hp = _param_class.from_dict(config)
-    assert isinstance(hp, _param_class)
-
-    if checkpoint_dir:
-        # see https://docs.ray.io/en/master/tune/user-guide.html#checkpointing
-        raise NotImplementedError(f"Got checkpoint_dir in trian_fn: {checkpoint_dir}")
-
-    net = _factored_lightning_module_class.from_hp(hp=hp)
-
-    utils.set_seeds(hp.data.seed)
-
-    # noinspection PyTypeChecker
-    trainer = pl.Trainer(
-        logger=True,
-        # logger=param_torch_mods.get_pl_logger(hp=hp.exp, tune=tune, offline_mode=fast_dev_run),
-        default_root_dir=tune.get_trial_dir(),
-        callbacks=callbacks,
-        max_epochs=hp.opt.num_epochs,
-        # gpus=None if is_local_run else search_params.data.num_gpus,
-        gpus=hp.data.num_gpus if include_gpus else None,
-        weights_summary='full',
-        fast_dev_run=fast_dev_run,
-        accumulate_grad_batches=1,
-        profiler=True,
-        deterministic=True,
-        log_every_n_steps=hp.metrics.num_steps_per_metric_log,
-    )
-    fit_out = trainer.fit(net, datamodule=net.dm)
-
-    utils.print_dict(config)
-    utils.hprint('Done')
-
-    return fit_out
-
-
 # noinspection DuplicatedCode
 if __name__ == '__main__':
     hp = model_bertenc_conv_tclass.ModelBertEncConvTClass.Params(
@@ -381,7 +322,7 @@ if __name__ == '__main__':
 
     hp.opt.search_metric = 'valid_loss_total'
     hp.opt.search_mode = 'min'
-    hp.opt.num_epochs = 2
+    hp.opt.num_epochs = 10
     hp.opt.lr = params.Discrete([1e-4, 1e-3, 1e-2, 1e-1, 1e0])
     hp.opt.min_lr = 1e-6
     hp.opt.patience = 10
@@ -399,30 +340,30 @@ if __name__ == '__main__':
     hp.embed.dim = 16
     hp.embed.requires_grad = True
 
-    # hp.heads.num_features = params.Discrete([32, 64, 128, 256])
-    hp.heads.num_features = 32
+    hp.heads.num_features = params.Discrete([32, 64, 128, 256])
+    # hp.heads.num_features = 32
     hp.conv.num_layers = params.Integer(2, 11)
     hp.conv.kernel_size = 3
-    # hp.conv.num_groups = params.Discrete([8, 16, 32, 64])
-    hp.conv.num_groups = 64
+    hp.conv.num_groups = params.Discrete([8, 16, 32, 64])
+    # hp.conv.num_groups = 64
     hp.conv.num_blocks_per_pool = 20
     hp.conv.num_blocks_per_skip = 2
     hp.conv.requires_grad = True
 
-    # hp.heads.num_features = params.Discrete([32, 64, 128, 256])
-    hp.heads.num_features = 32
+    hp.heads.num_features = params.Discrete([32, 64, 128, 256])
+    # hp.heads.num_features = 32
     hp.fc.num_layers = params.Integer(2, 7)
-    # hp.fc.num_groups = params.Discrete([8, 16, 32, 64])
-    hp.fc.num_groups = 64
+    hp.fc.num_groups = params.Discrete([8, 16, 32, 64])
+    # hp.fc.num_groups = 64
     hp.fc.num_blocks_per_residual = params.Integer(1, 5)
     hp.fc.num_blocks_per_dropout = params.Integer(1, 8)
     hp.fc.requires_grad = True
 
-    # hp.heads.num_features = params.Discrete([32, 64, 128, 256])
-    hp.heads.num_features = 32
+    hp.heads.num_features = params.Discrete([32, 64, 128, 256])
+    # hp.heads.num_features = 32
     hp.heads.num_layers = params.Integer(2, 5)
-    # hp.fc.num_groups = params.Discrete([8, 16, 32, 64])
-    hp.fc.num_groups = 64
+    hp.fc.num_groups = params.Discrete([8, 16, 32, 64])
+    # hp.fc.num_groups = 64
     hp.heads.num_blocks_per_residual = params.Integer(1, 5)
     hp.heads.num_blocks_per_dropout = params.Integer(1, 5)
     hp.heads.requires_grad = True
@@ -432,49 +373,17 @@ if __name__ == '__main__':
     hp.tune.asha_reduction_factor = 2
     hp.tune.num_hp_samples = 2
 
-    ray.init(
-        address=None,
-        ignore_reinit_error=True,
-        include_dashboard=True,
-        local_mode=False,
-    )
-
     # noinspection PyTypeChecker
     tune_runner = TuneRunner(
         search_params=hp,
         factored_lightning_module_class=model_bertenc_conv_tclass.ModelBertEncConvTClass,
         extra_pl_callbacks=None,
-        ray_local_mode=True,
+        ray_local_mode=False,
     )
-    # tune_runner.run(
-    #     fast_dev_run=True,
-    #     include_gpus=False,
-    #     log_to_file=False,
-    # )
-
-    search_dict = hp.to_ray_tune_search_dict()
-    # see tune.utils.UtilMonitor
-    # search_dict['log_sys_usage'] = True
-
-    # noinspection PyTypeChecker
-    analysis = tune.run(
-        # run_or_experiment=self._get_train_fn(fast_dev_run=fast_dev_run, include_gpus=include_gpus),
-        run_or_experiment=train_fn,
-        name=hp.exp.get_project_exp_name(),
-        stop=tune_runner.get_tune_stopper(hp.opt.num_epochs),
-        config=search_dict,
-        resources_per_trial=tune_runner.get_resources_per_trial(hp, include_gpu=include_gpus),
-        num_samples=hp.tune.num_hp_samples,
-        # sync_config=tune.SyncConfig(upload_dir=self.search_params.metrics.output_dir),
-        loggers=tune_runner.get_tune_loggers(),
-        # log_to_file=log_to_file,
-        # keep_checkpoints_num=2,
-        # checkpoint_score_attr=f'{self.search_params.opt.search_mode}-{self.search_params.opt.search_metric}',
-        fail_fast=False,
-        # scheduler=self.get_tune_scheduler(self.search_params),
-        verbose=2,
-        progress_reporter=tune_runner.get_cli_reporter(),
-        # queue_trials=False,
+    tune_runner.run(
+        fast_dev_run=False,
+        include_gpus=False,
+        log_to_file=True,
     )
 
-    utils.hprint("done with tune.run")
+    utils.hprint("done with tune_runner.run")

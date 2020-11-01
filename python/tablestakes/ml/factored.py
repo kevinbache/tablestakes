@@ -93,6 +93,8 @@ class MetricsTracker(param_torch_mods.Parametrized):
         self.hp = hp
         self.pl_module = None
 
+        self.metrics_to_log_for_tune = {}
+
     def set_pl_module(self, pl_module: pl.LightningModule):
         self.pl_module = pl_module
 
@@ -160,7 +162,7 @@ class MetricsTracker(param_torch_mods.Parametrized):
         lr = lrs[0]
         self.pl_module.log('lrs_opt', lr, prog_bar=False, on_epoch=on_epoch)
 
-        # self.metrics_to_log = d
+        self.metrics_to_log_for_tune = d
 
     def on_pretrain_routine_start(self) -> None:
         if self.pl_module.logger is None:

@@ -155,11 +155,7 @@ class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.ModelParams']):
         # neurons which are added to each layer to ensure that layer sizes are divisible by num_groups
         self._extra_counts = [self.hp.num_groups - r if r else 0 for r in remainders]
 
-        print(f'fc setup remainders:   ',  remainders)
-        print(f'fc setup extra counts: ',  self._extra_counts)
-        print(f'fc setup all_counts pre: ',  all_counts)
         all_counts = [c + e for c, e in zip(all_counts, self._extra_counts)]
-        print(f'fc setup all_counts post:',  all_counts)
 
         self._num_output_features = all_counts[-1]
 
@@ -251,11 +247,7 @@ class ConvBlock(ParametrizedModule['ConvBlock.ModelParams']):
 
         # neurons which are added to each layer to ensure that layer sizes are divisible by num_groups
         self._extra_counts = [self.hp.num_groups - r if r else 0 for r in remainders]
-        print(f'conv setup remainders:   ',  remainders)
-        print(f'conv setup extra counts: ',  self._extra_counts)
-        print(f'conv setup all_counts pre: ',  all_counts)
         all_counts = [c + e for c, e in zip(all_counts, self._extra_counts)]
-        print(f'conv setup all_counts post:',  all_counts)
 
         blocks = OrderedDict()
         num_old_x_features = num_prev_features = all_counts[0]
