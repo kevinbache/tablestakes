@@ -242,18 +242,18 @@ class TuneRunner(param_torch_mods.Parametrized['factored.FactoredLightningModule
             reduction_factor=search_params.tune.asha_reduction_factor,
         )
 
-    def run(self, fast_dev_run=False, include_gpus=False, log_to_file=False):
+    def run(self, fast_dev_run=False, use_gpus=False, log_to_file=False):
         search_dict = self.search_params.to_ray_tune_search_dict()
         # see tune.utils.UtilMonitor
         search_dict['log_sys_usage'] = True
 
         # noinspection PyTypeChecker
         analysis = tune.run(
-            run_or_experiment=self._get_train_fn(fast_dev_run=fast_dev_run, include_gpus=include_gpus),
+            run_or_experiment=self._get_train_fn(fast_dev_run=fast_dev_run, include_gpus=use_gpus),
             name=self.search_params.exp.get_project_exp_name(),
             stop=self.get_tune_stopper(self.search_params.opt.num_epochs),
             config=search_dict,
-            resources_per_trial=self.get_resources_per_trial(self.search_params, include_gpu=include_gpus),
+            resources_per_trial=self.get_resources_per_trial(self.search_params, include_gpu=use_gpus),
             num_samples=self.search_params.tune.num_hp_samples,
             sync_config=tune.SyncConfig(upload_dir=self.search_params.metrics.output_dir),
             loggers=self.get_tune_loggers(),
@@ -312,18 +312,18 @@ if __name__ == '__main__':
         batch_size=32,
     )
 
-    hp.data.dataset_name = 'num=1000_02b7'
-    # hp.data.dataset_name = 'num=4000_9b9f'
+    # hp.data.dataset_name = 'num=1000_02b7'
+    hp.data.dataset_name = 'num=4000_9b9f'
     hp.data.do_ignore_cached_dataset = False
     hp.data.seed = 42
     hp.data.num_workers = 0
-    hp.data.num_gpus = 0
+    hp.data.num_gpus = 1
     hp.data.num_cpus = 4
 
     hp.opt.search_metric = 'valid_loss_total'
     hp.opt.search_mode = 'min'
     hp.opt.num_epochs = 10
-    hp.opt.lr = params.Discrete([1e-4, 1e-3, 1e-2, 1e-1, 1e0])
+    hp.opt.lr = params.Discrete([1e-4, 1e-3, 1e-2, 1e-1])
     hp.opt.min_lr = 1e-6
     hp.opt.patience = 10
 
@@ -371,7 +371,10 @@ if __name__ == '__main__':
     hp.tune = TuneRunner.TuneParams()
     hp.tune.asha_grace_period = 4
     hp.tune.asha_reduction_factor = 2
-    hp.tune.num_hp_samples = 2
+    hp.tune.num_hp_samples = 100
+
+    hostname = socket.gethostname()
+    is_local_run = hostname.endswith('.local')
 
     # noinspection PyTypeChecker
     tune_runner = TuneRunner(
@@ -382,7 +385,7 @@ if __name__ == '__main__':
     )
     tune_runner.run(
         fast_dev_run=False,
-        include_gpus=False,
+        use_gpus=not is_local_run,
         log_to_file=True,
     )
 

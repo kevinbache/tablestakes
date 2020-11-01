@@ -142,23 +142,10 @@ TIME_PROCESS_NAME = 'train_time_process'
 class LogCopierCallback(pl.Callback):
     @staticmethod
     def _get_metrics_dict(trainer, pl_module):
-        utils.hprint('LogCopierCallback d:')
         d = trainer.logged_metrics
         d.update(trainer.callback_metrics)
         d.update(trainer.progress_bar_metrics)
-        d.update(pl_module.metrics_tracker.metrics_to_log_for_tune)
-
-        print(' logged metrics')
-        utils.print_dict(trainer.logged_metrics, indent_width=4)
-
-        print(' callback_metrics')
-        utils.print_dict(trainer.callback_metrics, indent_width=4)
-
-        print(' progress_bar_metrics')
-        utils.print_dict(trainer.progress_bar_metrics, indent_width=4)
-
-        print(' metrics to log for tune')
-        utils.print_dict(pl_module.metrics_tracker.metrics_to_log_for_tune, indent_width=4)
+        # d.update(pl_module.metrics_tracker.metrics_to_log_for_tune)
 
         for k, v in d.items():
             if isinstance(v, torch.Tensor):
