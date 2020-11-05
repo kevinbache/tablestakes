@@ -41,7 +41,7 @@ class TrapezoidConv1Module(pl.LightningModule):
     # todo: really i need to split the datapoints first and then calculate the vocab
 
     @staticmethod
-    def _recalc_vocab_size(ds: data.XYCsvDataset):
+    def _recalc_vocab_size(ds: data.XYMetaCsvDataset):
         return torch.stack([xs[1].max() for xs in ds._xs]).max().item()
 
     def __init__(
@@ -60,7 +60,7 @@ class TrapezoidConv1Module(pl.LightningModule):
         self.word_to_count = utils.load_json(data_dir / constants.WORD_COUNT_FILENAME)
 
         self.hp = hp
-        self.ds = data.XYCsvDataset(self.data_dir, limit_num_data=self.hp.limit_num_data)
+        self.ds = data.XYMetaCsvDataset(self.data_dir, limit_num_data=self.hp.limit_num_data)
 
         if hp.limit_num_data:
             self.num_vocab = self._recalc_vocab_size(self.ds)

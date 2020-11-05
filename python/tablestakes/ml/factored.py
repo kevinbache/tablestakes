@@ -68,7 +68,7 @@ class FactoredLightningModule(pl.LightningModule, torch_mod.Parametrized[torch_m
     class FactoredParams(params.ParameterSet):
         data = data.TablestakesDataModule.DataParams()
         opt = OptimizersMaker.OptParams()
-        metrics = metrics_mod.MetricsTracker.MetricParams()
+        metrics = metrics_mod.ClassificationMetricsTracker.MetricParams()
         exp = torch_mod.ExperimentParams()
         Tune = None
 
@@ -76,7 +76,7 @@ class FactoredLightningModule(pl.LightningModule, torch_mod.Parametrized[torch_m
     def __init__(
             self,
             hp: FactoredParams,
-            metrics_tracker: metrics_mod.MetricsTracker,
+            metrics_tracker: metrics_mod.ClassificationMetricsTracker,
             opt: OptimizersMaker,
             *args,
             **kwargs,
@@ -109,7 +109,7 @@ class FactoredLightningModule(pl.LightningModule, torch_mod.Parametrized[torch_m
 
     @staticmethod
     def get_metrics_tracker_class():
-        return metrics_mod.MetricsTracker
+        return metrics_mod.ClassificationMetricsTracker
 
     @classmethod
     def from_hp(cls, hp: FactoredParams):

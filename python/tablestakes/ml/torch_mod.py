@@ -17,6 +17,7 @@ from pytorch_lightning import loggers as pl_loggers
 from chillpill import params
 
 from tablestakes import utils
+from transformers import modeling_outputs
 
 PS = TypeVar('PS', bound=params.ParameterSet)
 
@@ -320,6 +321,7 @@ class SlabNet(FullyConv1Resnet):
         activation = nn.LeakyReLU
         do_include_first_norm = True
         requires_grad = True
+        special_heads = {}
 
         @classmethod
         def search_default(cls) -> "SlabNet.ModelParams":
@@ -341,13 +343,84 @@ class SlabNet(FullyConv1Resnet):
         )
 
 
-class HeadedSlabNet(SlabNet):
-    """A slabnet with a head containing num_output_features."""
-
+class Head(nn.Module):
     def __init__(
             self,
             num_input_features: int,
             num_output_features: int,
+    ):
+        nn.Module.__init__(self)
+        self.head = nn.Conv1d(num_input_features, num_output_features, 1)
+
+    def forward(self, x):
+        x = x.permute(0, 2, 1)
+        return self.head(x).permute(0, 2, 1)
+
+
+def make_lm_loss_head(num_features, num_vocab):
+    """Linear head + loss"""
+    num_first_bin = round(num_vocab / 20)
+    return nn.AdaptiveLogSoftmaxWithLoss(
+        num_features,
+        num_vocab,
+        cutoffs=[
+            num_first_bin,
+            5 * num_first_bin,
+        ],
+        div_value=4,
+    )
+
+
+class AdaptiveSoftmaxHead(Head):
+    def __init__(
+            self,
+            num_input_features: int,
+            num_output_features: int,
+    ):
+        nn.Module.__init__(self)
+        self.head = make_lm_loss_head(num_input_features, num_output_features)
+
+    def forward(self, x):
+        return self.head(x)
+
+
+class StartEndHead(Head):
+    """Predict the start and end location within a sequence.  Prediction must be positive."""
+    def __init__(
+            self,
+            num_input_features: int,
+            num_classes: int,
+    ):
+        nn.Module.__init__(self)
+        self.start = nn.Conv1d(
+            in_channels=num_input_features,
+            out_channels=num_classes,
+            kernel_size=1,
+            stride=1,
+        )
+
+        self.end = nn.Conv1d(
+            in_channels=num_input_features,
+            out_channels=num_classes,
+            kernel_size=1,
+            stride=1,
+        )
+
+    def forward(self, x):
+        x.permute(0, 2, 1)
+        return {
+            'start_logits': nn.ReLU(self.start(x)).permute(0, 2, 1),
+            'end_logits': nn.ReLU(self.end(x)).permute(0, 2, 1),
+        }
+
+
+class HeadedSlabNet(SlabNet):
+    """A slabnet with a head containing num_output_features."""
+    def __init__(
+            self,
+            num_input_features: int,
+            num_output_features: int,
+            head_maker: Optional[Callable[[int, int], Head]] = None,
             hp: Optional[SlabNet.ModelParams] = SlabNet.ModelParams(),
     ):
         super().__init__(
@@ -357,7 +430,12 @@ class HeadedSlabNet(SlabNet):
         # could be changed by GroupNorm fixup
         num_slab_outputs = self.get_num_outputs()
 
-        self.head = nn.Conv1d(num_slab_outputs, num_output_features, 1)
+        if head_maker is None:
+            head = nn.Conv1d(num_slab_outputs, num_output_features, 1)
+        else:
+            head = head_maker(num_slab_outputs, num_output_features)
+        self.head = head
+
         self._num_output_features = num_output_features
 
     def forward(self, x):
@@ -451,7 +529,11 @@ class ArtlessSmasher(nn.Module):
         return 8 * self.num_input_channels
 
 
-def build_fast_trans_block(hp: 'TransBlockBuilder.ModelParams', num_input_features: int) -> nn.Module:
+def build_fast_trans_block(
+        hp: 'TransBlockBuilder.ModelParams',
+        num_input_features: int,
+        get_decoder=False,
+) -> nn.Module:
     from fast_transformers import builders, feature_maps
     s = TransBlockBuilder.split(hp.impl)
     feature_map_name = None if len(s) == 1 else s[1]
@@ -465,22 +547,38 @@ def build_fast_trans_block(hp: 'TransBlockBuilder.ModelParams', num_input_featur
     else:
         feature_map = None
 
+    kwargs = {
+        'n_layers': hp.num_layers,
+        'n_heads': hp.num_heads,
+        'query_dimensions': num_query_features // hp.num_heads,
+        'value_dimensions': num_input_features // hp.num_heads,
+        'feed_forward_dimensions': num_input_features * hp.fc_dim_mult,
+        'activation': 'gelu',
+        'feature_map': feature_map,
+        'dropout': hp.p_dropout,
+        'attention_dropout': hp.p_attention_dropout,
+    }
+
     # Create the builder for our transformers
-    builder = builders.TransformerEncoderBuilder.from_kwargs(
-        n_layers=hp.num_layers,
-        n_heads=hp.num_heads,
-        query_dimensions=num_query_features // hp.num_heads,
-        value_dimensions=num_input_features // hp.num_heads,
-        feed_forward_dimensions=num_input_features * hp.fc_dim_mult,
-        attention_type='linear',
-        activation='gelu',
-        feature_map=feature_map,
-    )
+    if get_decoder:
+        kwargs['attention_type'] = 'causal-linear'
+        kwargs['cross_attention_type'] = 'linear'
+        builder = builders.TransformerDecoderBuilder.from_kwargs(**kwargs)
+    else:
+        kwargs['attention_type'] = 'linear'
+        builder = builders.TransformerEncoderBuilder.from_kwargs(**kwargs)
 
     return builder.get()
 
 
-def build_performer_trans_block(hp: 'TransBlockBuilder.ModelParams', num_input_features: int) -> nn.Module:
+def build_performer_trans_block(
+        hp: 'TransBlockBuilder.ModelParams',
+        num_input_features: int,
+        get_decoder=False,
+) -> nn.Module:
+    if get_decoder:
+        raise NotImplementedError('Impelment a decoder')
+
     """https://github.com/lucidrains/performer-pytorch"""
     from performer_pytorch import Performer
     return Performer(
@@ -492,27 +590,54 @@ def build_performer_trans_block(hp: 'TransBlockBuilder.ModelParams', num_input_f
     )
 
 
-def build_pytorch_trans_block(hp: 'TransBlockBuilder.ModelParams', num_input_features: int) -> nn.Module:
-    enc_layer = nn.TransformerEncoderLayer(
-        d_model=num_input_features,
-        nhead=hp.num_heads,
-        dim_feedforward=hp.fc_dim_mult * num_input_features,
-        activation='gelu'
-    )
+def build_pytorch_trans_block(
+        hp: 'TransBlockBuilder.ModelParams',
+        num_input_features: int,
+        get_decoder=False,
+) -> nn.Module:
+    if get_decoder:
+        layer = nn.TransformerDecoderLayer(
+            d_model=num_input_features,
+            nhead=hp.num_heads,
+            dim_feedforward=hp.fc_dim_mult * num_input_features,
+            activation='gelu',
+            dropout=hp.p_dropout,
+        )
 
-    return nn.TransformerEncoder(
-        encoder_layer=enc_layer,
-        num_layers=hp.num_layers,
-    )
+        return nn.TransformerDecoder(
+            decoder_layer=layer,
+            num_layers=hp.num_layers,
+        )
+    else:
+        layer = nn.TransformerEncoderLayer(
+            d_model=num_input_features,
+            nhead=hp.num_heads,
+            dim_feedforward=hp.fc_dim_mult * num_input_features,
+            activation='gelu',
+            dropout=hp.p_dropout,
+        )
+
+        return nn.TransformerEncoder(
+            encoder_layer=layer,
+            num_layers=hp.num_layers,
+        )
 
 
-def build_ablatable_trans_block(hp: 'TransBlockBuilder.ModelParams', num_input_features: int) -> nn.Module:
-    do_drop_k = False
+def build_ablatable_trans_block(
+        hp: 'TransBlockBuilder.ModelParams',
+        num_input_features: int,
+        get_decoder=False,
+) -> nn.Module:
+    if get_decoder:
+        raise NotImplementedError('Impelment a decoder')
+
+    do_drop_k = True
 
     return ablation.Encoder(
         d_model=num_input_features,
         num_layers=hp.num_layers,
         num_heads=hp.num_heads,
+        p_dropout=hp.p_dropout,
         d_ff_mult=hp.fc_dim_mult,
         do_drop_k=do_drop_k,
     )
@@ -525,6 +650,8 @@ class TransBlockBuilder(abc.ABC):
         num_heads = 8
         num_query_features = 32
         fc_dim_mult = 2
+        p_dropout = 0.1
+        p_attention_dropout = 0.1
 
     IMPL_NAME_SPLIT_STR = '-'
     name = None
@@ -546,12 +673,13 @@ class TransBlockBuilder(abc.ABC):
         return enc_name.split(cls.IMPL_NAME_SPLIT_STR)
 
     @classmethod
-    def build(cls, hp: ModelParams, num_input_features: int) -> nn.Module:
+    def build(cls, hp: ModelParams, num_input_features: int, get_decoder=False) -> nn.Module:
         base_name = TransBlockBuilder.split(hp.impl)[0]
 
         if base_name not in cls.KNOWN_ENCODER_BUILDERS:
             raise ValueError(f"Couldn't find an encoder called {base_name}, "
                              f"only have: {list(cls.KNOWN_ENCODER_BUILDERS.keys())}.")
 
-        return cls.KNOWN_ENCODER_BUILDERS[base_name](hp=hp, num_input_features=num_input_features)
+        builder_fn = cls.KNOWN_ENCODER_BUILDERS[base_name]
+        return builder_fn(hp=hp, num_input_features=num_input_features, get_decoder=get_decoder)
 

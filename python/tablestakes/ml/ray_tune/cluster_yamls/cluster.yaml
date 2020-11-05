@@ -16,7 +16,7 @@ target_utilization_fraction: 0.8
 idle_timeout_minutes: 20
 
 head_node:
-    InstanceType: g4dn.xlarge
+    InstanceType: m4.large
 #    ImageId: latest_dlami
     ImageId: ami-0c528fc50c922876d
     BlockDeviceMappings:

@@ -6,15 +6,17 @@ import torch
 import torch.nn as nn
 import pytorch_lightning as pl
 
+import pandas as pd
+
 from tablestakes import constants, utils
 from tablestakes.ml import metrics_mod, torch_mod, factored, data
 
 
-class ModelBertEncConvTClass(factored.FactoredLightningModule):
+class ModelBertConvTransTClass(factored.FactoredLightningModule):
     class Params(factored.FactoredLightningModule.FactoredParams):
         data = data.TablestakesDataModule.DataParams()
         opt = factored.OptimizersMaker.OptParams()
-        metrics = tablestakes.ml.metrics_mod.MetricsTracker.MetricParams()
+        metrics = tablestakes.ml.metrics_mod.ClassificationMetricsTracker.MetricParams()
         exp = torch_mod.ExperimentParams()
 
         embed = torch_mod.BertEmbedder.ModelParams()
@@ -32,7 +34,7 @@ class ModelBertEncConvTClass(factored.FactoredLightningModule):
             self,
             hp: Params,
             data_module: data.XYDocumentDataModule,
-            metrics_tracker: tablestakes.ml.metrics_mod.MetricsTracker,
+            metrics_tracker: tablestakes.ml.metrics_mod.ClassificationMetricsTracker,
             opt: factored.OptimizersMaker,
     ):
         super().__init__(hp, metrics_tracker, opt)
@@ -66,31 +68,41 @@ class ModelBertEncConvTClass(factored.FactoredLightningModule):
             self.trans = torch_mod.TransBlockBuilder.build(hp=hp.trans, num_input_features=num_embedcat_features)
             num_trans_features = num_embedcat_features
 
-        # cat here
-        print(f'num_embedcat_features:  {num_embedcat_features}')
-        print(f'num_trans_features:     {num_trans_features}')
-        print(f'num_conv_features:      {num_conv_features}')
         num_fc_features = num_x_base_features + num_trans_features + num_conv_features
         self.fc = torch_mod.SlabNet(
             num_input_features=num_fc_features,
             hp=self.hp.fc,
         )
 
-        self.heads = nn.ModuleDict({
-            name: torch_mod.HeadedSlabNet(
+        special_head_registry = {
+            'startend': torch_mod.StartEndHead,
+            'softmax': torch_mod.AdaptiveSoftmaxHead,
+        }
+
+        heads = {}
+        for y_name, num_classes in self.num_y_classes.items():
+            if self.hp.heads.special_heads and y_name in self.hp.heads.special_heads:
+                head_type_name = self.hp.heads.special_heads[y_name]
+                if head_type_name not in special_head_registry:
+                    raise ValueError(f'Head name: {head_type_name} for y_name: {y_name}')
+                head = special_head_registry[head_type_name]
+            else:
+                head = None
+            heads[y_name] = torch_mod.HeadedSlabNet(
                 num_input_features=self.fc.get_num_outputs(),
                 num_output_features=num_classes,
+                head_maker=head,
                 hp=self.hp.heads,
             )
-            for name, num_classes in self.num_y_classes.items()
-        })
+
+        self.heads = nn.ModuleDict(heads)
         # END MODEL
         ###############################################################
 
         self.save_hyperparameters(self.hp.to_dict())
         self.hparams.lr = self.hp.opt.lr
 
-    def forward(self, base: torch.Tensor, vocab: torch.Tensor):
+    def forward(self, base: torch.Tensor, vocab: torch.Tensor, meta: pd.DataFrame):
         x = self.embed(vocab)
         x = torch.cat([base, x.last_hidden_state], dim=-1)
 
@@ -114,10 +126,11 @@ class ModelBertEncConvTClass(factored.FactoredLightningModule):
 def run(
         net: pl.LightningModule,
         dm: pl.LightningDataModule,
-        hp: ModelBertEncConvTClass.Params,
+        hp: ModelBertConvTransTClass.Params,
         fast_dev_run=False,
         do_find_lr=False,
 ):
+    print("model run about to create trainer")
     trainer = pl.Trainer(
         logger=True if fast_dev_run else torch_mod.get_pl_logger(hp.exp),
         default_root_dir=hp.metrics.output_dir,
@@ -132,6 +145,7 @@ def run(
         auto_lr_find=do_find_lr,
         log_every_n_steps=hp.metrics.num_steps_per_metric_log,
     )
+    print("model run done creating trainer")
 
     if do_find_lr:
         utils.hprint("Starting trainer.tune:")
@@ -148,8 +162,8 @@ def run(
 if __name__ == '__main__':
     fast_dev_run = False
 
-    hp = ModelBertEncConvTClass.Params(
-        max_seq_len=int(np.power(2, 11)),
+    hp = ModelBertConvTransTClass.Params(
+        max_seq_len=int(np.power(2, 15)),
         batch_size=32,
     )
 
@@ -180,15 +194,16 @@ if __name__ == '__main__':
     hp.embed.requires_grad = True
 
     hp.conv.num_features = 128
-    hp.conv.num_layers = 0
+    hp.conv.num_layers = 4
     hp.conv.kernel_size = 3
     hp.conv.num_groups = 16
     hp.conv.num_blocks_per_pool = 20
     hp.conv.requires_grad = True
 
     hp.trans.impl = 'fast-favor'
+    # hp.trans.impl = 'fast'
     hp.trans.num_heads = 8
-    hp.trans.num_layers = 2
+    hp.trans.num_layers = 6
     hp.trans.num_query_features = None
     hp.trans.fc_dim_mult = 2
 
@@ -207,10 +222,10 @@ if __name__ == '__main__':
     hp.heads.requires_grad = True
 
     dm = data.TablestakesDataModule(hp.data)
-    net = ModelBertEncConvTClass(
+    net = ModelBertConvTransTClass(
         hp=hp,
         data_module=dm,
-        metrics_tracker=tablestakes.ml.metrics_mod.MetricsTracker(hp.metrics),
+        metrics_tracker=tablestakes.ml.metrics_mod.ClassificationMetricsTracker(hp.metrics),
         opt=factored.OptimizersMaker(hp.opt),
     )
 

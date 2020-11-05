@@ -101,51 +101,47 @@ class BetterAccuracy(pl.metrics.Accuracy):
         self.correct = self.correct + torch.sum(preds.eq(target))
         self.total = self.total + target.numel() - target.eq(constants.Y_VALUE_TO_IGNORE).sum()
 
-# ref: https://community.neptune.ai/t/neptune-and-hyperparameter-search-with-tune/567/3
-class TuneNeptuneLogger(TuneLogger):
-    """Neptune logger.
-    """
 
-    def _init(self):
-        from neptune.sessions import Session
-
-        hp = hyperparams.LearningParams.from_dict(self.config)
-        project_name = utils.get_neptune_fully_qualified_project_name(hp.project_name)
-        experiment_name = f'tune_logger-{hp.get_exp_group_name()}-{tune.get_trial_id()}'
-
-        project = Session().get_project(project_name)
-
-        self.exp = project.create_experiment(
-            name=experiment_name,
-            params=self.config,
-            tags=hp.experiment_tags,
-            upload_source_files=constants.SOURCES_GLOB_STR,
-        )
-
-    def on_result(self, result):
-        for name, value in result.items():
-            if isinstance(value, float):
-                self.exp.log_metric(name, x=result.get(tune_result.TRAINING_ITERATION), y=value)
-            elif isinstance(value, int):
-                self.exp.log_metric(name, x=result.get(tune_result.TRAINING_ITERATION), y=value)
-            elif isinstance(value, str):
-                self.exp.log_text(name, x=result.get(tune_result.TRAINING_ITERATION), y=value)
-            else:
-                continue
-
-        # from ray.tune.result import (NODE_IP, TRAINING_ITERATION, TIME_TOTAL_S,
-        #                              TIMESTEPS_TOTAL, EXPR_PARAM_FILE,
-        #                              EXPR_PARAM_PICKLE_FILE, EXPR_PROGRESS_FILE,
-        #                              EXPR_RESULT_FILE)
-
-    def close(self):
-        self.exp.stop()
+# # ref: https://community.neptune.ai/t/neptune-and-hyperparameter-search-with-tune/567/3
+# class TuneNeptuneLogger(TuneLogger):
+#     """Neptune logger.
+#     """
+#
+#     def _init(self):
+#         from neptune.sessions import Session
+#
+#         hp = hyperparams.LearningParams.from_dict(self.config)
+#         project_name = utils.get_neptune_fully_qualified_project_name(hp.project_name)
+#         experiment_name = f'tune_logger-{hp.get_exp_group_name()}-{tune.get_trial_id()}'
+#
+#         project = Session().get_project(project_name)
+#
+#         self.exp = project.create_experiment(
+#             name=experiment_name,
+#             params=self.config,
+#             tags=hp.experiment_tags,
+#             upload_source_files=constants.SOURCES_GLOB_STR,
+#         )
+#
+#     def on_result(self, result):
+#         for name, value in result.items():
+#             if isinstance(value, float):
+#                 self.exp.log_metric(name, x=result.get(tune_result.TRAINING_ITERATION), y=value)
+#             elif isinstance(value, int):
+#                 self.exp.log_metric(name, x=result.get(tune_result.TRAINING_ITERATION), y=value)
+#             elif isinstance(value, str):
+#                 self.exp.log_text(name, x=result.get(tune_result.TRAINING_ITERATION), y=value)
+#             else:
+#                 continue
+#
+#     def close(self):
+#         self.exp.stop()
 
 
 Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
 
-class MetricsTracker(torch_mod.Parametrized):
 
+class ClassificationMetricsTracker(torch_mod.Parametrized):
     TRAIN_PHASE_NAME = 'train'
     VALID_PHASE_NAME = 'valid'
     TEST_PHASE_NAME = 'test'
@@ -266,7 +262,7 @@ class MetricsTracker(torch_mod.Parametrized):
                 step=self.pl_module.global_step,
             )
 
-    def inner_forward_step(self, batch):
+    def inner_forward_step(self, batch, batch_idx):
         xs_dict, ys_dict = batch
         y_hats_dict = self.pl_module(**xs_dict)
 
@@ -284,14 +280,14 @@ class MetricsTracker(torch_mod.Parametrized):
         return xs_dict, ys_dict, y_hats_dict, losses, loss
 
     def training_step(self, batch, batch_idx):
-        xs_dict, ys_dict, y_hats_dict, losses, loss = self.inner_forward_step(batch)
+        xs_dict, ys_dict, y_hats_dict, losses, loss = self.inner_forward_step(batch, batch_idx)
         self.log_losses_and_metrics(self.TRAIN_PHASE_NAME, loss, losses, y_hats_dict, ys_dict, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        xs_dict, ys_dict, y_hats_dict, losses, loss = self.inner_forward_step(batch)
+        xs_dict, ys_dict, y_hats_dict, losses, loss = self.inner_forward_step(batch, batch_idx)
         self.log_losses_and_metrics(self.VALID_PHASE_NAME, loss, losses, y_hats_dict, ys_dict)
 
     def test_step(self, batch, batch_idx):
-        xs_dict, ys_dict, y_hats_dict, losses, loss = self.inner_forward_step(batch)
+        xs_dict, ys_dict, y_hats_dict, losses, loss = self.inner_forward_step(batch, batch_idx)
         self.log_losses_and_metrics(self.TEST_PHASE_NAME, loss, losses, y_hats_dict, ys_dict)

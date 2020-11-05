@@ -134,13 +134,13 @@ def get_clones(module, num_layers):
 
 
 class Encoder(nn.Module):
-    def __init__(self, d_model, num_layers, num_heads, d_ff_mult, do_drop_k=True):
+    def __init__(self, d_model, num_layers, num_heads, p_dropout, d_ff_mult, do_drop_k=True):
         super().__init__()
         self.num_layers = num_layers
         # self.embed = Embedder(vocab_size, d_model)
         # self.pe = PositionalEncoder(d_model)
         self.layers = get_clones(
-            EncoderLayer(d_model, num_heads, d_ff_mult=d_ff_mult, do_drop_k=do_drop_k),
+            EncoderLayer(d_model, num_heads, dropout=p_dropout, d_ff_mult=d_ff_mult, do_drop_k=do_drop_k),
             num_layers,
         )
         self.norm = Norm(d_model)

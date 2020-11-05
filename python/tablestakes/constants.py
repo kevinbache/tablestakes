@@ -29,6 +29,7 @@ X_BASE_NAME = X_PREFIX + X_BASE_BASE_NAME
 X_VOCAB_NAME = X_PREFIX + X_VOCAB_BASE_NAME
 
 META_DIR_NAME = 'meta'
+META_PREFIX = 'meta_'
 
 LOGGER_API_KEY_FILE = str(Path.home() / '.logger_api_key')
 NEPTUNE_USERNAME = 'kevinbache'
@@ -77,7 +78,7 @@ class ColNames:
     TOKEN_RAW = 'token_raw'
     TOKEN = 'token'
     TOKEN_ID = 'token_id'
-    TOKENIZER = 'tokenizer'
+    TOKENIZER = 'tok'
     # ocr tokenizes to "text", then we further tokenize into "tokens".
     # this tells us which tokens correspond to which original text items
     ORIGINAL_TEXT_INDEX = 'original_text_index'

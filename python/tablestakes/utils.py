@@ -321,8 +321,11 @@ def ray_prog_bar(obj_refs: List[ray.ObjectRef]):
 
     def to_iterator(obj_refs):
         while obj_refs:
-            done, obj_refs = ray.wait(obj_refs)
-            yield ray.get(done[0])
+            try:
+                done, obj_refs = ray.wait(obj_refs)
+                yield ray.get(done[0])
+            except TypeError as e:
+                return
 
     for _ in tqdm.tqdm(to_iterator(obj_refs), total=len(obj_refs)):
         pass

@@ -16,7 +16,7 @@ from ray.tune.integration import pytorch_lightning as tune_pl
 from chillpill import params
 
 from tablestakes import constants, utils
-from tablestakes.ml import metrics_mod, data, torch_mod, factored, model_bertenc_conv_tclass
+from tablestakes.ml import metrics_mod, data, torch_mod, factored, model_bert_trans_conv_tclass
 
 
 REGION = 'us-west-2'
@@ -97,7 +97,7 @@ class TuneRunner(torch_mod.Parametrized['factored.FactoredLightningModule.Factor
         assert isinstance(hp, factored.FactoredLightningModule.FactoredParams)
         assert isinstance(hp.data, data.TablestakesDataModule.DataParams)
         assert isinstance(hp.opt, factored.OptimizersMaker.OptParams)
-        assert isinstance(hp.metrics, tablestakes.ml.metrics_mod.MetricsTracker.MetricParams)
+        assert isinstance(hp.metrics, tablestakes.ml.metrics_mod.ClassificationMetricsTracker.MetricParams)
         assert isinstance(hp.exp, torch_mod.ExperimentParams)
         assert isinstance(hp.tune, TuneRunner.TuneParams)
 
@@ -288,7 +288,7 @@ class TuneRunner(torch_mod.Parametrized['factored.FactoredLightningModule.Factor
 class TuneFactoredParams(factored.FactoredLightningModule.FactoredParams):
     data = data.TablestakesDataModule.DataParams()
     opt = factored.OptimizersMaker.OptParams()
-    metrics = tablestakes.ml.metrics_mod.MetricsTracker.MetricParams()
+    metrics = tablestakes.ml.metrics_mod.ClassificationMetricsTracker.MetricParams()
     exp = torch_mod.ExperimentParams()
     tune = TuneRunner.TuneParams()
 
@@ -306,7 +306,7 @@ class TuneFactoredParams(factored.FactoredLightningModule.FactoredParams):
 
 # noinspection DuplicatedCode
 if __name__ == '__main__':
-    hp = model_bertenc_conv_tclass.ModelBertEncConvTClass.Params(
+    hp = model_bert_trans_conv_tclass.ModelBertConvTransTClass.Params(
         max_seq_len=2 ** 11,
         batch_size=32,
     )
@@ -338,7 +338,7 @@ if __name__ == '__main__':
     hp.embed.dim = 16
     hp.embed.requires_grad = True
 
-    hp.heads.num_features = params.Discrete([32, 64, 128, 256])
+    hp.conv.num_features = params.Discrete([32, 64, 128, 256])
     hp.conv.num_layers = params.Integer(2, 11)
     hp.conv.kernel_size = 3
     hp.conv.num_groups = params.Discrete([8, 16, 32, 64])
@@ -346,7 +346,13 @@ if __name__ == '__main__':
     hp.conv.num_blocks_per_skip = 2
     hp.conv.requires_grad = True
 
-    hp.heads.num_features = params.Discrete([32, 64, 128, 256])
+    hp.trans.impl = params.Categorical(['fast', 'fast-favor'])
+    hp.trans.num_layers = params.Discrete([0, 2, 4, 6, 8])
+    hp.trans.num_heads = params.Discrete([4, 8, 12])
+    hp.trans.num_query_features = params.Discrete([0, 32, 64, 128, 256, 512])
+    hp.trans.fc_dim_mult = params.Discrete([1, 2, 3, 4])
+
+    hp.fc.num_features = params.Discrete([32, 64, 128, 256])
     hp.fc.num_layers = params.Integer(2, 7)
     hp.fc.num_groups = params.Discrete([8, 16, 32, 64])
     hp.fc.num_blocks_per_residual = params.Integer(1, 5)
@@ -355,7 +361,7 @@ if __name__ == '__main__':
 
     hp.heads.num_features = params.Discrete([32, 64, 128, 256])
     hp.heads.num_layers = params.Integer(2, 5)
-    hp.fc.num_groups = params.Discrete([8, 16, 32, 64])
+    hp.heads.num_groups = params.Discrete([8, 16, 32, 64])
     hp.heads.num_blocks_per_residual = params.Integer(1, 5)
     hp.heads.num_blocks_per_dropout = params.Integer(1, 5)
     hp.heads.requires_grad = True
@@ -371,7 +377,7 @@ if __name__ == '__main__':
     # noinspection PyTypeChecker
     tune_runner = TuneRunner(
         search_params=hp,
-        factored_lightning_module_class=model_bertenc_conv_tclass.ModelBertEncConvTClass,
+        factored_lightning_module_class=model_bert_trans_conv_tclass.ModelBertConvTransTClass,
         extra_pl_callbacks=None,
         ray_local_mode=False,
     )

@@ -20,11 +20,12 @@ from tablestakes import constants, utils, load_makers
 
 X_PREFIX = constants.X_PREFIX
 Y_PREFIX = constants.Y_PREFIX
+META_PREFIX = constants.META_PREFIX
 
 Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
 
 
-class XYCsvDataset(Dataset):
+class XYMetaCsvDataset(Dataset):
     """
     Expects data to look like this:
 
@@ -74,7 +75,7 @@ class XYCsvDataset(Dataset):
         return {key_to_base_name_fn(k): df_postproc(pd.read_csv(v)) for k, v in d.items()}
 
     @staticmethod
-    def _convert_dict_of_dfs_to_tensors(d: dict):
+    def _default_convert_dict_of_dfs_to_tensors(d: dict):
         try:
             return {k: torch.tensor(v.values) for k, v in d.items()}
         except BaseException as e:
@@ -86,14 +87,19 @@ class XYCsvDataset(Dataset):
             data_dir: Union[Path, str],
             x_pattern=Path('**') / f'{X_PREFIX}*.csv',
             y_pattern=Path('**') / f'{Y_PREFIX}*.csv',
+            meta_pattern=Path('**') / f'{META_PREFIX}*.csv',
             csv_filename_to_x_name: Optional[Callable[[str], str]] = None,
             csv_filename_to_y_name: Optional[Callable[[str], str]] = None,
+            csv_filename_to_meta_name: Optional[Callable[[str], str]] = None,
             x_df_postproc: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
             y_df_postproc: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
+            meta_df_postproc: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
+            convert_to_tensors_fn: Optional[Callable[[Dict[str, pd.DataFrame]], Dict[str, torch.Tensor]]] = None
     ):
         self.data_dir = str(Path(data_dir))
         self.x_pattern = x_pattern
         self.y_pattern = y_pattern
+        self.meta_pattern = meta_pattern
 
         drop_unnamed = lambda df: df.loc[:, ~df.columns.str.contains('^Unnamed')]
         if x_df_postproc is None:
@@ -103,6 +109,12 @@ class XYCsvDataset(Dataset):
         if y_df_postproc is None:
             y_df_postproc = drop_unnamed
         self._y_df_postproc = y_df_postproc
+
+        if meta_df_postproc is None:
+            meta_df_postproc = drop_unnamed
+        self._meta_df_postproc = meta_df_postproc
+
+        self._convert_dict_of_dfs_to_tensors = convert_to_tensors_fn or self._default_convert_dict_of_dfs_to_tensors
 
         def _match_after_prefix(filename: str, prefix: str) -> str:
             m = re.match(fr'.*{prefix}(\w+)$', filename)
@@ -116,15 +128,24 @@ class XYCsvDataset(Dataset):
             csv_filename_to_y_name = lambda filename: _match_after_prefix(filename, Y_PREFIX)
         self._csv_filename_to_y_name = csv_filename_to_y_name
 
+        if csv_filename_to_meta_name is None:
+            csv_filename_to_meta_name = lambda filename: _match_after_prefix(filename, META_PREFIX)
+        self._csv_filename_to_meta_name = csv_filename_to_meta_name
+
         self._x_filename_dicts = self._find_files(self.data_dir / self.x_pattern)
         self._y_filename_dicts = self._find_files(self.data_dir / self.y_pattern)
+        self._meta_filename_dicts = self._find_files(self.data_dir / self.meta_pattern)
+
         if len(self._x_filename_dicts) == 0:
             raise ValueError(f"Found no files matching {self.data_dir / self.x_pattern}")
         if len(self._y_filename_dicts) == 0:
             raise ValueError(f"Found no files matching {self.data_dir / self.y_pattern}")
+        if len(self._meta_filename_dicts) == 0:
+            raise ValueError(f"Found no files matching {self.data_dir / self.meta_pattern}")
 
         df_dicts = []
-        for x_filename_dict, y_filename_dict in zip(self._x_filename_dicts, self._y_filename_dicts):
+        for x_filename_dict, y_filename_dict, meta_filename_dict \
+                in zip(self._x_filename_dicts, self._y_filename_dicts, self._meta_filename_dicts):
             df_dicts.append((
                 self._read_csvs_from_dict(
                     x_filename_dict,
@@ -136,25 +157,36 @@ class XYCsvDataset(Dataset):
                     key_to_base_name_fn=self._csv_filename_to_y_name,
                     df_postproc=self._y_df_postproc,
                 ),
+                self._read_csvs_from_dict(
+                    meta_filename_dict,
+                    key_to_base_name_fn=self._csv_filename_to_meta_name,
+                    df_postproc=self._meta_df_postproc,
+                ),
             ))
 
         self._datapoints = []
-        for x_dict, y_dict in df_dicts:
+        for x_dict, y_dict, meta_dict in df_dicts:
             self._datapoints.append((
                 self._convert_dict_of_dfs_to_tensors(x_dict),
                 self._convert_dict_of_dfs_to_tensors(y_dict),
+                meta_dict,
             ))
 
         self.num_x_dims = {k: df.shape[1] for k, df in self._datapoints[0][0].items()}
-        self.num_y_dims = {k: df.shape[1] for k, df in self._datapoints[0][1].items()}
 
-        self.num_y_classes = {
-            k: df.shape[1] if df.shape[1] > 1 else df.max().item() + 1
-            for k, df in self._datapoints[0][1].items()
-        }
+        self.num_y_dims = {}
+        self.num_y_classes = {}
+        for k, df in self._datapoints[0][1].items():
+            if hasattr(df, 'shape'):
+                self.num_y_dims[k] = df.shape[1]
+                self.num_y_classes[k] = df.shape[1] if df.shape[1] > 1 else df.max().item() + 1
+            else:
+                self.num_y_dims[k] = None
+                self.num_y_classes[k] = None
 
         self.x_names = self.num_x_dims.keys()
         self.y_names = self.num_y_dims.keys()
+        self.meta_names = [k for k in self._datapoints[0][2]]
 
     def __len__(self):
         return len(self._datapoints)
@@ -186,7 +218,7 @@ class XYCsvDataset(Dataset):
         return utils.load_cloudpickle(filename)
 
 
-class TablestakesDataset(XYCsvDataset):
+class TablestakesDataset(XYMetaCsvDataset):
     def __init__(self, docs_dir: Union[Path, str]):
         super().__init__(docs_dir)
         self.docs_dir = self.data_dir
@@ -260,7 +292,7 @@ class XYDocumentDataModule(pl.LightningDataModule):
         pass
 
     @abc.abstractmethod
-    def get_dataset(self, hp: DataParams) -> XYCsvDataset:
+    def get_dataset(self, hp: DataParams) -> XYMetaCsvDataset:
         pass
 
     @abc.abstractmethod
@@ -298,7 +330,7 @@ class XYDocumentDataModule(pl.LightningDataModule):
             ...
           ]
         """
-        xs, ys = zip(*batch)
+        xs, ys, metas = zip(*batch)
         xs = {k: [d[k] for d in xs] for k in xs[0]}
         ys = {k: [d[k] for d in ys] for k in ys[0]}
 
@@ -319,7 +351,7 @@ class XYDocumentDataModule(pl.LightningDataModule):
             for k, v in ys.items()
         }
 
-        return xs, ys
+        return xs, ys, metas
 
     def train_dataloader(self):
         return DataLoader(
@@ -413,7 +445,7 @@ class TablestakesDataModule(XYDocumentDataModule):
 
     def get_example_input_array(self) -> Dict[str, torch.Tensor]:
         num_example_batch_size = 32
-        num_example_words = 1000
+        num_example_words = 30000
 
         return {
             constants.X_BASE_BASE_NAME:
@@ -422,7 +454,7 @@ class TablestakesDataModule(XYDocumentDataModule):
                 torch.tensor(np.random.rand(num_example_batch_size, num_example_words)).long(),
         }
 
-    def get_dataset(self, hp: DataParams) -> XYCsvDataset:
+    def get_dataset(self, hp: DataParams) -> XYMetaCsvDataset:
         return TablestakesDatasetLoadMaker.run_from_hp(hp)
 
     def _transform_xs(self, xs: Dict[str, List[torch.Tensor]]) -> Dict[str, List[torch.Tensor]]:
