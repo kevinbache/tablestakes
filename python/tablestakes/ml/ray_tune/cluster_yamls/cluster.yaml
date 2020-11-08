@@ -39,8 +39,8 @@ worker_nodes:
 
 # Remote -> Local
 file_mounts: {
-    "/tmp/chillpill_current_branch_sha": "~/projects/chillpill/.git/refs/heads/master",
-    "/tmp/tablestakes_current_branch_sha": "~/projects/tablestakes/.git/refs/heads/master",
+    "/tmp/chillpill_current_branch_sha": "~/projects/chillpill/.git/refs/sub_losses/master",
+    "/tmp/tablestakes_current_branch_sha": "~/projects/tablestakes/.git/refs/sub_losses/master",
     ~/.logger_api_key: ~/.logger_api_key,
 #    "~/lib/": "~/projects/tablestakes/python/lib/",
     "~/data/tablestakes/datasets/": "~/data/tablestakes/datasets/",

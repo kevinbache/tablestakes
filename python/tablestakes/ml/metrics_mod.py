@@ -1,3 +1,4 @@
+import abc
 import time
 from typing import *
 
@@ -95,11 +96,13 @@ class CounterTimerCallback(pl.Callback):
 
 
 class BetterAccuracy(pl.metrics.Accuracy):
+    Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
+
     """PyTorch Lightning's += lines cause warnings about transferring lots of scalars between cpu / gpu"""
     def update(self, preds: torch.Tensor, target: torch.Tensor):
         assert preds.shape == target.shape,  f"preds.shape: {preds.shape}, target.shape: {target.shape}"
         self.correct = self.correct + torch.sum(preds.eq(target))
-        self.total = self.total + target.numel() - target.eq(constants.Y_VALUE_TO_IGNORE).sum()
+        self.total = self.total + target.numel() - target.eq(self.Y_VALUE_TO_IGNORE).sum()
 
 
 # # ref: https://community.neptune.ai/t/neptune-and-hyperparameter-search-with-tune/567/3
@@ -141,7 +144,7 @@ class BetterAccuracy(pl.metrics.Accuracy):
 Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
 
 
-class ClassificationMetricsTracker(torch_mod.Parametrized):
+class ClassificationMetricsTracker(torch_mod.Parameterized, abc.ABC):
     TRAIN_PHASE_NAME = 'train'
     VALID_PHASE_NAME = 'valid'
     TEST_PHASE_NAME = 'test'
@@ -164,8 +167,11 @@ class ClassificationMetricsTracker(torch_mod.Parametrized):
         num_steps_per_metric_log = 10
         output_dir = 'output'
 
+    def get_params(self) -> MetricParams:
+        return self.MetricParams()
+
     def __init__(self, hp: MetricParams):
-        super().__init__(hp)
+        super().__init__()
         self.hp = hp
         self.pl_module = None
 
@@ -182,13 +188,13 @@ class ClassificationMetricsTracker(torch_mod.Parametrized):
             out += f'_{output_name}'
         return out
 
-    @classmethod
-    def get_valid_metric_name(cls, metric_name: str, output_name: Optional[str] = None):
-        return cls._get_phase_name(cls.VALID_PHASE_NAME, metric_name, output_name)
-
-    @classmethod
-    def get_train_metric_name(cls, metric_name: str, output_name: Optional[str] = None):
-        return cls._get_phase_name(cls.TRAIN_PHASE_NAME, metric_name, output_name)
+    # @classmethod
+    # def get_valid_metric_name(cls, metric_name: str, output_name: Optional[str] = None):
+    #     return cls._get_phase_name(cls.VALID_PHASE_NAME, metric_name, output_name)
+    #
+    # @classmethod
+    # def get_train_metric_name(cls, metric_name: str, output_name: Optional[str] = None):
+    #     return cls._get_phase_name(cls.TRAIN_PHASE_NAME, metric_name, output_name)
 
     @classmethod
     def get_all_metric_names_for_phase(cls, phase_name: str):
@@ -212,11 +218,13 @@ class ClassificationMetricsTracker(torch_mod.Parametrized):
 
         total_loss_name = self._get_phase_name(phase_name, 'loss', 'total')
 
+        # LOG
         self.pl_module.log(total_loss_name, loss, prog_bar=False, on_epoch=on_epoch)
         d[total_loss_name] = loss
 
         for output_name, current_loss in zip(output_names, losses):
             full_metric_name = self._get_phase_name(phase_name, 'loss', output_name)
+            # LOG
             self.pl_module.log(full_metric_name, current_loss, prog_bar=False, on_epoch=on_epoch)
 
             d[full_metric_name] = current_loss
@@ -229,6 +237,7 @@ class ClassificationMetricsTracker(torch_mod.Parametrized):
                 y_hat = y_hat.argmax(dim=2)
                 metric_value = metric(y_hat, y)
 
+                # LOG
                 self.pl_module.log(full_metric_name, metric_value, prog_bar=prog_bar, on_epoch=on_epoch)
                 d[full_metric_name] = metric_value
 
@@ -236,6 +245,7 @@ class ClassificationMetricsTracker(torch_mod.Parametrized):
         lrs = [float(param_group['lr']) for param_group in opt.param_groups]
         assert(all([lr == lrs[0] for lr in lrs]))
         lr = lrs[0]
+        # LOG
         self.pl_module.log('lrs_opt', lr, prog_bar=False, on_epoch=on_epoch)
         d['lrs_op'] = lr
 
@@ -263,8 +273,8 @@ class ClassificationMetricsTracker(torch_mod.Parametrized):
             )
 
     def inner_forward_step(self, batch, batch_idx):
-        xs_dict, ys_dict = batch
-        y_hats_dict = self.pl_module(**xs_dict)
+        xs_dict, ys_dict, meta = batch
+        y_hats_dict = self.pl_module(batch)
 
         losses = torch.stack([
             F.cross_entropy(

@@ -22,7 +22,7 @@ from tablestakes.ml import metrics_mod, data, torch_mod, factored, model_bert_tr
 REGION = 'us-west-2'
 
 
-class TuneRunner(torch_mod.Parametrized['factored.FactoredLightningModule.FactoredParams']):
+class TuneRunner(torch_mod.Parameterized['factored.FactoredLightningModule.FactoredParams']):
     class TuneParams(params.ParameterSet):
         asha_grace_period = 4
         asha_reduction_factor = 2
@@ -41,7 +41,8 @@ class TuneRunner(torch_mod.Parametrized['factored.FactoredLightningModule.Factor
         os.environ['TUNE_DISABLE_STRICT_METRIC_CHECKING'] = "1"
 
         self.ensure_hp_is_factored(search_params)
-        super().__init__(search_params)
+        super().__init__()
+        self.hp = search_params
         self.search_params = self.hp
         assert hasattr(self.search_params, 'tune')
         # noinspection PyUnresolvedReferences

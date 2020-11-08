@@ -7,6 +7,8 @@ import os
 num_jobs = multiprocessing.cpu_count() - 2
 os.environ["OMP_THREAD_LIMIT"] = f'{num_jobs}'
 
+import pandas as pd
+
 import ray
 
 from tablestakes import utils, ocr, constants
@@ -177,6 +179,8 @@ def join_and_split_and_save_dfs(
         else:
             df.to_csv(final_data_dir / f'{name}.csv', index=False)
 
+    pd.DataFrame([{'original_data_dir': this_doc_dir}]).to_csv(final_data_dir / f'meta_short.csv', index=False)
+
     return len(y_korv_cols), len(y_which_kv_cols)
 
 
@@ -201,7 +205,7 @@ if __name__ == '__main__':
         doc_gen_params=doc_gen_params,
         doc_prep_params=doc_prep_params,
     )
-    doc_settings.num_docs = 101
+    doc_settings.num_docs = 100
     # doc_settings.doc_gen_params.num_extra_fields = 0
 
     fast_test = False

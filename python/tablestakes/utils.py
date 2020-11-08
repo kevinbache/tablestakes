@@ -1,3 +1,4 @@
+import enum
 from typing import List
 
 import ray
@@ -23,6 +24,12 @@ from matplotlib.image import imread
 from tablestakes import constants
 
 StrDict = Dict[str, Union[str, int, float]]
+
+
+class Phase(enum.Enum):
+    train = 0
+    valid = 1
+    test = 2
 
 
 def to_list(v: Any):

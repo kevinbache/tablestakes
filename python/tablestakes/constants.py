@@ -28,8 +28,9 @@ X_VOCAB_BASE_NAME = 'vocab'
 X_BASE_NAME = X_PREFIX + X_BASE_BASE_NAME
 X_VOCAB_NAME = X_PREFIX + X_VOCAB_BASE_NAME
 
-META_DIR_NAME = 'meta'
-META_PREFIX = 'meta_'
+META_NAME = 'meta'
+META_PREFIX = f'{META_NAME}_'
+
 
 LOGGER_API_KEY_FILE = str(Path.home() / '.logger_api_key')
 NEPTUNE_USERNAME = 'kevinbache'

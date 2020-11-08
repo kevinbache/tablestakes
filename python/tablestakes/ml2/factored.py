@@ -1,7 +1,9 @@
+import abc
 from typing import *
 
 from tablestakes.ml import metrics_mod
-from torch import optim
+# from tablestakes.ml.torch_mod import PS
+from torch import optim, nn
 import pytorch_lightning as pl
 
 from chillpill import params
@@ -67,12 +69,58 @@ class OptimizersMaker(torch_mod.Parameterized['OptimizationMaker.OptParams']):
         return optimizers, schedulers
 
 
-class FactoredLightningModule(pl.LightningModule, torch_mod.Parameterized[torch_mod.PS]):
+class Head(nn.Module):
+    """
+    A head
+        takes in y_hat and y and spits out loss
+        and logs
+
+    OR
+        it takes the x' and transforms it into y_hat then takes in y and calculates loss
+
+        takes in y_hat
+            good definition of difference
+            but then a head is just a logged loss
+        a logged loss is a tracked loss
+            it doesn't log it tracks metrics
+            cause every time you run classification you want some basic metrics:
+                confusion matrix
+                every time you use region start/end head you're gonna want the same metrics
+                MetricSet
+                    is basically a list of metrics but can share computation?
+                    probably not important.  just do a list of metrics.
+                What kinds of things are you going ot be interested in
+                    s2s - save the datapoint.  output sequences.
+                        how well each sequence matches the original
+                            is it a superset
+                            is it a subset
+                            venn diagram of tokens
+                    token class - save a datapoint.  repaint the original docs
+                        stats on number of tokens in each class
+                        absolute and proportional confusion matrices
+                        save the sequences that were generated
+                        types of each token
+                            how do i want to deal with token types?
+
+            it takes in a y_hat and a y and it spits out an output object which includes loss and other metrics of
+                interest
+
+        a head meanwhile might produce the actual output.  like lm heads' .generate
+
+    """
+
+    def loss(self, y_hat, y):
+        return nn.CrossEntropyLoss(y_hat, y)
+
+
+
+
+class FactoredLightningModule(pl.LightningModule, torch_mod.Parameterized[torch_mod.PS], abc.ABC):
     """A Lightning Module which has been factored into distinct parts."""
     class FactoredParams(params.ParameterSet):
         data = data.TablestakesDataModule.DataParams()
         opt = OptimizersMaker.OptParams()
-        metrics = metrics_mod.ClassificationMetricsTracker.MetricParams()
+        head = Head.HeadParams()
         exp = torch_mod.ExperimentParams()
         Tune = None
 

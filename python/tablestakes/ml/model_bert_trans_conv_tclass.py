@@ -30,6 +30,9 @@ class ModelBertConvTransTClass(factored.FactoredLightningModule):
             self.embed.max_seq_len = self.data.max_seq_length = max_seq_len
             self.data.batch_size = self.opt.batch_size = batch_size
 
+    def get_params(self) -> Params:
+        return self.hp
+
     def __init__(
             self,
             hp: Params,
@@ -61,6 +64,7 @@ class ModelBertConvTransTClass(factored.FactoredLightningModule):
             )
             num_conv_features = self.conv.get_num_output_features()
 
+        print('')
         if self.hp.trans.num_layers == 0:
             self.trans = None
             num_trans_features = 0
@@ -102,14 +106,22 @@ class ModelBertConvTransTClass(factored.FactoredLightningModule):
         self.save_hyperparameters(self.hp.to_dict())
         self.hparams.lr = self.hp.opt.lr
 
-    def forward(self, base: torch.Tensor, vocab: torch.Tensor, meta: pd.DataFrame):
+    def forward(self, batch):
+        xs, ys, meta = batch
+        base, vocab = xs
         x = self.embed(vocab)
+        print(f'embedx {x.last_hidden_state.shape}')
         x = torch.cat([base, x.last_hidden_state], dim=-1)
+        print(f'base {base.shape}')
+        print(f'catx {x.shape}')
 
         num_batch, num_seq, _ = base.shape
 
+        print(num_batch)
+        print(num_seq)
         x_trans = self.trans(x) if self.trans else torch.zeros(num_batch, num_seq, 0)
         x_conv = self.conv(x) if self.conv else torch.zeros(num_batch, num_seq, 0)
+        print(f'xtrans {x_trans.shape}')
 
         # concatenate for sharpness
         x = torch.cat([base, x_trans, x_conv], dim=-1)
@@ -167,7 +179,8 @@ if __name__ == '__main__':
         batch_size=32,
     )
 
-    hp.data.dataset_name = 'num=1000_02b7'
+    hp.data.dataset_name = 'num=100_8163'
+    # hp.data.dataset_name = 'num=1000_02b7'
     # hp.data.dataset_name = 'num=4000_9b9f'
     hp.data.do_ignore_cached_dataset = False
     hp.data.seed = 42
@@ -190,7 +203,7 @@ if __name__ == '__main__':
     hp.exp.experiment_tags = ['korv_which', 'conv', 'sharp', 'testing']
     hp.exp.sources_glob_str = constants.THIS_DIR.parent.parent / '**/*.py'
 
-    hp.embed.dim = 15
+    hp.embed.dim = 14
     hp.embed.requires_grad = True
 
     hp.conv.num_features = 128
@@ -225,7 +238,7 @@ if __name__ == '__main__':
     net = ModelBertConvTransTClass(
         hp=hp,
         data_module=dm,
-        metrics_tracker=tablestakes.ml.metrics_mod.ClassificationMetricsTracker(hp.metrics),
+        metrics_tracker=metrics_mod.ClassificationMetricsTracker(hp.metrics),
         opt=factored.OptimizersMaker(hp.opt),
     )
 

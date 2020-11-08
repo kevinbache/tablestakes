@@ -48,6 +48,7 @@ class RectTransformerModule(pl.LightningModule):
         self.example_input_array = {
             constants.X_BASE_BASE_NAME: torch.tensor(np.random.rand(1, num_example_words, num_x_basic_dims)).float(),
             constants.X_VOCAB_BASE_NAME: torch.tensor(np.random.rand(1, num_example_words, num_x_vocab_dims)).long(),
+            constants.META_PREFIX: pd.DataFrame(),
         }
 
         self.hp.num_x_dims = self.ds.num_x_dims

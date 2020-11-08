@@ -180,6 +180,9 @@ class XYMetaCsvDataset(Dataset):
             if hasattr(df, 'shape'):
                 self.num_y_dims[k] = df.shape[1]
                 self.num_y_classes[k] = df.shape[1] if df.shape[1] > 1 else df.max().item() + 1
+            elif isinstance(df, MutableMapping):
+                self.num_y_dims[k] = None
+                self.num_y_classes[k] = len(df)
             else:
                 self.num_y_dims[k] = None
                 self.num_y_classes[k] = None
@@ -335,7 +338,6 @@ class XYDocumentDataModule(pl.LightningDataModule):
         ys = {k: [d[k] for d in ys] for k in ys[0]}
 
         xs = self._transform_xs(xs)
-        ys = self._transform_ys(ys)
 
         new_xs = {}
         for k, v in xs.items():
@@ -346,10 +348,16 @@ class XYDocumentDataModule(pl.LightningDataModule):
             new_xs[k] = x_padded
         xs = new_xs
 
-        ys = {
-            k: torch.nn.utils.rnn.pad_sequence(v, batch_first=True, padding_value=Y_VALUE_TO_IGNORE)
-            for k, v in ys.items()
-        }
+        ys = self._transform_ys(ys)
+        for k, v in ys.items():
+            ys[k] = torch.nn.utils.rnn.pad_sequence(v, batch_first=True, padding_value=Y_VALUE_TO_IGNORE)
+            # if isinstance(v, MutableMapping):
+            #     ys[k] = {
+            #         sub_k: torch.nn.utils.rnn.pad_sequence(sub_v, batch_first=True, padding_value=Y_VALUE_TO_IGNORE)
+            #         for sub_v, sub_k in v.items()
+            #     }
+            # else:
+            #     ys[k] = torch.nn.utils.rnn.pad_sequence(v, batch_first=True, padding_value=Y_VALUE_TO_IGNORE)
 
         return xs, ys, metas
 
@@ -396,7 +404,8 @@ class XYDocumentDataModule(pl.LightningDataModule):
             batch = outs
         elif isinstance(batch, MutableMapping):
             for k, v in batch.items():
-                batch[k] = v.to(device)
+                if isinstance(v, torch.Tensor):
+                    batch[k] = v.to(device)
         else:
             raise ValueError('')
 
@@ -452,6 +461,8 @@ class TablestakesDataModule(XYDocumentDataModule):
                 torch.tensor(np.random.rand(num_example_batch_size, num_example_words, self.num_x_base_dims)).float(),
             constants.X_VOCAB_BASE_NAME:
                 torch.tensor(np.random.rand(num_example_batch_size, num_example_words)).long(),
+            constants.META_NAME:
+                pd.DataFrame(),
         }
 
     def get_dataset(self, hp: DataParams) -> XYMetaCsvDataset:

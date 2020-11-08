@@ -77,7 +77,7 @@
 #     # log2num_head_neurons = 4
 #     # num_head_blocks_per_resid = 1
 #
-#     # heads = param_torch_mods.HeadedSlabNet.DataParams(
+#     # sub_losses = param_torch_mods.HeadedSlabNet.DataParams(
 #     #     num_features=32,
 #     #     num_layers=2,
 #     #     num_groups=32,
@@ -299,7 +299,7 @@ from tablestakes.create_fake_data import kv_styles, html_css as hc
 #     # log2num_head_neurons = 4
 #     # num_head_blocks_per_resid = 1
 #
-#     # heads = param_torch_mods.HeadedSlabNet.DataParams(
+#     # sub_losses = param_torch_mods.HeadedSlabNet.DataParams(
 #     #     num_features=32,
 #     #     num_layers=2,
 #     #     num_groups=32,

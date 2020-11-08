@@ -3,9 +3,8 @@ import glob
 from argparse import Namespace
 from typing import *
 
-import torch
-from tablestakes.ml import ablation
 
+import torch
 from torch import nn as nn
 from torch.nn import functional as F
 
@@ -17,21 +16,25 @@ from pytorch_lightning import loggers as pl_loggers
 from chillpill import params
 
 from tablestakes import utils
-from transformers import modeling_outputs
+from tablestakes.ml import ablation
 
 PS = TypeVar('PS', bound=params.ParameterSet)
 
 
-class Parametrized(Generic[PS]):
-    def __init__(self, hp: PS):
-        super().__init__()
-        self.hp = hp
+class Parameterized(Generic[PS]):
+    # def __init__(self, hp: PS):
+    #     super().__init__()
+    #     self.hp = hp
+
+    # def get_params(self) -> PS:
+    #     raise NotImplementedError('Implement it in your subclass')
+    pass
 
 
-class ParametrizedModule(Parametrized, nn.Module, Generic[PS]):
-    def __init__(self, hp: PS):
-        Parametrized.__init__(self, hp)
-        nn.Module.__init__(self)
+class ParameterizedModule(Parameterized, nn.Module, Generic[PS]):
+    # def __init__(self, hp: PS):
+    #     nn.Module.__init__(self)
+    pass
 
 
 class SizedSequential(nn.Sequential):
@@ -77,14 +80,15 @@ def resnet_conv1_block(
     return SizedSequential(layers, num_output_features=num_output_features)
 
 
-class BertEmbedder(ParametrizedModule['BertEmbedder.ModelParams']):
+class BertEmbedder(ParameterizedModule['BertEmbedder.ModelParams']):
     class ModelParams(params.ParameterSet):
         dim = 64
         max_seq_len = 1024
         requires_grad = True
 
     def __init__(self, hp: Optional[ModelParams] = ModelParams()):
-        super().__init__(hp)
+        super().__init__()
+        self.hp = hp
 
         config = transformers.BertConfig(
             hidden_size=self.hp.dim,
@@ -109,7 +113,7 @@ class BertEmbedder(ParametrizedModule['BertEmbedder.ModelParams']):
         return self.e.forward(x)
 
 
-class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.ModelParams']):
+class FullyConv1Resnet(ParameterizedModule['FullyConv1Resnet.ModelParams']):
     """
     Would be a normal resnet but I don't want to force a known input size input size constant.
 
@@ -145,7 +149,8 @@ class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.ModelParams']):
             do_error_if_group_div_off=False,
             hp: Optional[ModelParams] = ModelParams(),
     ):
-        super().__init__(hp)
+        super().__init__()
+        self.hp = hp
         self.neuron_counts = neuron_counts
         all_counts = [num_input_features] + neuron_counts
 
@@ -215,7 +220,7 @@ class FullyConv1Resnet(ParametrizedModule['FullyConv1Resnet.ModelParams']):
         return self._num_output_features
 
 
-class ConvBlock(ParametrizedModule['ConvBlock.ModelParams']):
+class ConvBlock(ParameterizedModule['ConvBlock.ModelParams']):
     SKIP_SUFFIX = '_skip'
 
     class ModelParams(params.ParameterSet):
@@ -240,7 +245,7 @@ class ConvBlock(ParametrizedModule['ConvBlock.ModelParams']):
         if hp is None:
             hp = self.ModelParams()
 
-        super().__init__(hp)
+        super().__init__()
         self.hp = hp
 
         all_counts = [num_input_features] + ([self.hp.num_features] * int(self.hp.num_layers))
@@ -357,7 +362,7 @@ class Head(nn.Module):
         return self.head(x).permute(0, 2, 1)
 
 
-def make_lm_loss_head(num_features, num_vocab):
+def make_lm_loss(num_features, num_vocab):
     """Linear head + loss"""
     num_first_bin = round(num_vocab / 20)
     return nn.AdaptiveLogSoftmaxWithLoss(
@@ -378,7 +383,7 @@ class AdaptiveSoftmaxHead(Head):
             num_output_features: int,
     ):
         nn.Module.__init__(self)
-        self.head = make_lm_loss_head(num_input_features, num_output_features)
+        self.head = make_lm_loss(num_input_features, num_output_features)
 
     def forward(self, x):
         return self.head(x)
@@ -407,10 +412,10 @@ class StartEndHead(Head):
         )
 
     def forward(self, x):
-        x.permute(0, 2, 1)
+        relu = nn.ReLU()
         return {
-            'start_logits': nn.ReLU(self.start(x)).permute(0, 2, 1),
-            'end_logits': nn.ReLU(self.end(x)).permute(0, 2, 1),
+            'start_logits': relu(self.start(x)).permute(0, 2, 1),
+            'end_logits': relu(self.end(x)).permute(0, 2, 1),
         }
 
 
@@ -442,7 +447,10 @@ class HeadedSlabNet(SlabNet):
         x = super().forward(x)
         x = x.permute(0, 2, 1)
         x = self.head(x)
-        x = x.permute(0, 2, 1)
+        if isinstance(x, MutableMapping):
+            x = {k: v.permute(0, 2, 1) for k, v in x.items()}
+        else:
+            x = x.permute(0, 2, 1)
         return x
 
 

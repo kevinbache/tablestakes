@@ -59,7 +59,7 @@ class MultiHeadAttention(nn.Module):
     def forward(self, q, k, v):
         num_batch = q.size(0)
 
-        # perform linear operation and split into h heads
+        # perform linear operation and split into h sub_losses
 
         k = self.k_linear(k).view(num_batch, -1, self.h, self.d_k)
         q, v = self.qv_linear(q).view(num_batch, -1, self.h * 2, self.d_k).chunk(2, dim=-2)
@@ -73,7 +73,7 @@ class MultiHeadAttention(nn.Module):
         # calculate attention using function we will define next
         scores = attention(q, k, v, self.d_k, self.dropout)
 
-        # concatenate heads and put through final linear layer
+        # concatenate sub_losses and put through final linear layer
         concat = scores.transpose(1, 2).contiguous().view(num_batch, -1, self.d_model)
 
         output = self.out(concat)
