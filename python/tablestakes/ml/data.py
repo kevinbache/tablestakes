@@ -1,6 +1,7 @@
 import abc
 import collections
 import glob
+from dataclasses import dataclass
 from pathlib import Path
 import re
 from typing import *
@@ -25,7 +26,32 @@ META_PREFIX = constants.META_PREFIX
 Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
 
 
-class XYMetaCsvDataset(Dataset):
+@dataclass
+class Datapoint:
+    pass
+
+
+@dataclass
+class XYMetaDatapoint(Datapoint):
+    x: Any
+    y: Any
+    meta: Any
+
+
+@dataclass
+class BaseVocabDatapoint(Datapoint):
+    base: Any
+    vocab: Any
+
+
+@dataclass
+class SeqTokClassDatapoint(Datapoint):
+    seq_class: Any
+    token_classes: Any
+    # sequence: Any
+
+
+class XYMetaCsvDataset(Dataset[XYMetaDatapoint]):
     """
     Expects data to look like this:
 
@@ -166,11 +192,8 @@ class XYMetaCsvDataset(Dataset):
 
         self._datapoints = []
         for x_dict, y_dict, meta_dict in df_dicts:
-            self._datapoints.append((
-                self._convert_dict_of_dfs_to_tensors(x_dict),
-                self._convert_dict_of_dfs_to_tensors(y_dict),
-                meta_dict,
-            ))
+            datapoint = XYMetaDatapoint(x_dict, y_dict, meta_dict)
+            self._datapoints.append(datapoint)
 
         self.num_x_dims = {k: df.shape[1] for k, df in self._datapoints[0][0].items()}
 
