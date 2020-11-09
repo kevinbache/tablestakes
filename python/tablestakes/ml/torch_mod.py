@@ -83,7 +83,7 @@ def resnet_conv1_block(
 class BertEmbedder(ParameterizedModule['BertEmbedder.ModelParams']):
     class ModelParams(params.ParameterSet):
         dim = 64
-        max_seq_len = 1024
+        max_seq_len  = 1024
         requires_grad = True
 
     def __init__(self, hp: Optional[ModelParams] = ModelParams()):

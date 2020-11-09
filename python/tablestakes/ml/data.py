@@ -26,9 +26,18 @@ META_PREFIX = constants.META_PREFIX
 Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
 
 
+# Iterator based solution
+import operator
+
+from dataclasses import dataclass, fields, asdict, astuple
+
+
 @dataclass
 class Datapoint:
     pass
+
+    def __iter__(self):
+        return iter(asdict(self))
 
 
 @dataclass
@@ -55,7 +64,7 @@ class XYMetaCsvDataset(Dataset[XYMetaDatapoint]):
     """
     Expects data to look like this:
 
-    docs_dir
+    data_dir
         datapoint_dir_1
             x.csv
             x_2.csv
@@ -67,14 +76,16 @@ class XYMetaCsvDataset(Dataset[XYMetaDatapoint]):
     """
     DATAPOINT_DIR_NAME = '*'
 
-    @classmethod
-    def _find_files_matching_patterns(cls, data_dir: Union[Path, str], patterns: List[str]):
-        return [sorted(glob.glob(str(data_dir / Path(cls.DATAPOINT_DIR_NAME) / Path(p)), recursive=True)) for p in
-                patterns]
-
-    @staticmethod
-    def _read_dfs(files):
-        return [pd.read_csv(f) for f in files]
+    # @classmethod
+    # def _find_files_matching_patterns(cls, data_dir: Union[Path, str], patterns: List[str]):
+    #     return [
+    #         sorted(glob.glob(str(data_dir / Path(cls.DATAPOINT_DIR_NAME) / Path(p)), recursive=True))
+    #         for p in patterns
+    #     ]
+    #
+    # @staticmethod
+    # def _read_dfs(files):
+    #     return [pd.read_csv(f) for f in files]
 
     @classmethod
     def _find_files(cls, pattern):
@@ -220,21 +231,21 @@ class XYMetaCsvDataset(Dataset[XYMetaDatapoint]):
     def __getitem__(self, item):
         return self._datapoints[item]
 
-    def __getstate__(self):
-        return {
-            'data_dir': self.data_dir,
-            'x_pattern': self.x_pattern,
-            'y_pattern': self.y_pattern,
-            '_datapoints': self._datapoints,
-            'num_x_dims': self.num_x_dims,
-            'num_y_dims': self.num_y_dims,
-            'num_y_classes': self.num_y_classes,
-            'x_names': self.x_names,
-            'y_names': self.y_names,
-        }
-
-    def __setstate__(self, state):
-        self.__dict__.update(state)
+    # def __getstate__(self):
+    #     return {
+    #         'data_dir': self.data_dir,
+    #         'x_pattern': self.x_pattern,
+    #         'y_pattern': self.y_pattern,
+    #         '_datapoints': self._datapoints,
+    #         'num_x_dims': self.num_x_dims,
+    #         'num_y_dims': self.num_y_dims,
+    #         'num_y_classes': self.num_y_classes,
+    #         'x_names': self.x_names,
+    #         'y_names': self.y_names,
+    #     }
+    #
+    # def __setstate__(self, state):
+    #     self.__dict__.update(state)
 
     def save(self, filename: str):
         utils.save_cloudpickle(filename, self)
@@ -360,9 +371,8 @@ class XYDocumentDataModule(pl.LightningDataModule):
         xs = {k: [d[k] for d in xs] for k in xs[0]}
         ys = {k: [d[k] for d in ys] for k in ys[0]}
 
-        xs = self._transform_xs(xs)
-
         new_xs = {}
+        xs = self._transform_xs(xs)
         for k, v in xs.items():
             x_padded = torch.nn.utils.rnn.pad_sequence(v, batch_first=True)
             seq_len = x_padded.shape[1]

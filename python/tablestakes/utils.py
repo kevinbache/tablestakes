@@ -1,4 +1,5 @@
 import enum
+import itertools
 from typing import List
 
 import ray
@@ -73,6 +74,13 @@ def globster(p, *args, **kwargs):
 DirtyPath = Union[Path, str]
 
 
+def glob_multiple(base_dir: DirtyPath, patterns: List[DirtyPath], recursive=False):
+    return sorted(itertools.chain(*[
+        globster(base_dir / Path(p), recursive=recursive)
+        for p in patterns
+    ]))
+
+
 def load_json(filename: DirtyPath):
     with open(filename, mode='r') as f:
         return json.load(f)
@@ -128,6 +136,17 @@ def save_cloudpickle(filename: DirtyPath, obj: Any):
     mkdir_if_not_exist(parent)
     with open(filename, mode='wb') as f:
         cloudpickle.dump(obj, f, protocol=4)
+
+
+def load_csv(filename: DirtyPath, *args, **kwargs) -> pd.DataFrame:
+    return pd.read_csv(filename, *args, **kwargs)
+
+
+def save_csv(filename: DirtyPath, obj: pd.DataFrame, index=False, *args, **kwargs):
+    return obj.to_csv(filename, index=index, *args, **kwargs)
+
+
+
 
 
 def set_seeds(seed: int):

@@ -75,7 +75,7 @@ class RayExtHandler(RayFileHandler[pd.DataFrame]):
         self.ext = ext
 
 
-class DirectoryDatapoint:
+class CrawledDirectory:
     """Represents a directory which contains files.
 
     The root_path is the parent portion of the path which can be ignored.
@@ -138,20 +138,19 @@ class ListDataset(Dataset, Generic[D]):
         return len(self.datapoints)
 
 
-class DirectoryDataset(ListDataset[DirectoryDatapoint]):
+class DirectoryCrawler(ListDataset[CrawledDirectory]):
     def __init__(
             self,
             root_path: utils.DirtyPath,
             search_str='*',
     ):
         self.root_path = Path(root_path)
-        self.load_makers = load_makers
 
-        subdirs = utils.globster(self.root_path / search_str)
+        subdirs = utils.globster(self.root_path / search_str, recursive=False)
         subdirs = [Path(sd) for sd in subdirs if Path(sd).is_dir()]
 
         super().__init__([
-            DirectoryDatapoint(f, root_path=self.root_path)
+            CrawledDirectory(f, root_path=self.root_path)
             for f in subdirs
         ])
 
@@ -180,7 +179,7 @@ class DirectoryDataset(ListDataset[DirectoryDatapoint]):
 
     def crawl_dirs(
             self,
-            dir_handler: Union[Callable[[DirectoryDatapoint], Any], remote_function.RemoteFunction],
+            dir_handler: Union[Callable[[CrawledDirectory], Any], remote_function.RemoteFunction],
     ):
         outs = {}
         for dir_datapoint in self.datapoints:

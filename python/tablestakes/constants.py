@@ -30,6 +30,8 @@ X_VOCAB_NAME = X_PREFIX + X_VOCAB_BASE_NAME
 
 META_NAME = 'meta'
 META_PREFIX = f'{META_NAME}_'
+META_SHORT_BASE_NAME = f'short'
+META_ORIGINAL_DATA_DIR_COL_NAME = 'original_data_dir'
 
 
 LOGGER_API_KEY_FILE = str(Path.home() / '.logger_api_key')
