@@ -15,6 +15,8 @@ OUTPUT_DIR = DATA_DIR / 'outputs'
 
 CHECKPOINT_FILE_BASENAME = 'checkpoint'
 
+LOSS_NAME = 'loss'
+
 Y_PREFIX = 'y_'
 Y_KORV_BASE_NAME = 'korv'
 Y_WHICH_KV_BASE_NAME = 'which_kv'

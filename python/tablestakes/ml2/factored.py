@@ -1,15 +1,13 @@
 import abc
 from typing import *
 
-from tablestakes.ml import metrics_mod
-# from tablestakes.ml.torch_mod import PS
 from torch import optim, nn
 import pytorch_lightning as pl
 
 from chillpill import params
 
 from tablestakes import constants
-from tablestakes.ml import torch_mod, data
+from tablestakes.ml import torch_mod, data, metrics_mod
 
 
 Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
@@ -111,8 +109,6 @@ class Head(nn.Module):
 
     def loss(self, y_hat, y):
         return nn.CrossEntropyLoss(y_hat, y)
-
-
 
 
 class FactoredLightningModule(pl.LightningModule, torch_mod.Parameterized[torch_mod.PS], abc.ABC):

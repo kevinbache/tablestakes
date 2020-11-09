@@ -272,32 +272,32 @@ class ClassificationMetricsTracker(torch_mod.Parameterized, abc.ABC):
                 step=self.pl_module.global_step,
             )
 
-    def inner_forward_step(self, batch, batch_idx):
-        xs_dict, ys_dict, meta = batch
-        y_hats_dict = self.pl_module(batch)
-
-        losses = torch.stack([
-            F.cross_entropy(
-                input=y_hat.permute(0, 2, 1),
-                target=y,
-                ignore_index=Y_VALUE_TO_IGNORE,
-            )
-            for y, y_hat in zip(ys_dict.values(), y_hats_dict.values())
-        ])
-
-        loss = losses.sum()
-
-        return xs_dict, ys_dict, y_hats_dict, losses, loss
-
-    def training_step(self, batch, batch_idx):
-        xs_dict, ys_dict, y_hats_dict, losses, loss = self.inner_forward_step(batch, batch_idx)
-        self.log_losses_and_metrics(self.TRAIN_PHASE_NAME, loss, losses, y_hats_dict, ys_dict, prog_bar=True)
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        xs_dict, ys_dict, y_hats_dict, losses, loss = self.inner_forward_step(batch, batch_idx)
-        self.log_losses_and_metrics(self.VALID_PHASE_NAME, loss, losses, y_hats_dict, ys_dict)
-
-    def test_step(self, batch, batch_idx):
-        xs_dict, ys_dict, y_hats_dict, losses, loss = self.inner_forward_step(batch, batch_idx)
-        self.log_losses_and_metrics(self.TEST_PHASE_NAME, loss, losses, y_hats_dict, ys_dict)
+    # def inner_forward_step(self, batch, batch_idx):
+    #     xs_dict, ys_dict, meta = batch
+    #     y_hats_dict = self.pl_module(batch)
+    #
+    #     losses = torch.stack([
+    #         F.cross_entropy(
+    #             input=y_hat.permute(0, 2, 1),
+    #             target=y,
+    #             ignore_index=Y_VALUE_TO_IGNORE,
+    #         )
+    #         for y, y_hat in zip(ys_dict.values(), y_hats_dict.values())
+    #     ])
+    #
+    #     loss = losses.sum()
+    #
+    #     return xs_dict, ys_dict, y_hats_dict, losses, loss
+    #
+    # def training_step(self, batch, batch_idx):
+    #     xs_dict, ys_dict, y_hats_dict, losses, loss = self.inner_forward_step(batch, batch_idx)
+    #     self.log_losses_and_metrics(self.TRAIN_PHASE_NAME, loss, losses, y_hats_dict, ys_dict, prog_bar=True)
+    #     return loss
+    #
+    # def validation_step(self, batch, batch_idx):
+    #     xs_dict, ys_dict, y_hats_dict, losses, loss = self.inner_forward_step(batch, batch_idx)
+    #     self.log_losses_and_metrics(self.VALID_PHASE_NAME, loss, losses, y_hats_dict, ys_dict)
+    #
+    # def test_step(self, batch, batch_idx):
+    #     xs_dict, ys_dict, y_hats_dict, losses, loss = self.inner_forward_step(batch, batch_idx)
+    #     self.log_losses_and_metrics(self.TEST_PHASE_NAME, loss, losses, y_hats_dict, ys_dict)

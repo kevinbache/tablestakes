@@ -1,8 +1,6 @@
+from dataclasses import dataclass, fields, asdict
 import enum
 import itertools
-from typing import List
-
-import ray
 from glob2 import glob
 import json
 import os
@@ -21,6 +19,8 @@ import pdf2image
 import numpy as np
 import pandas as pd
 from matplotlib.image import imread
+
+import ray
 
 from tablestakes import constants
 
@@ -355,3 +355,50 @@ def ray_prog_bar(obj_refs: List[ray.ObjectRef]):
 
     for _ in tqdm.tqdm(to_iterator(obj_refs), total=len(obj_refs)):
         pass
+
+@dataclass
+class DataclassPlus:
+    """dataclass with a few dict methods and a fancy __str__"""""
+    def keys(self):
+        return [f.name for f in fields(self)]
+
+    def __getitem__(self, item):
+        if item not in self.keys():
+            raise ValueError(f'Keys for this class are: {self.keys()} but you tried to get {item}')
+        return getattr(self, item)
+
+    def __contains__(self, item):
+        return item in self.keys()
+
+    def __iter__(self):
+        d = {k: getattr(self, k) for k in self.keys()}
+        return iter(d.items())
+
+    def _str_inner(self, obj):
+        typestr = obj.__class__.__name__
+        if isinstance(obj, DataclassPlus):
+            return str(obj).replace('\n', '\n  ')
+        elif hasattr(obj, 'shape'):
+            shape = ', '.join([str(e) for e in obj.shape])
+            return f'{typestr}({shape})'
+        elif isinstance(obj, list):
+            l = len(obj)
+            first_str = self._str_inner(obj[0]) if l else '[]'
+            return f'{typestr}(len={l}, first={first_str})'
+        elif isinstance(obj, dict):
+            l = len(obj)
+            k0 = list(obj.keys())[0]
+            v0 = obj[k0]
+            first_str = f'{self._str_inner(k0)}: {self._str_inner(v0)}' if l else '{}'
+            return f'{typestr}([len={l}, first={first_str})'
+        else:
+            return f'{typestr}({str(obj)})'
+
+    def __str__(self):
+        d = {k: self._str_inner(v) for k, v in self}
+        strs = [f'{k}={v}' for k, v in d.items()]
+        arg_str = ',\n  '.join(strs)
+        return f'{self.__class__.__name__}(\n  {arg_str}\n)'
+
+    def to_dict(self):
+        return asdict(self)

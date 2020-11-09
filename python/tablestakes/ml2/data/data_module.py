@@ -3,9 +3,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import *
 
-import numpy as np
-import pandas as pd
-
 import pytorch_lightning as pl
 import torch
 from tablestakes import utils
@@ -15,34 +12,35 @@ from torch.utils.data import DataLoader
 from tablestakes.ml2 import data
 
 
+@dataclass
+class DataParams:
+    dataset_name: utils.DirtyPath
+    docs_root_dir: utils.DirtyPath
+    dataset_root_dir: utils.DirtyPath
+    do_ignore_cached_dataset: bool = False
+
+    p_valid = 0.1
+    p_test = 0.1
+    num_workers = 4
+
+    num_gpus = 0
+    num_cpus = 0
+
+    seed = 42
+
+    max_seq_length = 1024
+    batch_size = 32
+
+    def __post_init__(self):
+        self.dataset_name = Path(self.dataset_name)
+        self.docs_root_dir = Path(self.docs_root_dir)
+        self.dataset_root_dir = Path(self.dataset_root_dir)
+
+        self.dataset_file = self.dataset_root_dir / f'{self.dataset_name}.cloudpickle'
+        self.docs_dir = self.docs_root_dir / self.dataset_name
+
+
 class XYMetaHandlerDatasetModule(pl.LightningDataModule):
-    @dataclass
-    class DataParams:
-        dataset_name: utils.DirtyPath
-        docs_root_dir: utils.DirtyPath
-        dataset_root_dir: utils.DirtyPath
-        do_ignore_cached_dataset: bool = False
-
-        p_valid = 0.1
-        p_test = 0.1
-        num_workers = 4
-
-        num_gpus = 0
-        num_cpus = 0
-
-        seed = 42
-
-        max_seq_length = 1024
-        batch_size = 32
-
-        def __post_init__(self):
-            self.dataset_name = Path(self.dataset_name)
-            self.docs_root_dir = Path(self.docs_root_dir)
-            self.dataset_root_dir = Path(self.dataset_root_dir)
-
-            self.dataset_file = self.dataset_root_dir / f'{self.dataset_name}.cloudpickle'
-            self.docs_dir = self.docs_root_dir / self.dataset_name
-
     def __init__(self, hp: DataParams, verbose=False):
         super().__init__()
         self.hp = hp

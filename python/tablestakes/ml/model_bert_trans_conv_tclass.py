@@ -64,7 +64,6 @@ class ModelBertConvTransTClass(factored.FactoredLightningModule):
             )
             num_conv_features = self.conv.get_num_output_features()
 
-        print('')
         if self.hp.trans.num_layers == 0:
             self.trans = None
             num_trans_features = 0
@@ -110,18 +109,18 @@ class ModelBertConvTransTClass(factored.FactoredLightningModule):
         xs, ys, meta = batch
         base, vocab = xs
         x = self.embed(vocab)
-        print(f'embedx {x.last_hidden_state.shape}')
+        # print(f'embedx {x.last_hidden_state.shape}')
         x = torch.cat([base, x.last_hidden_state], dim=-1)
-        print(f'base {base.shape}')
-        print(f'catx {x.shape}')
+        # print(f'base {base.shape}')
+        # print(f'catx {x.shape}')
 
         num_batch, num_seq, _ = base.shape
 
-        print(num_batch)
-        print(num_seq)
-        x_trans = self.trans(x) if self.trans else torch.zeros(num_batch, num_seq, 0)
-        x_conv = self.conv(x) if self.conv else torch.zeros(num_batch, num_seq, 0)
-        print(f'xtrans {x_trans.shape}')
+        # print(num_batch)
+        # print(num_seq)
+        x_trans = self.trans(x) if self.trans else torch.zeros(num_batch, num_seq, 0, requires_grad=False)
+        x_conv = self.conv(x) if self.conv else torch.zeros(num_batch, num_seq, 0, requires_grad=False)
+        # print(f'xtrans {x_trans.shape}')
 
         # concatenate for sharpness
         x = torch.cat([base, x_trans, x_conv], dim=-1)

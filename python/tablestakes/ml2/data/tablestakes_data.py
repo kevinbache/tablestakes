@@ -56,24 +56,6 @@ class TablestakesHandledDatasetLoadMaker(load_makers.LoadMaker[TablestakesHandle
 
 
 class TablestakesHandlerDataModule(data_module.XYMetaHandlerDatasetModule):
-    class DataParams(data_module.XYMetaHandlerDatasetModule.DataParams):
-        dataset_name: utils.DirtyPath
-        docs_root_dir: utils.DirtyPath
-        dataset_root_dir: utils.DirtyPath
-        do_ignore_cached_dataset: bool = False
-
-        p_valid = 0.1
-        p_test = 0.1
-        num_workers = 4
-
-        num_gpus = 0
-        num_cpus = 0
-
-        seed = 42
-
-        max_seq_length = 1024
-        batch_size = 32
-
     def get_example_input_array(self) -> datapoints.XYMetaDatapoint:
         num_example_batch_size = 32
         num_example_words = 10000
@@ -95,14 +77,14 @@ class TablestakesHandlerDataModule(data_module.XYMetaHandlerDatasetModule):
             ),
         )
 
-    def get_dataset(self, hp: DataParams) -> TablestakesHandledDataset:
+    def get_dataset(self, hp: data_module.DataParams) -> TablestakesHandledDataset:
         return TablestakesHandledDatasetLoadMaker.run_from_hp(hp)
 
 
 if __name__ == '__main__':
     dataset_name = 'num=100_8163'
 
-    hp_dm = TablestakesHandlerDataModule.DataParams(
+    hp_dm = data_module.DataParams(
         dataset_name=dataset_name,
         docs_root_dir=constants.DOCS_DIR,
         dataset_root_dir=constants.DATASETS_DIR,

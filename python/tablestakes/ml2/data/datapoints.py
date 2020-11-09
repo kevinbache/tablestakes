@@ -43,41 +43,7 @@ def _get_df_or_tensor_num_features(e: Union[pd.DataFrame, torch.Tensor]):
         raise NotImplementedError
 
 
-@dataclass
-class Datapoint(abc.ABC):
-    def keys(self):
-        return [f.name for f in fields(self)]
-
-    def __iter__(self):
-        d = {k: getattr(self, k) for k in self.keys()}
-        return iter(d.items())
-
-    def _str_inner(self, obj):
-        typestr = obj.__class__.__name__
-        if isinstance(obj, Datapoint):
-            return str(obj).replace('\n', '\n  ')
-        elif hasattr(obj, 'shape'):
-            shape = ', '.join([str(e) for e in obj.shape])
-            return f'{typestr}({shape})'
-        elif isinstance(obj, list):
-            l = len(obj)
-            first_str = self._str_inner(obj[0]) if l else '[]'
-            return f'{typestr}(len={l}, first={first_str})'
-        elif isinstance(obj, dict):
-            l = len(obj)
-            k0 = list(obj.keys())[0]
-            v0 = obj[k0]
-            first_str = f'{self._str_inner(k0)}: {self._str_inner(v0)}' if l else '{}'
-            return f'{typestr}([len={l}, first={first_str})'
-        else:
-            return f'{typestr}({str(obj)})'
-
-    def __str__(self):
-        d = {k: self._str_inner(v) for k, v in self}
-        strs = [f'{k}={v}' for k, v in d.items()]
-        arg_str = ',\n  '.join(strs)
-        return f'{self.__class__.__name__}(\n  {arg_str}\n)'
-
+class Datapoint(utils.DataclassPlus, abc.ABC):
     @classmethod
     @abc.abstractmethod
     def collate(cls, dps: List['Datapoint'], max_seq_len: int) -> 'Datapoint':
@@ -106,42 +72,6 @@ class Datapoint(abc.ABC):
         return self.__class__(**{
             k: _get_df_or_tensor_num_features(v) for k, v in self
         })
-
-
-@dataclass
-class XYMetaDatapoint(Datapoint):
-    x: Any
-    y: Any
-    meta: Any
-
-    @classmethod
-    def from_makers(
-            cls,
-            data_dir,
-            x_maker: [Callable[[utils.DirtyPath], Any]],
-            y_maker: [Callable[[utils.DirtyPath], Any]],
-            meta_maker: [Callable[[utils.DirtyPath], Any]]
-    ):
-        return cls(
-            x=x_maker(data_dir),
-            y=y_maker(data_dir),
-            meta=meta_maker(data_dir),
-        )
-
-    # def __add__(self, other):
-    #     return self.__class__(*(getattr(self, dim.name)+getattr(other, dim.name) for dim in fields(self)))
-
-    @classmethod
-    def collate(cls, datapoints: List['XYMetaDatapoint'], max_seq_len: int) -> 'XYMetaDatapoint':
-        assert len(datapoints) > 0
-
-        dp = datapoints[0]
-
-        return cls(
-            x=dp.x.collate([dp.x for dp in datapoints], max_seq_len=max_seq_len),
-            y=dp.y.collate([dp.y for dp in datapoints], max_seq_len=max_seq_len),
-            meta=dp.meta.collate([dp.meta for dp in datapoints], max_seq_len=None),
-        )
 
 
 @dataclass
@@ -236,3 +166,43 @@ class SeqTokClassDatapoint(Datapoint):
     @classmethod
     def collate(cls, dps: List['SeqTokClassDatapoint'], max_seq_len: int) -> 'SeqTokClassDatapoint':
         raise NotImplementedError()
+
+
+@dataclass
+class XYMetaDatapoint(Datapoint):
+    x: Any
+    y: Any
+    meta: Any
+
+    @classmethod
+    def from_makers(
+            cls,
+            data_dir,
+            x_maker: [Callable[[utils.DirtyPath], Any]],
+            y_maker: [Callable[[utils.DirtyPath], Any]],
+            meta_maker: [Callable[[utils.DirtyPath], Any]]
+    ):
+        return cls(
+            x=x_maker(data_dir),
+            y=y_maker(data_dir),
+            meta=meta_maker(data_dir),
+        )
+
+    def get_y_class(self):
+        return self.y.__class__
+
+    # def __add__(self, other):
+    #     return self.__class__(*(getattr(self, dim.name)+getattr(other, dim.name) for dim in fields(self)))
+
+    @classmethod
+    def collate(cls, datapoints: List['XYMetaDatapoint'], max_seq_len: int) -> 'XYMetaDatapoint':
+        assert len(datapoints) > 0
+
+        dp = datapoints[0]
+
+        return cls(
+            x=dp.x.collate([dp.x for dp in datapoints], max_seq_len=max_seq_len),
+            y=dp.y.collate([dp.y for dp in datapoints], max_seq_len=max_seq_len),
+            meta=dp.meta.collate([dp.meta for dp in datapoints], max_seq_len=None),
+        )
+
