@@ -4,15 +4,14 @@ from typing import *
 
 import torch
 import pytorch_lightning as pl
-from chillpill import params
 
 from ray import tune
-from ray.tune.logger import Logger as TuneLogger
-from ray.tune import result as tune_result
 
-from tablestakes import constants, utils
-from tablestakes.ml import hyperparams, torch_mod
-from torch.nn import functional as F
+from chillpill import params
+
+from tablestakes import constants
+from tablestakes.ml import torch_mod
+
 
 CURRENT_EPOCH_NAME = 'current_epoch'
 PARAM_COUNT_NAME = 'param_count'
@@ -37,23 +36,17 @@ class LogCopierCallback(pl.Callback):
     def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
         d = self._get_metrics_dict(trainer, pl_module)
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
-        print('about to report')
         tune.report(**d)
-        print('done reporting')
 
     def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
         d = self._get_metrics_dict(trainer, pl_module)
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
-        print('about to report')
         tune.report(**d)
-        print('done reporting')
 
     def on_test_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
         d = self._get_metrics_dict(trainer, pl_module)
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
-        print('about to report')
         tune.report(**d)
-        print('done reporting')
 
 
 class CounterTimerCallback(pl.Callback):

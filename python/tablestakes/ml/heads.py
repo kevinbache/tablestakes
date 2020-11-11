@@ -1,11 +1,7 @@
 import abc
 from typing import *
 
-import numpy as np
-import pandas as pd
-
 import torch
-import transformers
 from chillpill import params
 from tablestakes import utils
 from tablestakes.ml.torch_mod import PS
@@ -15,6 +11,45 @@ import pytorch_lightning as pl
 
 from tablestakes.ml import torch_mod, metrics_mod
 from transformers.file_utils import ModelOutput
+
+"""
+A head
+    takes in y_hat and y and spits out loss
+    and logs
+
+OR
+    it takes the x' and transforms it into y_hat then takes in y and calculates loss
+
+    takes in y_hat
+        good definition of difference
+        but then a head is just a logged loss
+    a logged loss is a tracked loss
+        it doesn't log it tracks metrics
+        cause every time you run classification you want some basic metrics:
+            confusion matrix
+            every time you use region start/end head you're gonna want the same metrics
+            MetricSet
+                is basically a list of metrics but can share computation?
+                probably not important.  just do a list of metrics.
+            What kinds of things are you going ot be interested in
+                s2s - save the datapoint.  output sequences.
+                    how well each sequence matches the original
+                        is it a superset
+                        is it a subset
+                        venn diagram of tokens
+                token class - save a datapoint.  repaint the original docs
+                    stats on number of tokens in each class
+                    absolute and proportional confusion matrices
+                    save the sequences that were generated
+                    types of each token
+                        how do i want to deal with token types?
+
+        it takes in a y_hat and a y and it spits out an output object which includes loss and other metrics of
+            interest
+
+    a head meanwhile might produce the actual output.  like lm losses' .generate
+
+"""
 
 """
 structure
@@ -84,7 +119,7 @@ factored
 #         got the correct length
 #
 #     whole_seq_classification
-#         by reducer
+#         by x_reducer_name
 #             mean
 #             artless smasher
 #             first ( [CLS] )

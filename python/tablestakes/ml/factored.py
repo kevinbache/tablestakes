@@ -61,7 +61,7 @@ class OptimizersMaker(torch_mod.Parameterized['OptimizationMaker.OptParams']):
         }
 
         optimizers = [optimizer]
-        # schedulers = [reducer, coser]
+        # schedulers = [x_reducer_name, coser]
         schedulers = [reducer]
 
         return optimizers, schedulers

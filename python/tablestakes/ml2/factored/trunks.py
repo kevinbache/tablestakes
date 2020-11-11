@@ -1,8 +1,6 @@
 import abc
-import glob
-from argparse import Namespace
+from dataclasses import dataclass, field
 from typing import *
-
 
 import torch
 from torch import nn as nn
@@ -11,30 +9,9 @@ from torch.nn import functional as F
 import transformers
 
 import pytorch_lightning as pl
-from pytorch_lightning import loggers as pl_loggers
 
-from chillpill import params
-
-from tablestakes import utils
+from tablestakes import utils, constants
 from tablestakes.ml import ablation
-
-PS = TypeVar('PS', bound=params.ParameterSet)
-
-
-class Parameterized(Generic[PS]):
-    # def __init__(self, hp: PS):
-    #     super().__init__()
-    #     self.hp = hp
-
-    # def get_params(self) -> PS:
-    #     raise NotImplementedError('Implement it in your subclass')
-    pass
-
-
-class ParameterizedModule(Parameterized, nn.Module, Generic[PS]):
-    # def __init__(self, hp: PS):
-    #     nn.Module.__init__(self)
-    pass
 
 
 class SizedSequential(nn.Sequential):
@@ -80,11 +57,13 @@ def resnet_conv1_block(
     return SizedSequential(layers, num_output_features=num_output_features)
 
 
-class BertEmbedder(ParameterizedModule['BertEmbedder.ModelParams']):
-    class ModelParams(params.ParameterSet):
-        dim = 64
-        max_seq_len = 1024
-        requires_grad = True
+class BertEmbedder(pl.LightningModule):
+    @dataclass
+    class ModelParams(utils.DataclassPlus):
+        dim: int = 64
+        max_seq_len: int = 1024
+        requires_grad: bool = True
+        position_embedding_requires_grad: bool = False
 
     def __init__(self, hp: Optional[ModelParams] = ModelParams()):
         super().__init__()
@@ -104,16 +83,19 @@ class BertEmbedder(ParameterizedModule['BertEmbedder.ModelParams']):
         self.e = transformers.BertModel(config, add_pooling_layer=False)
         for name, param in self.e.named_parameters():
             if name == 'position_embeddings':
-                requires_grad = False
+                requires_grad = self.hp.position_embedding_requires_grad
             else:
                 requires_grad = self.hp.requires_grad
             param.requires_grad = requires_grad
 
     def forward(self, x):
-        return self.e.forward(x)
+        try:
+            return self.e.forward(x)
+        except BaseException as e:
+            raise e
 
 
-class FullyConv1Resnet(ParameterizedModule['FullyConv1Resnet.ModelParams']):
+class FullyConv1Resnet(pl.LightningModule):
     """
     Would be a normal resnet but I don't want to force a known input size input size constant.
 
@@ -125,22 +107,14 @@ class FullyConv1Resnet(ParameterizedModule['FullyConv1Resnet.ModelParams']):
     DROP_SUFFIX = '_drop'
     BLOCK_SUFFIX = ''
 
-    class ModelParams(params.ParameterSet):
-        num_groups = 32
-        num_blocks_per_residual = 2
-        num_blocks_per_dropout = 2
-        dropout_p = 0.5
-        activation = nn.LeakyReLU
-        do_include_first_norm = True
-
-        @classmethod
-        def search_default(cls) -> "FullyConv1Resnet.ModelParams":
-            return cls(
-                num_groups=params.Discrete([8, 16, 32, 64]),
-                num_blocks_per_residual=params.Integer(1, 5),
-                activation=params.Categorical([nn.LeakyReLU, nn.GELU]),
-                do_include_first_norm=params.Boolean(p_true=0.8),
-            )
+    @dataclass
+    class ModelParams(utils.DataclassPlus):
+        num_groups: int = 32
+        num_blocks_per_residual: int = 2
+        num_blocks_per_dropout: int = 2
+        dropout_p: float = 0.5
+        activation: nn.Module = nn.LeakyReLU
+        do_include_first_norm: bool = True
 
     def __init__(
             self,
@@ -220,31 +194,29 @@ class FullyConv1Resnet(ParameterizedModule['FullyConv1Resnet.ModelParams']):
         return self._num_output_features
 
 
-class ConvBlock(ParameterizedModule['ConvBlock.ModelParams']):
+class ConvBlock(pl.LightningModule):
     SKIP_SUFFIX = '_skip'
 
-    class ModelParams(params.ParameterSet):
-        num_layers = 8
-        num_features = 32
-        kernel_size = 3
-        stride = 1
-        pool_size = 2
-        num_groups = 32
-        num_blocks_per_pool = 2
-        num_blocks_per_skip = 2
-        activation = nn.LeakyReLU
-        do_include_first_norm = True
-        requires_grad = True
+    @dataclass
+    class ModelParams(utils.DataclassPlus):
+        num_layers: int = 8
+        num_features: int = 32
+        kernel_size: int = 3
+        stride: int = 1
+        pool_size: int = 2
+        num_groups: int = 32
+        num_blocks_per_pool: int = 2
+        num_blocks_per_skip: int = 2
+        activation: nn.Module = nn.LeakyReLU
+        do_include_first_norm: bool = True
+        requires_grad: bool = True
 
     def __init__(
             self,
             num_input_features: int,
-            hp: Optional[ModelParams] = None,
+            hp: ModelParams,
             do_error_if_group_div_off: bool = False,
     ):
-        if hp is None:
-            hp = self.ModelParams()
-
         super().__init__()
         self.hp = hp
 
@@ -316,25 +288,21 @@ class ConvBlock(ParameterizedModule['ConvBlock.ModelParams']):
 class SlabNet(FullyConv1Resnet):
     """A fully convolutional resnet with constant number of features across layers."""
 
-    class ModelParams(params.ParameterSet):
-        num_features = 32
-        num_layers = 4
-        num_groups = 32
-        num_blocks_per_residual = 2
-        num_blocks_per_dropout = 2
-        dropout_p = 0.5
-        activation = nn.LeakyReLU
-        do_include_first_norm = True
-        requires_grad = True
-        special_heads = {}
-
-        @classmethod
-        def search_default(cls) -> "SlabNet.ModelParams":
-            return cls(
-                num_features=params.Categorical([16, 32, 64, 128, 256]),
-                num_layers=params.Integer(1, 5),
-                **FullyConv1Resnet.ModelParams.search_default().__dict__,
-            )
+    @dataclass
+    class ModelParams(utils.DataclassPlus):
+        num_features: int = 32
+        num_layers: int = 4
+        num_groups: int = 32
+        num_blocks_per_residual: int = 2
+        num_blocks_per_dropout: int = 2
+        dropout_p: float = 0.5
+        activation: nn.Module = nn.LeakyReLU
+        do_include_first_norm: bool = True
+        requires_grad: bool = True
+        makers: dict = field(default_factory=lambda: {
+            constants.Y_WHICH_KV_BASE_NAME: 'linear',
+            constants.Y_KORV_BASE_NAME: 'linear',
+        })
 
     def __init__(
             self,
@@ -348,180 +316,23 @@ class SlabNet(FullyConv1Resnet):
         )
 
 
-class Head(nn.Module):
-    def __init__(
-            self,
-            num_input_features: int,
-            num_output_features: int,
-    ):
-        nn.Module.__init__(self)
-        self.head = nn.Conv1d(num_input_features, num_output_features, 1)
-
-    def forward(self, x):
-        x = x.permute(0, 2, 1)
-        return self.head(x).permute(0, 2, 1)
-
-
-def make_lm_loss(num_features, num_vocab):
-    """Linear head + loss"""
-    num_first_bin = round(num_vocab / 20)
-    return nn.AdaptiveLogSoftmaxWithLoss(
-        num_features,
-        num_vocab,
-        cutoffs=[
-            num_first_bin,
-            5 * num_first_bin,
-        ],
-        div_value=4,
-    )
-
-
-class AdaptiveSoftmaxHead(Head):
-    def __init__(
-            self,
-            num_input_features: int,
-            num_output_features: int,
-    ):
-        nn.Module.__init__(self)
-        self.head = make_lm_loss(num_input_features, num_output_features)
-
-    def forward(self, x):
-        return self.head(x)
-
-
-class StartEndHead(Head):
-    """Predict the start and end location within a sequence.  Prediction must be positive."""
-    def __init__(
-            self,
-            num_input_features: int,
-            num_classes: int,
-    ):
-        nn.Module.__init__(self)
-        self.start = nn.Conv1d(
-            in_channels=num_input_features,
-            out_channels=num_classes,
-            kernel_size=1,
-            stride=1,
-        )
-
-        self.end = nn.Conv1d(
-            in_channels=num_input_features,
-            out_channels=num_classes,
-            kernel_size=1,
-            stride=1,
-        )
-
-    def forward(self, x):
-        relu = nn.ReLU()
-        return {
-            'start_logits': relu(self.start(x)).permute(0, 2, 1),
-            'end_logits': relu(self.end(x)).permute(0, 2, 1),
-        }
-
-
-class HeadedSlabNet(SlabNet):
-    """A slabnet with a head containing num_output_features."""
-    def __init__(
-            self,
-            num_input_features: int,
-            num_output_features: int,
-            head_maker: Optional[Callable[[int, int], Head]] = None,
-            hp: Optional[SlabNet.ModelParams] = SlabNet.ModelParams(),
-    ):
-        super().__init__(
-            num_input_features=num_input_features,
-            hp=hp,
-        )
-        # could be changed by GroupNorm fixup
-        num_slab_outputs = self.get_num_outputs()
-
-        if head_maker is None:
-            head = nn.Conv1d(num_slab_outputs, num_output_features, 1)
-        else:
-            head = head_maker(num_slab_outputs, num_output_features)
-        self.head = head
-
-        self._num_output_features = num_output_features
-
-    def forward(self, x):
-        x = super().forward(x)
-        x = x.permute(0, 2, 1)
-        x = self.head(x)
-        if isinstance(x, MutableMapping):
-            x = {k: v.permute(0, 2, 1) for k, v in x.items()}
-        else:
-            x = x.permute(0, 2, 1)
-        return x
-
-
-class ExperimentParams(params.ParameterSet):
-    project_name = 'my_project'
-    experiment_name = 'my_experiment'
-    experiment_tags = ['testing']
-    sources_glob_str = '*.py'
-
-    def get_project_exp_name(self):
-        return f'{self.project_name}-{self.experiment_name}'
-
-
-# noinspection PyProtectedMember
-class MyLightningNeptuneLogger(pl_loggers.NeptuneLogger):
-    def __init__(self, hp: ExperimentParams, version: str = '', offline_mode=False):
-        source_files = glob.glob(str(hp.sources_glob_str), recursive=True)
-
-        super().__init__(
-            api_key=utils.get_logger_api_key(),
-            project_name=utils.get_neptune_fully_qualified_project_name(hp.project_name),
-            close_after_fit=True,
-            offline_mode=offline_mode,
-            experiment_name=f'pl_log-{version}',
-            params=hp.to_dict(),
-            tags=hp.experiment_tags,
-            upload_source_files=source_files,
-        )
-        self.append_tags(hp.experiment_tags)
-
-    @pl.utilities.rank_zero_only
-    def log_hyperparams(self, params: Union[Dict[str, Any], Namespace]) -> None:
-        params = self._convert_params(params)
-        params = self._flatten_dict(params)
-        params = self._sanitize_params(params)
-        return self.set_properties(params)
-
-    def set_properties(self, new_properties: Dict):
-        properties = self.experiment._backend.get_experiment(self.experiment.internal_id).properties
-        properties = {p.key: p.value for p in properties}
-        properties.update({k: str(v) for k, v in new_properties.items()})
-        return self.experiment._backend.update_experiment(
-            experiment=self.experiment,
-            properties=properties,
-        )
-
-
-def get_pl_logger(hp: ExperimentParams, tune=None, offline_mode=False):
-    version = 'local' if tune is None else tune.get_trial_id()
-    logger = MyLightningNeptuneLogger(hp=hp, version=version, offline_mode=offline_mode),
-
-    return logger
-
-
 def artless_smash(input: torch.Tensor) -> torch.Tensor:
     """
     Smash all vectors in time dimension into a series of summary layers.  cat them and work with that.
     This is about the simplest way you can move from O(n) time to O(1) time.
     If you want, make it better by starting with some conv layers.
     """
+    first = input[:, 0, :].squeeze(1)
     means = torch.mean(input, dim=1, keepdim=True)
     vars = torch.var(input, dim=1, keepdim=True)
     l1s = torch.norm(input, p=1, dim=1, keepdim=True)
-    l2s = torch.norm(input, p=2, dim=1, keepdim=True)
     lse = torch.logsumexp(input, dim=1, keepdim=True)
 
     maxs = torch.max(input, dim=1, keepdim=True)[0]
     mins = torch.min(input, dim=1, keepdim=True)[0]
     medians = torch.median(input, dim=1, keepdim=True)[0]
 
-    return torch.cat((means, vars, l1s, l2s, lse, maxs, mins, medians), dim=1).view(input.shape[0], 1, -1)
+    return torch.cat((first, means, vars, l1s, lse, maxs, mins, medians), dim=1).view(input.shape[0], 1, -1)
 
 
 class ArtlessSmasher(nn.Module):
@@ -652,14 +463,15 @@ def build_ablatable_trans_block(
 
 
 class TransBlockBuilder(abc.ABC):
-    class ModelParams(params.ParameterSet):
-        impl = 'fast-favor'
-        num_layers = 2
-        num_heads = 8
-        num_query_features = 32
-        fc_dim_mult = 2
-        p_dropout = 0.1
-        p_attention_dropout = 0.1
+    @dataclass
+    class ModelParams(utils.DataclassPlus):
+        impl: str = 'fast-favor'
+        num_layers: int = 2
+        num_heads: int = 8
+        num_query_features: int = 32
+        fc_dim_mult: int = 2
+        p_dropout: int = 0.1
+        p_attention_dropout: int = 0.1
 
     IMPL_NAME_SPLIT_STR = '-'
     name = None
@@ -690,4 +502,3 @@ class TransBlockBuilder(abc.ABC):
 
         builder_fn = cls.KNOWN_ENCODER_BUILDERS[base_name]
         return builder_fn(hp=hp, num_input_features=num_input_features, get_decoder=get_decoder)
-

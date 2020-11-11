@@ -56,26 +56,63 @@ class TablestakesHandledDatasetLoadMaker(load_makers.LoadMaker[TablestakesHandle
 
 
 class TablestakesHandlerDataModule(data_module.XYMetaHandlerDatasetModule):
-    def get_example_input_array(self) -> datapoints.XYMetaDatapoint:
+    def get_example_input_array(self) -> datapoints.BaseVocabDatapoint:
         num_example_batch_size = 32
-        num_example_words = 10000
+        num_example_words = 4096
+        num_vocab = 1000
 
-        return datapoints.XYMetaDatapoint(
-            x=datapoints.BaseVocabDatapoint(
-                base=torch.tensor(
-                    np.random.rand(num_example_batch_size, num_example_words, self.num_x_base_dims),
-                    dtype=torch.float
+        return datapoints.BaseVocabDatapoint(
+            base=torch.tensor(
+                np.random.rand(num_example_batch_size, num_example_words, self.num_x_base_dims),
+                dtype=torch.float
+            ),
+            vocab=torch.tensor(
+                data=np.random.randint(
+                    low=0,
+                    high=num_vocab,
+                    size=[num_example_batch_size, num_example_words],
                 ),
-                vocab=torch.tensor(np.random.randint(num_example_batch_size, num_example_words), dtype=torch.long),
-            ),
-            y=datapoints.KorvWhichDatapoint(
-                korv=torch.tensor(np.random.randint(num_example_batch_size, num_example_words), dtype=torch.long),
-                which_kv=torch.tensor(np.random.randint(num_example_batch_size, num_example_words), dtype=torch.long),
-            ),
-            meta=datapoints.MetaDatapoint(
-                datapoint_dir=['test_datapoint'] * num_example_batch_size,
+                dtype=torch.long,
             ),
         )
+
+        # return datapoints.XYMetaDatapoint(
+        #     x=datapoints.BaseVocabDatapoint(
+        #         base=torch.tensor(
+        #             np.random.rand(num_example_batch_size, num_example_words, self.num_x_base_dims),
+        #             dtype=torch.float
+        #         ),
+        #         vocab=torch.tensor(
+        #             data=np.random.randint(
+        #                 low=0,
+        #                 high=num_vocab,
+        #                 size=[num_example_batch_size, num_example_words],
+        #             ),
+        #             dtype=torch.long,
+        #         ),
+        #     ),
+        #     y=datapoints.KorvWhichDatapoint(
+        #         korv=torch.tensor(
+        #             data=np.random.randint(
+        #                 low=0,
+        #                 high=2,
+        #                 size=[num_example_batch_size, num_example_words],
+        #             ),
+        #             dtype=torch.long,
+        #         ),
+        #         which_kv=torch.tensor(
+        #             data=np.random.randint(
+        #                 low=0,
+        #                 high=12,
+        #                 size=[num_example_batch_size, num_example_words],
+        #             ),
+        #             dtype=torch.long,
+        #         ),
+        #     ),
+        #     meta=datapoints.MetaDatapoint(
+        #         datapoint_dir=['test_datapoint'] * num_example_batch_size,
+        #     ),
+        # )
 
     def get_dataset(self, hp: data_module.DataParams) -> TablestakesHandledDataset:
         return TablestakesHandledDatasetLoadMaker.run_from_hp(hp)
@@ -88,14 +125,14 @@ if __name__ == '__main__':
         dataset_name=dataset_name,
         docs_root_dir=constants.DOCS_DIR,
         dataset_root_dir=constants.DATASETS_DIR,
-        do_ignore_cached_dataset=True,
+        do_ignore_cached_dataset=False,
     )
     hp_dm.batch_size = 5
 
     dm = TablestakesHandlerDataModule(hp=hp_dm)
     dm.setup()
 
-    for batch in dm.train_dataloader():
-        break
-
-    print(str(batch))
+    # for batch in dm.train_dataloader():
+    #     break
+    #
+    # print(str(batch))

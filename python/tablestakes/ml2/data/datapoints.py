@@ -51,19 +51,22 @@ class Datapoint(utils.DataclassPlus, abc.ABC):
 
     def transfer_to_device(self, device: torch.device):
         def _inner(obj: Any, device: torch.device):
-            if isinstance(obj, (Mapping, MutableMapping)):
-                return {k: _inner(v, device) for k, v in obj.items()}
-
-            if isinstance(obj, (Sequence, list)):
-                return [_inner(o, device) for o in obj]
-
-            if hasattr(obj, 'transfer_to_device'):
-                return obj.transfer_to_device(device)
-
             if hasattr(obj, 'to'):
                 return obj.to(device)
 
-            raise NotImplementedError()
+            if isinstance(obj, utils.DataclassPlus):
+                for k, v in obj:
+                    obj[k] = _inner(v, device)
+                # d = {k: _inner(v, device) for k, v in obj}
+                return obj
+
+            if isinstance(obj, Dict):
+                return {k: _inner(v, device) for k, v in obj.items()}
+
+            if isinstance(obj, (list, tuple)):
+                return [_inner(o, device) for o in obj]
+
+            return obj
 
         return _inner(self, device)
 
@@ -90,7 +93,7 @@ class BaseVocabDatapoint(Datapoint):
             pad_val=0,
         )
         vocab = _pad_arrays(
-            arrays=[dp.vocab.values.squeeze() for dp in dps],
+            arrays=[dp.vocab.values for dp in dps],
             dtype=torch.long,
             max_seq_len=max_seq_len,
             pad_val=constants.Y_VALUE_TO_IGNORE,
@@ -100,6 +103,10 @@ class BaseVocabDatapoint(Datapoint):
             base=base,
             vocab=vocab,
         )
+
+
+class XDatapoint(Datapoint, abc.ABC):
+    pass
 
 
 class YDatapoint(Datapoint, abc.ABC):
@@ -113,6 +120,10 @@ class YDatapoint(Datapoint, abc.ABC):
 
         # noinspection PyArgumentList
         return self.__class__(**d)
+
+
+class LossYDatapoint(YDatapoint, abc.ABC):
+    loss: Optional[torch.Tensor] = None
 
 
 @dataclass
@@ -155,6 +166,9 @@ class MetaDatapoint(Datapoint):
 
     def get_num_features(self):
         return None
+
+    def transfer_to_device(self, device: torch.device):
+        return self
 
 
 @dataclass
@@ -205,4 +219,3 @@ class XYMetaDatapoint(Datapoint):
             y=dp.y.collate([dp.y for dp in datapoints], max_seq_len=max_seq_len),
             meta=dp.meta.collate([dp.meta for dp in datapoints], max_seq_len=None),
         )
-

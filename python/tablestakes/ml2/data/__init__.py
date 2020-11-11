@@ -52,6 +52,8 @@ class SubtypeCsvHandler(Generic[DP], abc.ABC):
     def handle(self, datapoint_dir: Path) -> DP:
         files = utils.glob_multiple(datapoint_dir, self.patterns, self.glob_recursive)
         subname_to_filename = {self.filename_to_subtype_name(f): f for f in files}
+        print('SubtypeCsvHandler handle files:,')
+        print(files)
         return self._files_to_subtype(subname_to_filename)
 
     @staticmethod
@@ -63,13 +65,6 @@ class SubtypeCsvHandler(Generic[DP], abc.ABC):
             after_prefix = after_prefix.replace('.csv', '')
         return after_prefix
 
-    # @staticmethod
-    # def _drop_csv(name: str):
-    #     ext = '.csv'
-    #     if name.endswith(ext):
-    #         name = name.replace(ext, '')
-    #     return name
-
     @abc.abstractmethod
     def _files_to_subtype(self, subname_to_file: Dict[str, Path]) -> DP:
         pass
@@ -80,6 +75,9 @@ class BaseVocabXHandler(SubtypeCsvHandler[datapoints.BaseVocabDatapoint]):
         super().__init__(subtype_name='x', patterns=['**/x_*.csv'], glob_recursive=True)
 
     def _files_to_subtype(self, subname_to_file: Dict[str, Path]) -> datapoints.BaseVocabDatapoint:
+        print(f'BaseVocabXHandler subname_to_file:')
+        utils.print_dict(subname_to_file)
+
         return datapoints.BaseVocabDatapoint(
             base=utils.load_csv(subname_to_file[constants.X_BASE_BASE_NAME]),
             vocab=utils.load_csv(subname_to_file[constants.X_VOCAB_BASE_NAME]),
@@ -142,7 +140,6 @@ class XYMetaDirHandlerDataset(DirHandlerDataset[datapoints.XYMetaDatapoint]):
             data_dir_glob_patterns: Optional[List[utils.DirtyPath]] = None,
             data_dir_glob_recursive=False,
     ):
-
         def dir_handler(d: utils.DirtyPath) -> datapoints.XYMetaDatapoint:
             return datapoints.XYMetaDatapoint.from_makers(
                 data_dir=d,
@@ -157,3 +154,4 @@ class XYMetaDirHandlerDataset(DirHandlerDataset[datapoints.XYMetaDatapoint]):
             data_dir_glob_patterns,
             data_dir_glob_recursive,
         )
+

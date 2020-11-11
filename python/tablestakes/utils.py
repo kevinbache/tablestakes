@@ -356,23 +356,41 @@ def ray_prog_bar(obj_refs: List[ray.ObjectRef]):
     for _ in tqdm.tqdm(to_iterator(obj_refs), total=len(obj_refs)):
         pass
 
+
 @dataclass
 class DataclassPlus:
-    """dataclass with a few dict methods and a fancy __str__"""""
+    """dataclass with a few dict methods and a fancy __str__.
+
+    Subclasess of DataclassPlus should still use the @dataclass decorator so that __init__s work.
+        Double check this.
+
+    Class members need type annotations in order to be dataclass fields.
+    """
+    def __contains__(self, item):
+        return item in self.keys()
+
     def keys(self):
         return [f.name for f in fields(self)]
+
+    # def items(self):
+    #     d = {k: getattr(self, k) for k in self.keys()}
+    #     return iter(d.items())
 
     def __getitem__(self, item):
         if item not in self.keys():
             raise ValueError(f'Keys for this class are: {self.keys()} but you tried to get {item}')
         return getattr(self, item)
 
-    def __contains__(self, item):
-        return item in self.keys()
+    def __setitem__(self, key, value):
+        setattr(self, key, value)
 
     def __iter__(self):
+        # return iter(self.items())
         d = {k: getattr(self, k) for k in self.keys()}
         return iter(d.items())
+
+    def to_dict(self):
+        return asdict(self)
 
     def _str_inner(self, obj):
         typestr = obj.__class__.__name__
@@ -399,6 +417,3 @@ class DataclassPlus:
         strs = [f'{k}={v}' for k, v in d.items()]
         arg_str = ',\n  '.join(strs)
         return f'{self.__class__.__name__}(\n  {arg_str}\n)'
-
-    def to_dict(self):
-        return asdict(self)

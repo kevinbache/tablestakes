@@ -5,7 +5,7 @@ from typing import *
 
 import pytorch_lightning as pl
 import torch
-from tablestakes import utils
+from tablestakes import utils, constants
 from tablestakes.ml2.data import datapoints
 from torch.utils.data import DataLoader
 
@@ -13,10 +13,10 @@ from tablestakes.ml2 import data
 
 
 @dataclass
-class DataParams:
+class DataParams(utils.DataclassPlus):
     dataset_name: utils.DirtyPath
-    docs_root_dir: utils.DirtyPath
-    dataset_root_dir: utils.DirtyPath
+    docs_root_dir: utils.DirtyPath = constants.DOCS_DIR
+    dataset_root_dir: utils.DirtyPath = constants.DATASETS_DIR
     do_ignore_cached_dataset: bool = False
 
     p_valid = 0.1
@@ -32,7 +32,6 @@ class DataParams:
     batch_size = 32
 
     def __post_init__(self):
-        self.dataset_name = Path(self.dataset_name)
         self.docs_root_dir = Path(self.docs_root_dir)
         self.dataset_root_dir = Path(self.dataset_root_dir)
 
@@ -51,7 +50,7 @@ class XYMetaHandlerDatasetModule(pl.LightningDataModule):
         dims = self.ds.get_num_features()
 
         self.num_x_base_dims = dims.x.base
-        self.num_y_classes = dims.y
+        self.num_y_classes: datapoints.YDatapoint = dims.y
 
         self.hp.num_x_dims = dims.x
         self.hp.num_y_classes = dims.y
@@ -61,7 +60,7 @@ class XYMetaHandlerDatasetModule(pl.LightningDataModule):
         self.train_dataset, self.valid_dataset, self.test_dataset = None, None, None
 
     @abc.abstractmethod
-    def get_example_input_array(self) -> Dict[str, torch.Tensor]:
+    def get_example_input_array(self) -> datapoints.XDatapoint:
         pass
 
     @abc.abstractmethod
