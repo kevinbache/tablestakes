@@ -46,7 +46,7 @@ class XYMetaHandlerDatasetModule(pl.LightningDataModule):
         self.verbose = verbose
 
         self.ds = self.get_dataset(hp)
-
+        assert isinstance(self.ds, data.XYMetaDirHandlerDataset)
         dims = self.ds.get_num_features()
 
         self.num_x_base_dims = dims.x.base

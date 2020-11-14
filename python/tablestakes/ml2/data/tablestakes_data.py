@@ -46,7 +46,7 @@ class TablestakesHandledDatasetLoadMaker(load_makers.LoadMaker[TablestakesHandle
         return ds
 
     @classmethod
-    def run_from_hp(cls, hp: "TablestakesHandlerDataModule.DataParams") -> TablestakesHandledDataset:
+    def run_from_hp(cls, hp: "data_module.DataParams") -> TablestakesHandledDataset:
         return TablestakesHandledDatasetLoadMaker(
             saved_dataset_file=hp.dataset_file,
             input_docs_directory_for_maker=hp.docs_dir,

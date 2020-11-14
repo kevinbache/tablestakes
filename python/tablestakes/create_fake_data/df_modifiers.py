@@ -86,8 +86,7 @@ class CharCounter(DfModifier):
 
 
 class MyBertTokenizer(DfModifier):
-    VERSION = '0.1'
-    FILL_NA_VALUE = -100
+    VERSION = '0.2'
 
     def __init__(self, model_name='bert-base-uncased'):
         self.tok = self.get_tokenizer(model_name)
@@ -180,7 +179,7 @@ class MyBertTokenizer(DfModifier):
             columns={f'{join_col}_right': join_col},
         )
 
-        tokens_df.fillna(self.FILL_NA_VALUE, inplace=True)
+        tokens_df.fillna(self.tok.mask_token_id, inplace=True)
 
         return tokens_df
 

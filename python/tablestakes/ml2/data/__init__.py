@@ -24,6 +24,13 @@ class ListDataset(Dataset, Generic[D]):
     def __len__(self):
         return len(self.datapoints)
 
+    def save(self, filename: str):
+        utils.save_cloudpickle(filename, self)
+
+    @classmethod
+    def load(cls, filename: str):
+        return utils.load_cloudpickle(filename)
+
 
 DP = TypeVar('DP')
 

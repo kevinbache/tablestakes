@@ -14,16 +14,15 @@ import pandas as pd
 import ray
 
 from tablestakes import utils, ocr, constants
-from tablestakes.create_fake_data import basic_document, color_matcher, etree_modifiers, df_modifiers, html_css as hc, \
-    kv_styles
-from tablestakes.ml import hyperparams
-from tablestakes.ml import data
+from tablestakes.create_fake_data import basic_document, color_matcher, etree_modifiers, df_modifiers,  doc_gen_params as dgp_mod
+from tablestakes.ml2.data import tablestakes_data, data_module
+
 
 @ray.remote
-def make_and_ocr_docs(doc_ind, doc_set_params: hyperparams.DocSetParams):
+def make_and_ocr_docs(doc_ind, doc_set_params: dgp_mod.DocSetParams):
     print(f"Starting to create doc {doc_ind}")
     doc_gen_params = doc_set_params.doc_gen_params.sample()
-    assert isinstance(doc_gen_params, hyperparams.DocGenParams)  # for pycharm autocomplete
+    assert isinstance(doc_gen_params, dgp_mod.DocGenParams)  # for pycharm autocomplete
 
     doc = basic_document.make_doc(
         seed=doc_set_params.seed_start + doc_ind,
@@ -32,7 +31,7 @@ def make_and_ocr_docs(doc_ind, doc_set_params: hyperparams.DocSetParams):
     this_doc_dir = doc_set_params.docs_dir / f'doc_{doc_ind:02d}'
     utils.mkdir_if_not_exist(this_doc_dir)
 
-    utils.save_json(this_doc_dir / 'new_properties.txt', doc_gen_params.to_dict())
+    utils.save_json(this_doc_dir / 'doc_gen_params.txt', doc_gen_params.to_dict())
 
     ########################################
     # postproc doc to add word_ids, labels #
@@ -197,20 +196,17 @@ if __name__ == '__main__':
     # Parameters #
     ##############
     do_regen_docs = True
+    doc_gen_params = dgp_mod.DocGenParams()
 
-    doc_gen_params = DocGenParams()
-
-    doc_prep_params = DocPrepParams()
+    doc_prep_params = dgp_mod.DocPrepParams()
     doc_prep_params.min_count_to_keep_word = 4
 
-    doc_settings = DocSetParams(
+    doc_settings = dgp_mod.DocSetParams(
         doc_gen_params=doc_gen_params,
         doc_prep_params=doc_prep_params,
     )
     doc_settings.num_docs = 100
     # doc_settings.doc_gen_params.num_extra_fields = 0
-
-
 
     fast_test = False
     if fast_test:
@@ -246,11 +242,18 @@ if __name__ == '__main__':
     utils.ray_prog_bar(joined_dfs)
 
     with utils.Timer('Reading csvs into Dataset'):
-        dataset = data.TablestakesDataset(docs_dir=doc_settings.docs_dir)
+        from tablestakes.ml2.data import data_module
+        data_hp = data_module.DataParams('')
+        data_hp.dataset_file = doc_settings.get_dataset_file()
+        data_hp.docs_dir = doc_settings.get_docs_dir()
+        data_hp.do_ignore_cached_dataset = True
+
+        # dataset = data.TablestakesHandledDataset(docs_dir=doc_settings.docs_dir)
+        dataset = tablestakes_data.TablestakesHandledDatasetLoadMaker.run_from_hp(hp=data_hp)
 
     dataset_file = doc_settings.get_dataset_file()
-    with utils.Timer(f'Saving Dataset of type {type((dataset))} to {dataset_file}'):
-        dataset.save(dataset_file)
+    with utils.Timer(f'Saving Dataset of type {type((dataset))} to {data_hp.dataset_file}'):
+        dataset.save(data_hp.dataset_file)
 
     print()
     print(f'Saved to {str(doc_settings.docs_dir)} and {dataset_file}')

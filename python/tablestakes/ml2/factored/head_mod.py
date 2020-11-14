@@ -2,6 +2,7 @@ import abc
 from typing import *
 
 import torch
+from tablestakes.ml2.data import datapoints
 from torch import nn
 import pytorch_lightning as pl
 
@@ -48,7 +49,7 @@ class SaveLossesMetric(pl.metrics.Metric):
 
 
 class MetaMetric(abc.ABC):
-    """Like a pl.metrics.Metric but which takes batch meta in its forward."""
+    """Like a pl.metrics.Metric but which takes batch meta in its forward. Default wraps metrics and discards meta."""
     def __init__(self, metric: pl.metrics.Metric):
         super().__init__()
         self.metric = metric
@@ -69,14 +70,17 @@ class LossMetrics:
     """Object which has a los and some metrics."""
     LOSS_NAME = constants.LOSS_NAME
 
-    def __init__(
+    def __init__(self):
+        self.loss_fn = None
+        self.metrics_dict = {}
+
+    def set_loss_fn_metrics_dict(
             self,
             loss: Loss,
-            metrics: Optional[Dict[str, Union[MetaMetric, pl.metrics.Metric]]] = None,
+            metrics_dict: Optional[Dict[str, Union[MetaMetric, pl.metrics.Metric]]] = None,
     ):
-        super().__init__()
         self.loss_fn = loss
-        self.metrics_dict = metrics
+        self.metrics_dict = metrics_dict
         for k, v in self.metrics_dict.items():
             if isinstance(v, MetaMetric):
                 pass
@@ -95,87 +99,40 @@ class LossMetrics:
         return d
 
 
-class Head(pl.LightningModule, LossMetrics, abc.ABC):
+class Head(LossMetrics, pl.LightningModule, abc.ABC):
     def __init__(
             self,
             num_input_features: int,
             num_classes: int,
             metrics: Optional[Dict[str, pl.metrics.Metric]] = None,
     ):
-        super().__init__()
+        pl.LightningModule.__init__(self)
         self.num_input_features = num_input_features
         self.num_classes = num_classes
         self.metrics_dict = metrics or {}
 
-    @abc.abstractmethod
-    def forward(self, x):
-        pass
+    # @abc.abstractmethod
+    # def forward(self, x: torch.tensor, y_dp: datapoints.YDatapoint):
 
+    # SOFTMAX:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.postproc_head_out(self.head(self.x_reducer_fn(x.squeeze(1))))
 
-class StartEndHead(Head):
-    """Predict the start and end location within a sequence.  Prediction must be positive."""
-    def __init__(
-            self,
-            num_input_features: int,
-            num_classes: int,
-    ):
-        nn.Module.__init__(self)
+    def metrics(self, y_hat: torch.Tensor, y: torch.Tensor, metas: List[Any]) -> Dict[str, torch.Tensor]:
+        d = {}
+        for metric_name, metric in self.metrics_dict:
+            d[metric_name] = metric(y_hat, y)
+        return d
 
-        self.start = nn.Linear(
-            in_features=num_input_features,
-            out_features=num_classes,
-            bias=True,
-        )
+    def loss(self, y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        try:
+            loss = self.loss_fn(y_hat, y)
+        except BaseException as e:
+            raise e
+        if self.loss_reducer_fn is not None:
+            loss = self.loss_reducer_fn(loss)
+        return loss
 
-        self.end = nn.Linear(
-            in_features=num_input_features,
-            out_features=num_classes,
-            bias=True,
-        )
-
-    def forward(self, x):
-        relu = nn.ReLU()
-        return {
-            'start_logits': relu(self.start(x)).permute(0, 2, 1),
-            'end_logits': relu(self.end(x)).permute(0, 2, 1),
-        }
-
-
-class HeadedSlabNet(trunks.SlabNet):
-    """A slabnet with a head containing num_output_features."""
-    def __init__(
-            self,
-            num_input_features: int,
-            num_output_features: int,
-            head_maker: Optional[Callable[[int, int], Head]] = None,
-            hp: Optional[trunks.SlabNet.ModelParams] = trunks.SlabNet.ModelParams(),
-    ):
-        super().__init__(
-            num_input_features=num_input_features,
-            hp=hp,
-        )
-        # could be changed by GroupNorm fixup so must use this
-        num_slab_outputs = self.get_num_outputs()
-
-        if head_maker is None:
-            head = nn.Linear(num_slab_outputs, num_output_features)
-        else:
-            head = head_maker(num_slab_outputs, num_output_features)
-        self.head = head
-
-        self._num_output_features = num_output_features
-
-    def forward(self, x):
-        x = super().forward(x)
-        x = self.head(x)
-        return x
-
-
-# class HeadParams(utils.DataclassPlus):
-#     # loss_weights: Dict[str, float]
-#     num_classes: int
-#     reducer: Optional[str] = None
-#     adaptive_softmax_cutoff = 256
 
 
 def get_reducer(num_input_features: int, reducer_str: str) -> Tuple[Callable[[torch.Tensor], torch.Tensor], int]:
@@ -196,26 +153,26 @@ class SoftmaxHead(Head):
             num_classes: int,
             head: nn.Module,
             x_reducer: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
-            y_reducer: Optional[Callable[[torch.Tensor], torch.Tensor]] = torch.mean,
+            loss_reducer: Optional[Callable[[torch.Tensor], torch.Tensor]] = torch.mean,
     ):
         super().__init__(num_input_features, num_classes)
 
         self.x_reducer_fn = x_reducer
-        self.y_reducer_fn = y_reducer
+        self.loss_reducer_fn = loss_reducer
 
         self.head = head
         self.loss_fn = nn.NLLLoss()
-
-    def postproc_head_out(self, head_output):
-        return head_output
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.postproc_head_out(self.head(self.x_reducer_fn(x.squeeze(1))))
 
     def loss(self, y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        loss = self.loss_fn(y_hat, y)
-        if self.y_reducer_fn is not None:
-            loss = self.y_reducer_fn(loss)
+        try:
+            loss = self.loss_fn(y_hat, y)
+        except BaseException as e:
+            raise e
+        if self.loss_reducer_fn is not None:
+            loss = self.loss_reducer_fn(loss)
         return loss
 
 
@@ -225,7 +182,7 @@ class AdaptiveSoftmaxHead(SoftmaxHead):
             num_input_features: int,
             num_classes: int,
             x_reducer_name: Optional[str] = None,
-            y_reducer: Optional[Callable[[torch.Tensor], torch.Tensor]] = torch.mean,
+            loss_reducer: Optional[Callable[[torch.Tensor], torch.Tensor]] = torch.mean,
     ):
         x_reducer, num_input_features = \
             get_reducer(num_input_features=num_input_features, reducer_str=x_reducer_name)
@@ -240,10 +197,7 @@ class AdaptiveSoftmaxHead(SoftmaxHead):
             ],
             div_value=4,
         )
-        super().__init__(num_input_features, num_classes, head, x_reducer, y_reducer)
-
-    def postproc_head_out(self, head_output):
-        return head_output[0]
+        super().__init__(num_input_features, num_classes, head, x_reducer, loss_reducer)
 
 
 class LinearSoftmaxHead(SoftmaxHead):
@@ -252,22 +206,142 @@ class LinearSoftmaxHead(SoftmaxHead):
             num_input_features: int,
             num_classes: int,
             x_reducer_name: Optional[str] = None,
-            y_reducer: Optional[Callable[[torch.Tensor], torch.Tensor]] = torch.mean,
+            loss_reducer: Optional[Callable[[torch.Tensor], torch.Tensor]] = torch.mean,
     ):
         x_reducer, num_input_features = \
             get_reducer(num_input_features=num_input_features, reducer_str=x_reducer_name)
 
         head = nn.Linear(num_input_features, num_classes)
-        super().__init__(num_input_features, num_classes, head, x_reducer, y_reducer)
+        super().__init__(num_input_features, num_classes, head, x_reducer, loss_reducer)
+        self.lsm = nn.LogSoftmax(dim=1)
+
+    def postproc_head_out(self, head_output):
+        return self.lsm(head_output.permute(0, 2, 1))
 
 
-class WeightedLoss(pl.LightningModule):
-    def __init__(self, heads: List[Head], weights: Iterable[float]):
+class WeightedHead(Head):
+    LOSS_NAME = constants.LOSS_NAME
+    """Multiheaded head with weights for loss."""
+    def __init__(self, heads: Dict[str, Head], weights: Iterable[float], y_dp_class: type):
         super().__init__()
         self.heads = heads
         self.weights = None
         self.register_buffer('weights', torch.tensor(weights, dtype=torch.float))
+        self.y_dp_class = y_dp_class
 
-    def loss(self, y_hat, y):
-        losses = torch.stack([h.loss(y_hat, y) for h in self.heads], dim=0)
-        return losses.dot(self.weights)
+    def forward(self, x: torch.Tensor) -> datapoints.YDatapoint:
+        y_hats_dict = {}
+        for head_name, head in self.heads:
+            y_hats_dict[head_name] = head(x)
+        return self.y_dp_class.from_dict(y_hats_dict)
+
+    def loss(self, y_hat: datapoints.YDatapoint, y: datapoints.YDatapoint) -> datapoints.WeightedLossYDatapoint:
+        losses = torch.stack(
+            [head.loss(y_hat[head_name], y[head_name]) for head_name, head in self.heads.items()],
+            dim=0,
+        )
+        loss = self.losses_to_loss(losses)
+        return loss
+
+    def metrics(
+            self,
+            y_hat: datapoints.YDatapoint,
+            y: datapoints.YDatapoint,
+            metas: List[Any],
+    ) -> datapoints.YDatapoint:
+            d = {}
+            for head_name, head in self.heads:
+                y_tensor = y[head_name]
+                y_hat_tensor = y_hat[head_name]
+                d[head_name] = head.metrcis(y_hat_tensor, y_tensor, metas)
+            return y.from_dict(d)
+
+    def loss_metrics(
+            self,
+            y_hat: datapoints.YDatapoint,
+            y: datapoints.YDatapoint,
+            metas: List[Any],
+    ) -> datapoints.WeightedLossYDatapoint:
+            d = {}
+            for head_name, head in self.heads:
+                y_tensor = y[head_name]
+                y_hat_tensor = y_hat[head_name]
+                d[head_name] = head.loss_metrics(y_hat_tensor, y_tensor, metas)
+
+            losses = torch.stack(
+                [d[head_name] for head_name in self.heads.keys()],
+                dim=0,
+            )
+            loss = losses.dot(self.weights)
+
+            return datapoints.WeightedLossYDatapoint(
+                loss=loss,
+                weights=self.weights.copy(),
+                y_dp=y.from_dict(d),
+            )
+
+
+class HeadedSlabNet(trunks.SlabNet, LossMetrics):
+    """A slabnet with a head containing num_output_features."""
+    def __init__(
+            self,
+            num_input_features: int,
+            head_maker: Callable[[int], Head],
+            hp: Optional[trunks.SlabNet.ModelParams] = trunks.SlabNet.ModelParams(),
+    ):
+        super().__init__(
+            num_input_features=num_input_features,
+            hp=hp,
+        )
+        self.head = head_maker(num_input_features)
+
+    def forward(self, x):
+        x = super().forward(x)
+        x = self.head(x)
+        return x
+
+    def loss(self, y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        return self.head.loss(y_hat, y)
+
+    def metrics(self, y_hat: torch.Tensor, y: torch.Tensor, metas: List[Any]) -> Dict[str, torch.Tensor]:
+        return self.head.metrics(y_hat, y, metas)
+
+    def loss_metrics(self, y_hat: torch.Tensor, y: torch.Tensor, metas: List[Any]) -> Dict[str, torch.Tensor]:
+        return self.head.loss_metrics(y_hat, y, metas)
+
+
+
+
+
+
+
+
+# class StartEndHead(Head):
+#     """Predict the start and end location within a sequence.  Prediction must be positive."""
+#     def __init__(
+#             self,
+#             num_input_features: int,
+#             num_classes: int,
+#     ):
+#         nn.Module.__init__(self)
+#
+#         self.start = nn.Linear(
+#             in_features=num_input_features,
+#             out_features=num_classes,
+#             bias=True,
+#         )
+#
+#         self.end = nn.Linear(
+#             in_features=num_input_features,
+#             out_features=num_classes,
+#             bias=True,
+#         )
+#
+#     def forward(self, x):
+#         relu = nn.ReLU()
+#         return {
+#             'start_logits': relu(self.start(x)).permute(0, 2, 1),
+#             'end_logits': relu(self.end(x)).permute(0, 2, 1),
+#         }
+
+

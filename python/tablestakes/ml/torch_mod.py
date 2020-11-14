@@ -424,8 +424,7 @@ class HeadedSlabNet(SlabNet):
     def __init__(
             self,
             num_input_features: int,
-            num_output_features: int,
-            head_maker: Optional[Callable[[int, int], Head]] = None,
+            head_maker: Optional[Callable[[int], Head]] = None,
             hp: Optional[SlabNet.ModelParams] = SlabNet.ModelParams(),
     ):
         super().__init__(
@@ -433,14 +432,7 @@ class HeadedSlabNet(SlabNet):
             hp=hp,
         )
         # could be changed by GroupNorm fixup
-        num_slab_outputs = self.get_num_outputs()
-
-        if head_maker is None:
-            head = nn.Conv1d(num_slab_outputs, num_output_features, 1)
-        else:
-            head = head_maker(num_slab_outputs, num_output_features)
-        self.head = head
-
+        self.head = head_maker(num_input_features=self.get_num_outputs(), )
         self._num_output_features = num_output_features
 
     def forward(self, x):

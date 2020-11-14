@@ -206,11 +206,11 @@ class XYMetaCsvDataset(Dataset[XYMetaDatapoint]):
             datapoint = XYMetaDatapoint(x_dict, y_dict, meta_dict)
             self._datapoints.append(datapoint)
 
-        self.num_x_dims = {k: df.shape[1] for k, df in self._datapoints[0][0].items()}
+        self.num_x_dims = {k: df.shape[1] for k, df in self._datapoints[0].x.items()}
 
         self.num_y_dims = {}
         self.num_y_classes = {}
-        for k, df in self._datapoints[0][1].items():
+        for k, df in self._datapoints[0].y.items():
             if hasattr(df, 'shape'):
                 self.num_y_dims[k] = df.shape[1]
                 self.num_y_classes[k] = df.shape[1] if df.shape[1] > 1 else df.max().item() + 1
@@ -223,7 +223,7 @@ class XYMetaCsvDataset(Dataset[XYMetaDatapoint]):
 
         self.x_names = self.num_x_dims.keys()
         self.y_names = self.num_y_dims.keys()
-        self.meta_names = [k for k in self._datapoints[0][2]]
+        self.meta_names = [k for k in self._datapoints[0].meta]
 
     def __len__(self):
         return len(self._datapoints)

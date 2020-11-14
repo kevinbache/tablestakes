@@ -84,8 +84,8 @@ class ModelBertConvTransTClass(factored.FactoredLightningModule):
 
         heads = {}
         for y_name, num_classes in self.num_y_classes.items():
-            if self.hp.heads.special_heads and y_name in self.hp.heads.special_heads:
-                head_type_name = self.hp.heads.special_heads[y_name]
+            if self.hp.head.special_heads and y_name in self.hp.head.special_heads:
+                head_type_name = self.hp.head.special_heads[y_name]
                 if head_type_name not in special_head_registry:
                     raise ValueError(f'Head name: {head_type_name} for y_name: {y_name}')
                 head = special_head_registry[head_type_name]
@@ -95,7 +95,7 @@ class ModelBertConvTransTClass(factored.FactoredLightningModule):
                 num_input_features=self.fc.get_num_outputs(),
                 num_output_features=num_classes,
                 head_maker=head,
-                hp=self.hp.heads,
+                hp=self.hp.head,
             )
 
         self.heads = nn.ModuleDict(heads)

@@ -2,6 +2,7 @@ import copy
 from dataclasses import dataclass
 
 import pytorch_lightning as pl
+import torch
 
 from tablestakes import constants, utils
 from tablestakes.ml2.data import datapoints, data_module
@@ -26,6 +27,7 @@ class FactoredLightningModule(pl.LightningModule):
             self,
             hp: FactoredParams,
             opt_maker: opt_mod.OptimizersMaker,
+            head: head_mod.Head,
             *args,
             **kwargs,
     ):
@@ -34,7 +36,7 @@ class FactoredLightningModule(pl.LightningModule):
         self.opt = opt_maker
         self.opt.set_pl_module(pl_module=self)
 
-        self.heads = []
+        self.head = head
 
     ############
     # TRAINING #
@@ -44,32 +46,41 @@ class FactoredLightningModule(pl.LightningModule):
         y_hats = self(batch.x)
 
         # losses
-        head_to_lossmetrics = {}
-        for head in self.heads:
-            if head.name not in y_hats:
-                raise ValueError(f"Tried to run a head named {head.name} but y_hats only has keys: {y_hats.keys()}")
-            y_hat = y_hats[head.name]
-            y = batch.y[head.name]
-            head_to_lossmetrics[head.name] = head.loss_metrics(y_hat, y, batch.meta)
+        # head_to_lossmetrics = {}
+        # for head_name, head in self.head.items():
+        #     if head_name not in y_hats:
+        #         raise ValueError(f"Tried to run a head named {head_name} but y_hats only has keys: {y_hats.keys()}")
+        #     y_hat = y_hats[head_name]
+        #     y = batch.y[head_name]
+        #     value = head.loss_metrics(y_hat, y, batch.meta)
+        #     head_to_lossmetrics[head_name] = value
 
         # the output will be the same type as the y datapoint
-        datapoint_cls = batch.get_y_class()
-        lossmetrics_datapoint = datapoint_cls(**head_to_lossmetrics)
+        # datapoint_cls = batch.get_y_class()
+        #
+        # # TODO This is saying here that the datapoint class is going to take care of combining the head losses into weighted combo
+        # lossmetrics_datapoint = batch.from_dict()
 
+        head(y_hats)
+
+    def postproc_lossmetrics_dp(self, lossmetrics_datapoint:  datapoints.LossYDatapoint) -> datapoints.LossYDatapoint:
         return lossmetrics_datapoint
 
     def training_step(self, batch, batch_idx):
         lossmetrics_datapoint = self.forward_plus_lossmetrics(batch, batch_idx)
-        self.log_losses_and_metrics(utils.Phase.train.name, lossmetrics_datapoint)
+        lossmetrics_datapoint = self.postproc_lossmetrics_dp(lossmetrics_datapoint)
+        self.log_lossmetrics_datapoint(utils.Phase.train, lossmetrics_datapoint)
         return lossmetrics_datapoint.loss
 
     def validation_step(self, batch, batch_idx):
         lossmetrics_datapoint = self.forward_plus_lossmetrics(batch, batch_idx)
-        self.log_losses_and_metrics(utils.Phase.valid.name, lossmetrics_datapoint)
+        lossmetrics_datapoint = self.postproc_lossmetrics_dp(lossmetrics_datapoint)
+        self.log_lossmetrics_datapoint(utils.Phase.valid, lossmetrics_datapoint)
 
     def test_step(self, batch, batch_idx):
         lossmetrics_datapoint = self.forward_plus_lossmetrics(batch, batch_idx)
-        self.log_losses_and_metrics(utils.Phase.test.name, lossmetrics_datapoint)
+        lossmetrics_datapoint = self.postproc_lossmetrics_dp(lossmetrics_datapoint)
+        self.log_lossmetrics_datapoint(utils.Phase.test, lossmetrics_datapoint)
 
     #######
     # OPT #
@@ -80,6 +91,9 @@ class FactoredLightningModule(pl.LightningModule):
     ###########
     # LOGGING #
     ###########
+    def log_lossmetrics_datapoint(self, phase: utils.Phase, dp: datapoints.YDatapoint):
+        return self.log_dict({phase.name: dp.to_dict()})
+
     def on_pretrain_routine_start(self) -> None:
         if self.logger is None:
             return

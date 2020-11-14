@@ -22,7 +22,7 @@ class TotalParams(utils.DataclassPlus):
     conv: trunks.ConvBlock.ModelParams = trunks.ConvBlock.ModelParams()
     trans: trunks.TransBlockBuilder.ModelParams = trunks.TransBlockBuilder.ModelParams()
     fc: trunks.SlabNet.ModelParams = trunks.SlabNet.ModelParams()
-    heads: head_mod.HeadedSlabNet.ModelParams = head_mod.HeadedSlabNet.ModelParams()
+    # head: head_mod.HeadedSlabNet.ModelParams = head_mod.HeadedSlabNet.ModelParams()
 
     verbose: bool = False
 
@@ -40,6 +40,7 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
             hp: TotalParams,
             dm: data_module.XYMetaHandlerDatasetModule,
             opt_maker: opt_mod.OptimizersMaker,
+            head: head_mod.Head,
     ):
         super().__init__(hp, opt_maker)
         # for autocomplete
@@ -83,16 +84,18 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
             hp=self.hp.fc,
         )
 
-        heads = {}
-        for y_name, num_classes in self.num_y_classes:
-            heads[y_name] = head_mod.HeadedSlabNet(
-                num_input_features=self.fc.get_num_outputs(),
-                num_output_features=num_classes,
-                head_maker=hp.heads.makers[y_name],
-                hp=self.hp.heads,
-            )
-
-        self.heads = nn.ModuleDict(heads)
+        # head = head
+        self.head = head
+        # head = {}
+        # # for y_name, num_classes in self.num_y_classes:
+        # #     head[y_name] = head_mod.HeadedSlabNet(
+        # #         num_input_features=self.fc.get_num_outputs(),
+        # #         num_output_features=num_classes,
+        # #         head_maker=hp.head.makers[y_name],
+        # #         hp=self.hp.head,
+        # #     )
+        #
+        # self.head = nn.ModuleDict(head)
         # END MODEL
         ###############################################################
 
@@ -104,6 +107,8 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
     def forward(self, x: datapoints.BaseVocabDatapoint):
         base = x.base
         vocab = x.vocab
+        assert isinstance(base, torch.Tensor)
+        assert isinstance(vocab, torch.Tensor)
 
         if self.verbose:
             print(f'base.shape: {base.shape}')
@@ -137,14 +142,9 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
         x = self.fc(x)
 
         if self.verbose:
-            print('x shape after fc before heads: ', x.shape)
+            print('x shape after fc before head: ', x.shape)
 
-        y_hats = {
-            head_name: head(x)
-            for head_name, head in self.heads.items()
-        }
-
-        return y_hats
+        return self.head(x)
 
 
 def run(
@@ -187,7 +187,7 @@ if __name__ == '__main__':
     fast_dev_run = False
 
     dp = data_module.DataParams(
-        dataset_name='num=100_8163',
+        dataset_name='num=100_057b',
     )
     hp = TotalParams(
         max_seq_len=8192,
@@ -199,7 +199,7 @@ if __name__ == '__main__':
 
     hp.data.do_ignore_cached_dataset = False
     hp.data.seed = 42
-    hp.data.num_workers = 4
+    hp.data.num_workers = 0
     hp.data.num_gpus = 0
     hp.data.num_cpus = 4
 
@@ -251,18 +251,23 @@ if __name__ == '__main__':
     hp.heads.num_blocks_per_residual = 2
     hp.heads.num_blocks_per_dropout = 2
     hp.heads.requires_grad = True
-    hp.heads.makers = {
-        constants.Y_WHICH_KV_BASE_NAME: None,
-        constants.Y_KORV_BASE_NAME: None,
-    }
 
     hp.verbose = True
 
+    head_makers = datapoints.KorvWhichDatapoint(
+        korv=lambda num_input_features: head_mod.LinearSoftmaxHead(num_input_features, num_classes=2),
+        which_kv=lambda num_input_features: head_mod.LinearSoftmaxHead(num_input_features, num_classes=11),
+    )
+    weights = datapoints.KorvWhichDatapoint(
+        korv=0.3,
+        which_kv=1.0,
+    )
     dm = tablestakes_data.TablestakesHandlerDataModule(hp.data)
     net = ModelBertConvTransTClass2(
         hp=hp,
         dm=dm,
         opt_maker=opt_mod.OptimizersMaker(hp.opt),
+        head=head_mod.WeightedHead(heads=head_makers),
     )
 
     utils.hprint('About to start model run:')

@@ -2,17 +2,17 @@ import random
 
 from tablestakes import utils
 from tablestakes.create_fake_data import kv_styles, html_css as hc, creators
-from tablestakes.ml.hyperparams import DocGenParams
+from tablestakes.create_fake_data import doc_gen_params
 
 
 def make_doc(
         seed: int,
-        doc_config: DocGenParams,
+        doc_config: doc_gen_params.DocGenParams,
 ) -> hc.Document:
     utils.set_seeds(seed)
 
     doc_config = doc_config.sample()
-    assert isinstance(doc_config, DocGenParams) # for pycharm autocomplete
+    assert isinstance(doc_config, doc_gen_params.DocGenParams) # for pycharm autocomplete
 
     # create the complex creators up here so they'll use consistent formatting throughout.
     date_creator = creators.DateCreator()

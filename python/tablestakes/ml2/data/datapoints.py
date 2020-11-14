@@ -1,4 +1,5 @@
 import abc
+from abc import ABC
 from dataclasses import dataclass, asdict, fields
 from typing import *
 
@@ -8,6 +9,7 @@ import pandas as pd
 import torch
 
 from tablestakes import utils, constants
+from transformers import BertTokenizer
 
 VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
 
@@ -76,6 +78,9 @@ class Datapoint(utils.DataclassPlus, abc.ABC):
             k: _get_df_or_tensor_num_features(v) for k, v in self
         })
 
+    def from_dict(self, d: Dict[str, Any]):
+        return self.__class__(**d)
+
 
 @dataclass
 class BaseVocabDatapoint(Datapoint):
@@ -96,8 +101,8 @@ class BaseVocabDatapoint(Datapoint):
             arrays=[dp.vocab.values for dp in dps],
             dtype=torch.long,
             max_seq_len=max_seq_len,
-            pad_val=constants.Y_VALUE_TO_IGNORE,
-        )
+            pad_val=BertTokenizer.from_pretrained(constants.BERT_MODEL_NAME).mask_token_id,
+        ).squeeze(2)
 
         return cls(
             base=base,
@@ -105,10 +110,12 @@ class BaseVocabDatapoint(Datapoint):
         )
 
 
+@dataclass
 class XDatapoint(Datapoint, abc.ABC):
     pass
 
 
+@dataclass
 class YDatapoint(Datapoint, abc.ABC):
     def get_num_features(self):
         d = {}
@@ -121,9 +128,17 @@ class YDatapoint(Datapoint, abc.ABC):
         # noinspection PyArgumentList
         return self.__class__(**d)
 
+@dataclass
+class LossYDatapoint(Datapoint, abc.ABC):
+    loss: torch.Tensor
+    y: YDatapoint
 
-class LossYDatapoint(YDatapoint, abc.ABC):
-    loss: Optional[torch.Tensor] = None
+
+@dataclass
+class WeightedLossYDatapoint(Datapoint, abc.ABC):
+    loss: torch.Tensor
+    weights: torch.Tensor
+    y_dp: YDatapoint
 
 
 @dataclass
@@ -172,17 +187,6 @@ class MetaDatapoint(Datapoint):
 
 
 @dataclass
-class SeqTokClassDatapoint(Datapoint):
-    seq_class: Any
-    token_classes: Any
-    # sequence: Any
-
-    @classmethod
-    def collate(cls, dps: List['SeqTokClassDatapoint'], max_seq_len: int) -> 'SeqTokClassDatapoint':
-        raise NotImplementedError()
-
-
-@dataclass
 class XYMetaDatapoint(Datapoint):
     x: Any
     y: Any
@@ -202,11 +206,8 @@ class XYMetaDatapoint(Datapoint):
             meta=meta_maker(data_dir),
         )
 
-    def get_y_class(self):
-        return self.y.__class__
-
-    # def __add__(self, other):
-    #     return self.__class__(*(getattr(self, dim.name)+getattr(other, dim.name) for dim in fields(self)))
+    # def get_y_class(self):
+    #     return self.y.__class__
 
     @classmethod
     def collate(cls, datapoints: List['XYMetaDatapoint'], max_seq_len: int) -> 'XYMetaDatapoint':

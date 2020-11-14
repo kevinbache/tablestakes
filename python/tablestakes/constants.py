@@ -59,6 +59,8 @@ PHASE_NAMES = [
     TEST_PHASE_NAME,
 ]
 
+BERT_MODEL_NAME = 'bert-base-uncased'
+
 
 class ColNames:
     """DataFrame column names for input data matrices"""""
