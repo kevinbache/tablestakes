@@ -1,5 +1,6 @@
 import copy
 from dataclasses import dataclass
+from typing import *
 
 import pytorch_lightning as pl
 import torch
@@ -17,82 +18,68 @@ class FactoredParams(utils.DataclassPlus):
     logs: logs_mod.LoggingParams
     exp: logs_mod.ExperimentParams
 
+    head: Union[head_mod.HeadParams, head_mod.WeightedHeadParams]
+
     data: data_module.DataParams
 
 
-class FactoredLightningModule(pl.LightningModule):
+class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
     """A Lightning Module which has been factored into distinct parts."""
 
     def __init__(
             self,
             hp: FactoredParams,
-            opt_maker: opt_mod.OptimizersMaker,
-            head: head_mod.Head,
+            opt: opt_mod.OptimizersMaker,
             *args,
             **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.hp = copy.deepcopy(hp)
-        self.opt = opt_maker
+        self.opt = opt
         self.opt.set_pl_module(pl_module=self)
 
-        self.head = head
+        # set me in subclasses
+        self.head = None
 
     ############
     # TRAINING #
     ############
-    def forward_plus_lossmetrics(self, batch: datapoints.XYMetaDatapoint, batch_idx: int) -> datapoints.LossYDatapoint:
-        # model forward
+    def forward_plus_lossmetrics(
+            self,
+            batch: datapoints.XYMetaDatapoint,
+            batch_idx: int,
+    ) -> Dict[str, Any]:
         y_hats = self(batch.x)
-
-        # losses
-        # head_to_lossmetrics = {}
-        # for head_name, head in self.head.items():
-        #     if head_name not in y_hats:
-        #         raise ValueError(f"Tried to run a head named {head_name} but y_hats only has keys: {y_hats.keys()}")
-        #     y_hat = y_hats[head_name]
-        #     y = batch.y[head_name]
-        #     value = head.loss_metrics(y_hat, y, batch.meta)
-        #     head_to_lossmetrics[head_name] = value
-
-        # the output will be the same type as the y datapoint
-        # datapoint_cls = batch.get_y_class()
-        #
-        # # TODO This is saying here that the datapoint class is going to take care of combining the head losses into weighted combo
-        # lossmetrics_datapoint = batch.from_dict()
-
-        head(y_hats)
-
-    def postproc_lossmetrics_dp(self, lossmetrics_datapoint:  datapoints.LossYDatapoint) -> datapoints.LossYDatapoint:
-        return lossmetrics_datapoint
+        return self.head.loss_metrics(y_hats, batch.y, batch.meta)
 
     def training_step(self, batch, batch_idx):
-        lossmetrics_datapoint = self.forward_plus_lossmetrics(batch, batch_idx)
-        lossmetrics_datapoint = self.postproc_lossmetrics_dp(lossmetrics_datapoint)
-        self.log_lossmetrics_datapoint(utils.Phase.train, lossmetrics_datapoint)
-        return lossmetrics_datapoint.loss
+        d = self.forward_plus_lossmetrics(batch, batch_idx)
+        loss = d[self.LOSS_NAME]
+        self.log_lossmetrics_dict(utils.Phase.train, d)
+        return loss
 
     def validation_step(self, batch, batch_idx):
-        lossmetrics_datapoint = self.forward_plus_lossmetrics(batch, batch_idx)
-        lossmetrics_datapoint = self.postproc_lossmetrics_dp(lossmetrics_datapoint)
-        self.log_lossmetrics_datapoint(utils.Phase.valid, lossmetrics_datapoint)
+        d = self.forward_plus_lossmetrics(batch, batch_idx)
+        self.log_lossmetrics_dict(utils.Phase.valid, d)
 
     def test_step(self, batch, batch_idx):
-        lossmetrics_datapoint = self.forward_plus_lossmetrics(batch, batch_idx)
-        lossmetrics_datapoint = self.postproc_lossmetrics_dp(lossmetrics_datapoint)
-        self.log_lossmetrics_datapoint(utils.Phase.test, lossmetrics_datapoint)
+        d = self.forward_plus_lossmetrics(batch, batch_idx)
+        self.log_lossmetrics_dict(utils.Phase.test, d)
+
+    def log_lossmetrics_dict(self, phase: utils.Phase, d: Dict[str, Any]):
+        # if phase == utils.Phase.train:
+        #     self.log(name=self.LOSS_NAME, value=d[self.LOSS_NAME], prog_bar=True)
+        d = {phase.name: d}
+        d = utils.sanitize_tensors(d)
+        d = utils.flatten_dict(d, delimiter='/')
+        prog_bar = phase == utils.Phase.train
+        return self.log_dict(d, prog_bar=prog_bar)
 
     #######
     # OPT #
     #######
     def configure_optimizers(self):
         return self.opt.get_optimizers()
-
-    ###########
-    # LOGGING #
-    ###########
-    def log_lossmetrics_datapoint(self, phase: utils.Phase, dp: datapoints.YDatapoint):
-        return self.log_dict({phase.name: dp.to_dict()})
 
     def on_pretrain_routine_start(self) -> None:
         if self.logger is None:
@@ -114,8 +101,8 @@ class FactoredLightningModule(pl.LightningModule):
 
 
 class TablestakesBertTransConvTClass(FactoredLightningModule):
-    def __init__(self, hp: FactoredParams, opt_maker: opt_mod.OptimizersMaker):
-        super().__init__(hp, opt_maker)
+    def __init__(self, hp: FactoredParams, opt: opt_mod.OptimizersMaker):
+        super().__init__(hp, opt)
 
     @classmethod
     def from_hp(cls, hp: FactoredParams):

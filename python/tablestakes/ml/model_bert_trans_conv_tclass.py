@@ -6,8 +6,6 @@ import torch
 import torch.nn as nn
 import pytorch_lightning as pl
 
-import pandas as pd
-
 from tablestakes import constants, utils
 from tablestakes.ml import metrics_mod, torch_mod, factored, data
 
@@ -179,8 +177,8 @@ if __name__ == '__main__':
     )
 
     hp.data.dataset_name = 'num=100_8163'
-    # hp.data.dataset_name = 'num=1000_02b7'
-    # hp.data.dataset_name = 'num=4000_9b9f'
+    # neck_hp.data.dataset_name = 'num=1000_02b7'
+    # neck_hp.data.dataset_name = 'num=4000_9b9f'
     hp.data.do_ignore_cached_dataset = False
     hp.data.seed = 42
     hp.data.num_workers = 4
@@ -213,7 +211,7 @@ if __name__ == '__main__':
     hp.conv.requires_grad = True
 
     hp.trans.impl = 'fast-favor'
-    # hp.trans.impl = 'fast'
+    # neck_hp.trans.impl = 'fast'
     hp.trans.num_heads = 8
     hp.trans.num_layers = 6
     hp.trans.num_query_features = None

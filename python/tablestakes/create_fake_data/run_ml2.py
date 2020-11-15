@@ -187,9 +187,18 @@ def join_and_split_and_save_dfs(
 
 if __name__ == '__main__':
     # https://tesseract-ocr.github.io/tessdoc/FAQ#can-i-increase-speed-of-ocr
+    # ray.init(
+    #     address=None if is_running_on_local_machine else 'auto',
+    #     ignore_reinit_error=True,
+    #     include_dashboard=True,
+    #     local_mode=ray_local_mode,
+    # )
+
     ray.init(
+        address=None,
         ignore_reinit_error=True,
         local_mode=False,
+        # redis_max_clients=
     )
 
     ##############
@@ -205,7 +214,7 @@ if __name__ == '__main__':
         doc_gen_params=doc_gen_params,
         doc_prep_params=doc_prep_params,
     )
-    doc_settings.num_docs = 100
+    doc_settings.num_docs = 1000
     # doc_settings.doc_gen_params.num_extra_fields = 0
 
     fast_test = False

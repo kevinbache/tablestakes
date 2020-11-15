@@ -34,8 +34,8 @@ class OptimizersMaker:
 
         # coser = optim.lr_scheduler.CosineAnnealingLR(
         #     optimizer,
-        #     T_max=self.hp.opt.patience // 2,
-        #     eta_min=self.hp.opt.min_lr,
+        #     T_max=self.neck_hp.opt.patience // 2,
+        #     eta_min=self.neck_hp.opt.min_lr,
         #     verbose=True,
         # )
 

@@ -1,13 +1,22 @@
 from dataclasses import dataclass
+from typing import *
 
 import torch
-from torch import nn
 import pytorch_lightning as pl
 
 from tablestakes import utils, constants
+from tablestakes.ml2 import factored
 from tablestakes.ml2.data import datapoints, tablestakes_data
 from tablestakes.ml2.factored import data_module, logs_mod, opt_mod, trunks, head_mod
-from tablestakes.ml2 import factored
+
+
+class TablestakesHeadParams(head_mod.WeightedHeadParams):
+    def __init__(self):
+        head_params = {
+            constants.Y_KORV_BASE_NAME: head_mod.HeadParams('linear', num_classes=2),
+            constants.Y_WHICH_KV_BASE_NAME: head_mod.HeadParams('linear', num_classes=11),
+        }
+        super().__init__(head_params=head_params, weights=[1.0, 1.0])
 
 
 @dataclass
@@ -22,7 +31,8 @@ class TotalParams(utils.DataclassPlus):
     conv: trunks.ConvBlock.ModelParams = trunks.ConvBlock.ModelParams()
     trans: trunks.TransBlockBuilder.ModelParams = trunks.TransBlockBuilder.ModelParams()
     fc: trunks.SlabNet.ModelParams = trunks.SlabNet.ModelParams()
-    # head: head_mod.HeadedSlabNet.ModelParams = head_mod.HeadedSlabNet.ModelParams()
+    neck: head_mod.HeadedSlabNet.ModelParams = head_mod.HeadedSlabNet.ModelParams()
+    head: TablestakesHeadParams = TablestakesHeadParams()
 
     verbose: bool = False
 
@@ -39,10 +49,10 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
             self,
             hp: TotalParams,
             dm: data_module.XYMetaHandlerDatasetModule,
-            opt_maker: opt_mod.OptimizersMaker,
-            head: head_mod.Head,
+            opt: opt_mod.OptimizersMaker,
+            head_maker: Callable[[int], head_mod.Head],
     ):
-        super().__init__(hp, opt_maker)
+        super().__init__(hp, opt)
         # for autocomplete
         assert isinstance(self.hp, TotalParams)
 
@@ -83,19 +93,7 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
             num_input_features=num_fc_features,
             hp=self.hp.fc,
         )
-
-        # head = head
-        self.head = head
-        # head = {}
-        # # for y_name, num_classes in self.num_y_classes:
-        # #     head[y_name] = head_mod.HeadedSlabNet(
-        # #         num_input_features=self.fc.get_num_outputs(),
-        # #         num_output_features=num_classes,
-        # #         head_maker=hp.head.makers[y_name],
-        # #         hp=self.hp.head,
-        # #     )
-        #
-        # self.head = nn.ModuleDict(head)
+        self.head = head_maker(self.fc.get_num_outputs())
         # END MODEL
         ###############################################################
 
@@ -194,8 +192,6 @@ if __name__ == '__main__':
         batch_size=32,
         data=dp,
     )
-    # hp = TotalParams()
-    # print(f'hp: {hp}')
 
     hp.data.do_ignore_cached_dataset = False
     hp.data.seed = 42
@@ -203,7 +199,7 @@ if __name__ == '__main__':
     hp.data.num_gpus = 0
     hp.data.num_cpus = 4
 
-    hp.opt.search_metric = 'valid_loss_total'
+    hp.opt.search_metric = 'valid/loss'
     hp.opt.search_mode = 'min'
     hp.opt.num_epochs = 10
     hp.opt.lr = 0.003
@@ -217,7 +213,7 @@ if __name__ == '__main__':
     hp.exp.experiment_name = 'korv which'
     hp.exp.experiment_tags = ['korv_which', 'conv', 'sharp', 'testing']
     hp.exp.sources_glob_str = constants.THIS_DIR.parent.parent / '**/*.py'
-    hp.exp.offline_mode = True
+    hp.exp.offline_mode = False
 
     hp.embed.dim = 15
     hp.embed.requires_grad = True
@@ -230,7 +226,7 @@ if __name__ == '__main__':
     hp.conv.requires_grad = True
 
     hp.trans.impl = 'fast-favor'
-    # hp.trans.impl = 'fast'
+    # neck_hp.trans.impl = 'fast'
     hp.trans.num_heads = 8
     hp.trans.num_layers = 6
     hp.trans.num_query_features = None
@@ -245,29 +241,31 @@ if __name__ == '__main__':
     hp.fc.num_blocks_per_dropout = 2
     hp.fc.requires_grad = True
 
-    hp.heads.num_features = 128
-    hp.heads.num_layers = 4
-    hp.heads.num_groups = 16
-    hp.heads.num_blocks_per_residual = 2
-    hp.heads.num_blocks_per_dropout = 2
-    hp.heads.requires_grad = True
+    hp.neck.num_features = 128
+    hp.neck.num_layers = 4
+    hp.neck.num_groups = 16
+    hp.neck.num_blocks_per_residual = 2
+    hp.neck.num_blocks_per_dropout = 2
+    hp.neck.requires_grad = True
 
-    hp.verbose = True
+    hp.head.weights = {
+        constants.Y_KORV_BASE_NAME: 1.0,
+        constants.Y_WHICH_KV_BASE_NAME: 1.0,
+    }
 
-    head_makers = datapoints.KorvWhichDatapoint(
-        korv=lambda num_input_features: head_mod.LinearSoftmaxHead(num_input_features, num_classes=2),
-        which_kv=lambda num_input_features: head_mod.LinearSoftmaxHead(num_input_features, num_classes=11),
-    )
-    weights = datapoints.KorvWhichDatapoint(
-        korv=0.3,
-        which_kv=1.0,
-    )
+    hp.verbose = False
+
     dm = tablestakes_data.TablestakesHandlerDataModule(hp.data)
+    # noinspection PyTypeChecker
     net = ModelBertConvTransTClass2(
         hp=hp,
         dm=dm,
-        opt_maker=opt_mod.OptimizersMaker(hp.opt),
-        head=head_mod.WeightedHead(heads=head_makers),
+        opt=opt_mod.OptimizersMaker(hp.opt),
+        head_maker=head_mod.HeadMakerFactory.create(
+            neck_hp=hp.neck,
+            head_hp=hp.head,
+            y_dp_class=datapoints.KorvWhichDatapoint,
+        ),
     )
 
     utils.hprint('About to start model run:')

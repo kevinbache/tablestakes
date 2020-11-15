@@ -99,6 +99,8 @@ class BetterAccuracy(pl.metrics.Accuracy):
 
     """PyTorch Lightning's += lines cause warnings about transferring lots of scalars between cpu / gpu"""
     def update(self, preds: torch.Tensor, target: torch.Tensor):
+        # nn.
+        preds = preds.argmax(dim=1)
         assert preds.shape == target.shape,  f"preds.shape: {preds.shape}, target.shape: {target.shape}"
         self.correct = self.correct + torch.sum(preds.eq(target))
         self.total = self.total + target.numel() - target.eq(self.Y_VALUE_TO_IGNORE).sum()

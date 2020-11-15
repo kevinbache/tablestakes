@@ -1,6 +1,9 @@
+import copy
 from dataclasses import dataclass, fields, asdict
 import enum
 import itertools
+
+import torch
 from glob2 import glob
 import json
 import os
@@ -389,8 +392,8 @@ class DataclassPlus:
         d = {k: getattr(self, k) for k in self.keys()}
         return iter(d.items())
 
-    def to_dict(self):
-        return asdict(self)
+    def to_dict(self) -> Dict:
+        return sanitize_tensors(self)
 
     def _str_inner(self, obj):
         typestr = obj.__class__.__name__
@@ -417,3 +420,51 @@ class DataclassPlus:
         strs = [f'{k}={v}' for k, v in d.items()]
         arg_str = ',\n  '.join(strs)
         return f'{self.__class__.__name__}(\n  {arg_str}\n)'
+
+
+def tensor_is_singleton(t: torch.Tensor):
+    return t.view(-1).shape == torch.Size([1])
+
+
+def sanitize_tensors(obj: Any) -> Any:
+    if isinstance(obj, DataclassPlus):
+        return {k: sanitize_tensors(v) for k, v in obj}
+    elif isinstance(obj, torch.Tensor):
+        if tensor_is_singleton(obj):
+            return obj.detach().item()
+        else:
+            return obj.detach().numpy()
+    elif isinstance(obj, dict):
+        return {k: sanitize_tensors(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_tensors(o) for o in obj]
+    else:
+        return obj
+
+
+def flatten_dict(dt, delimiter="/", prevent_delimiter=False):
+    """Stolen from ray.tune"""
+    dt = copy.deepcopy(dt)
+    if prevent_delimiter and any(delimiter in key for key in dt):
+        # Raise if delimiter is any of the keys
+        raise ValueError(
+            "Found delimiter `{}` in key when trying to flatten array."
+            "Please avoid using the delimiter in your specification.")
+    while any(isinstance(v, dict) for v in dt.values()):
+        remove = []
+        add = {}
+        for key, value in dt.items():
+            if isinstance(value, dict):
+                for subkey, v in value.items():
+                    if prevent_delimiter and delimiter in subkey:
+                        # Raise  if delimiter is in any of the subkeys
+                        raise ValueError(
+                            "Found delimiter `{}` in key when trying to "
+                            "flatten array. Please avoid using the delimiter "
+                            "in your specification.")
+                    add[delimiter.join([key, str(subkey)])] = v
+                remove.append(key)
+        dt.update(add)
+        for k in remove:
+            del dt[k]
+    return dt

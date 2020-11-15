@@ -51,6 +51,10 @@ class Datapoint(utils.DataclassPlus, abc.ABC):
     def collate(cls, dps: List['Datapoint'], max_seq_len: int) -> 'Datapoint':
         pass
 
+    @abc.abstractmethod
+    def __len__(self):
+        pass
+
     def transfer_to_device(self, device: torch.device):
         def _inner(obj: Any, device: torch.device):
             if hasattr(obj, 'to'):
@@ -78,14 +82,18 @@ class Datapoint(utils.DataclassPlus, abc.ABC):
             k: _get_df_or_tensor_num_features(v) for k, v in self
         })
 
-    def from_dict(self, d: Dict[str, Any]):
-        return self.__class__(**d)
+    @classmethod
+    def from_dict(cls, d: Dict):
+        return cls(**d)
 
 
 @dataclass
 class BaseVocabDatapoint(Datapoint):
     base: Union[pd.DataFrame, torch.Tensor]
     vocab: Union[pd.DataFrame, torch.Tensor]
+
+    def __len__(self):
+        return len(self.base)
 
     # noinspection PyMethodOverriding
     @classmethod
@@ -128,23 +136,38 @@ class YDatapoint(Datapoint, abc.ABC):
         # noinspection PyArgumentList
         return self.__class__(**d)
 
-@dataclass
-class LossYDatapoint(Datapoint, abc.ABC):
-    loss: torch.Tensor
-    y: YDatapoint
-
 
 @dataclass
-class WeightedLossYDatapoint(Datapoint, abc.ABC):
+class LossMetricsDatapoint(Datapoint, abc.ABC):
     loss: torch.Tensor
-    weights: torch.Tensor
-    y_dp: YDatapoint
+    metrics: Dict[str, torch.Tensor]
+
+    @classmethod
+    def collate(cls, dps: List['LossMetricsDatapoint'], max_seq_len: int) -> 'LossMetricsDatapoint':
+        raise NotImplementedError()
+
+
+# @dataclass
+# class WeightedLossYDatapoint(Datapoint, abc.ABC):
+#     loss: torch.Tensor
+#     weights: torch.Tensor
+#     metrics: YDatapoint
+#
+#     def __len__(self):
+#         return len(self.metrics)
+#
+#     @classmethod
+#     def collate(cls, dps: List['WeightedLossYDatapoint'], max_seq_len: int) -> 'WeightedLossYDatapoint':
+#         raise NotImplementedError()
 
 
 @dataclass
 class KorvWhichDatapoint(YDatapoint):
     korv: Any
     which_kv: Any
+
+    def __len__(self):
+        return len(self.korv)
 
     # noinspection PyMethodOverriding
     @classmethod
@@ -172,6 +195,9 @@ class KorvWhichDatapoint(YDatapoint):
 class MetaDatapoint(Datapoint):
     datapoint_dir: Union[str, List[str]]
 
+    def __len__(self):
+        return len(self.datapoint_dir)
+
     # noinspection PyMethodOverriding
     @classmethod
     def collate(cls, dps: List['MetaDatapoint'], max_seq_len: int) -> 'MetaDatapoint':
@@ -191,6 +217,9 @@ class XYMetaDatapoint(Datapoint):
     x: Any
     y: Any
     meta: Any
+
+    def __len__(self):
+        return len(self.x)
 
     @classmethod
     def from_makers(

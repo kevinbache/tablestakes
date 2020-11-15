@@ -106,16 +106,16 @@ class BetterAccuracy(pl.metrics.Accuracy):
 #     def _init(self):
 #         from neptune.sessions import Session
 #
-#         hp = hyperparams.LearningParams.from_dict(self.config)
-#         project_name = utils.get_neptune_fully_qualified_project_name(hp.project_name)
-#         experiment_name = f'tune_logger-{hp.get_exp_group_name()}-{tune.get_trial_id()}'
+#         neck_hp = hyperparams.LearningParams.from_dict(self.config)
+#         project_name = utils.get_neptune_fully_qualified_project_name(neck_hp.project_name)
+#         experiment_name = f'tune_logger-{neck_hp.get_exp_group_name()}-{tune.get_trial_id()}'
 #
 #         project = Session().get_project(project_name)
 #
 #         self.exp = project.create_experiment(
 #             name=experiment_name,
 #             params=self.config,
-#             tags=hp.experiment_tags,
+#             tags=neck_hp.experiment_tags,
 #             upload_source_files=constants.SOURCES_GLOB_STR,
 #         )
 #

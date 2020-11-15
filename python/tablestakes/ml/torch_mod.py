@@ -22,9 +22,9 @@ PS = TypeVar('PS', bound=params.ParameterSet)
 
 
 class Parameterized(Generic[PS]):
-    # def __init__(self, hp: PS):
+    # def __init__(self, neck_hp: PS):
     #     super().__init__()
-    #     self.hp = hp
+    #     self.neck_hp = neck_hp
 
     # def get_params(self) -> PS:
     #     raise NotImplementedError('Implement it in your subclass')
@@ -32,7 +32,7 @@ class Parameterized(Generic[PS]):
 
 
 class ParameterizedModule(Parameterized, nn.Module, Generic[PS]):
-    # def __init__(self, hp: PS):
+    # def __init__(self, neck_hp: PS):
     #     nn.Module.__init__(self)
     pass
 
