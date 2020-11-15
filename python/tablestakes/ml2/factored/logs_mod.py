@@ -78,18 +78,35 @@ class CounterTimerCallback(pl.Callback):
         }
 
         # noinspection PyTypeChecker
-        # trainer.logger.log_hyperparams(params=d)
+        trainer.logger.log_hyperparams(params=d)
 
     def on_train_epoch_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
+        # log lrs
+        lrs = [float(param_group['lr']) for param_group in pl_module.optimizers().param_groups]
+        assert(all([lr == lrs[0] for lr in lrs]))
+        lr = lrs[0]
+
+        d = {
+            'lrs_opt': lr,
+        }
+        trainer.logger.log_metrics(d, step=trainer.global_step)
+
         self._train_start_perf = time.perf_counter()
         self._train_start_process = time.process_time()
 
     def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
         if trainer.logger is None:
             return
+
+        # log lrs
+        lrs = [float(param_group['lr']) for param_group in pl_module.optimizers().param_groups]
+        assert(all([lr == lrs[0] for lr in lrs]))
+        lr = lrs[0]
+
         d = {
             TIME_PERF_NAME: time.perf_counter() - self._train_start_perf,
             TIME_PROCESS_NAME: time.process_time() - self._train_start_process,
+            'lrs_opt': lr,
         }
         trainer.logger.log_metrics(d, step=trainer.global_step)
 
@@ -123,6 +140,8 @@ class MyLightningNeptuneLogger(pl_loggers.NeptuneLogger):
     def __init__(self, hp: ExperimentParams, version: str = '', offline_mode=False):
         source_files = glob.glob(str(hp.sources_glob_str), recursive=True)
 
+        self.offline_mode = offline_mode
+
         super().__init__(
             api_key=utils.get_logger_api_key(),
             project_name=utils.get_neptune_fully_qualified_project_name(hp.project_name),
@@ -143,16 +162,18 @@ class MyLightningNeptuneLogger(pl_loggers.NeptuneLogger):
         return self.set_properties(params)
 
     def set_properties(self, new_properties: Dict):
-        import warnings
-        warnings.warn('log_mods.MyNeptuneLogger skipping set_properties')
-        pass
-        # properties = self.experiment._backend.get_experiment(self.experiment.internal_id).properties
-        # properties = {p.key: p.value for p in properties}
-        # properties.update({k: str(v) for k, v in new_properties.items()})
-        # return self.experiment._backend.update_experiment(
-        #     experiment=self.experiment,
-        #     properties=properties,
-        # )
+        if self.offline_mode:
+            import warnings
+            warnings.warn('log_mods.MyNeptuneLogger skipping set_properties')
+            return
+        else:
+            properties = self.experiment._backend.get_experiment(self.experiment.internal_id).properties
+            properties = {p.key: p.value for p in properties}
+            properties.update({k: str(v) for k, v in new_properties.items()})
+            return self.experiment._backend.update_experiment(
+                experiment=self.experiment,
+                properties=properties,
+            )
 
 
 def get_pl_logger(hp: ExperimentParams, tune=None):

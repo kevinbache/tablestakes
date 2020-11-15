@@ -185,7 +185,8 @@ if __name__ == '__main__':
     fast_dev_run = False
 
     dp = data_module.DataParams(
-        dataset_name='num=100_057b',
+        # dataset_name='num=100_057b',
+        dataset_name='num=1000_2cfc',
     )
     hp = TotalParams(
         max_seq_len=8192,
@@ -195,14 +196,14 @@ if __name__ == '__main__':
 
     hp.data.do_ignore_cached_dataset = False
     hp.data.seed = 42
-    hp.data.num_workers = 0
+    hp.data.num_workers = 4
     hp.data.num_gpus = 0
     hp.data.num_cpus = 4
 
     hp.opt.search_metric = 'valid/loss'
     hp.opt.search_mode = 'min'
     hp.opt.num_epochs = 10
-    hp.opt.lr = 0.003
+    hp.opt.lr = 0.001
     hp.opt.patience = 10
 
     hp.logs.num_steps_per_histogram_log = 5
@@ -250,7 +251,7 @@ if __name__ == '__main__':
 
     hp.head.weights = {
         constants.Y_KORV_BASE_NAME: 1.0,
-        constants.Y_WHICH_KV_BASE_NAME: 1.0,
+        constants.Y_WHICH_KV_BASE_NAME: 0.3,
     }
 
     hp.verbose = False
