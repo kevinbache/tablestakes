@@ -55,7 +55,7 @@ class LogCopierCallback(pl.Callback):
         tune.report(**d)
 
 
-class CounterTimerCallback(pl.Callback):
+class CounterTimerLrCallback(pl.Callback):
     def __init__(self):
         self._train_start_perf = None
         self._train_start_process = None
@@ -80,15 +80,17 @@ class CounterTimerCallback(pl.Callback):
         # noinspection PyTypeChecker
         trainer.logger.log_hyperparams(params=d)
 
-    def on_train_epoch_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        # log lrs
+    def _get_lr_dict(self, pl_module) -> Dict[str, float]:
         lrs = [float(param_group['lr']) for param_group in pl_module.optimizers().param_groups]
         assert(all([lr == lrs[0] for lr in lrs]))
         lr = lrs[0]
 
-        d = {
+        return {
             'lrs_opt': lr,
         }
+
+    def on_train_epoch_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
+        d = self._get_lr_dict(pl_module)
         trainer.logger.log_metrics(d, step=trainer.global_step)
 
         self._train_start_perf = time.perf_counter()
@@ -98,16 +100,10 @@ class CounterTimerCallback(pl.Callback):
         if trainer.logger is None:
             return
 
-        # log lrs
-        lrs = [float(param_group['lr']) for param_group in pl_module.optimizers().param_groups]
-        assert(all([lr == lrs[0] for lr in lrs]))
-        lr = lrs[0]
+        d = self._get_lr_dict(pl_module)
+        d[TIME_PERF_NAME] = time.process_time() - self._train_start_process
+        d[TIME_PROCESS_NAME] = time.process_time() - self._train_start_process
 
-        d = {
-            TIME_PERF_NAME: time.perf_counter() - self._train_start_perf,
-            TIME_PROCESS_NAME: time.process_time() - self._train_start_process,
-            'lrs_opt': lr,
-        }
         trainer.logger.log_metrics(d, step=trainer.global_step)
 
 
@@ -116,8 +112,8 @@ class BetterAccuracy(pl.metrics.Accuracy):
 
     """PyTorch Lightning's += lines cause warnings about transferring lots of scalars between cpu / gpu"""
     def update(self, preds: torch.Tensor, target: torch.Tensor):
-        # nn.
-        preds = preds.argmax(dim=1)
+        # preds = preds.argmax(dim=1)
+        # target = target.squeeze(1)
         assert preds.shape == target.shape,  f"preds.shape: {preds.shape}, target.shape: {target.shape}"
         self.correct = self.correct + torch.sum(preds.eq(target))
         self.total = self.total + target.numel() - target.eq(self.Y_VALUE_TO_IGNORE).sum()

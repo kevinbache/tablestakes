@@ -24,11 +24,11 @@ class DataParams(utils.DataclassPlus):
     num_workers = 4
 
     num_gpus = 0
-    num_cpus = 0
+    num_cpus = 4
 
     seed = 42
 
-    max_seq_length = 1024
+    max_seq_length = 4096
     batch_size = 32
 
     def __post_init__(self):

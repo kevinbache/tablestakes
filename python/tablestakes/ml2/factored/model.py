@@ -156,7 +156,7 @@ def run(
     trainer = pl.Trainer(
         logger=True if fast_dev_run else logs_mod.get_pl_logger(hp.exp),
         default_root_dir=hp.logs.output_dir,
-        callbacks=[logs_mod.CounterTimerCallback()],
+        callbacks=[logs_mod.CounterTimerLrCallback()],
         max_epochs=hp.opt.num_epochs,
         gpus=hp.data.num_gpus,
         weights_summary='full',

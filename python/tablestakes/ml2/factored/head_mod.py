@@ -102,6 +102,26 @@ class LossMetrics:
         return d
 
 
+@dataclass
+class HeadParams(utils.DataclassPlus):
+    type: str
+    num_classes: int
+    x_reducer_name: str = ''
+    loss_reducer_name: str = 'mean'
+    do_permute_head_out: bool = True
+
+
+@dataclass
+class EmptyHeadParams(HeadParams):
+    type: str = 'none'
+    num_classes: int = -1
+    x_reducer_name: str = 'none'
+    do_permute_head_out: bool = False
+
+
+ReducerFn = Callable[[torch.Tensor], torch.Tensor]
+
+
 class Head(LossMetrics, pl.LightningModule, abc.ABC):
     def __init__(
             self,
@@ -113,6 +133,11 @@ class Head(LossMetrics, pl.LightningModule, abc.ABC):
         self.num_input_features = num_input_features
         self.num_classes = num_classes
         self.metrics_dict = metrics_dict or {}
+
+        self.loss_fn = lambda y_hat, y: -1
+        self.head = nn.Identity()
+        self.x_reducer_fn = lambda x: x
+        self.loss_reducer_fn = lambda x: x
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.postproc_head_out(self.head(self.x_reducer_fn(x.squeeze(1))))
@@ -135,25 +160,40 @@ class Head(LossMetrics, pl.LightningModule, abc.ABC):
     def postproc_head_out(self, head_out):
         return head_out
 
+    # noinspection PyMethodMayBeStatic
+    def _get_reducers(self, num_input_features: int, hp: HeadParams) -> Tuple[ReducerFn, ReducerFn, int]:
+        x_reducer, num_input_features = \
+            get_reducer(num_input_features=num_input_features, reducer_str=hp.x_reducer_name)
+        loss_reducer, num_input_features = \
+            get_reducer(num_input_features=num_input_features, reducer_str=hp.loss_reducer_name)
+        return x_reducer, loss_reducer, num_input_features
+
 
 HeadMaker = Callable[[int], Head]
-ReducerFn = Callable[[torch.Tensor], torch.Tensor]
 
 
-@dataclass
-class HeadParams(utils.DataclassPlus):
-    type: str
-    num_classes: int
-    x_reducer_name: str = ''
-    loss_reducer_name: str = 'mean'
+class EmptyHead(Head):
+    def __init__(self):
+        super().__init__(-1, -1, {})
+        self.loss_fn = lambda y_hat, y: -1
+        self.head = nn.Identity()
+        self.x_reducer_fn = lambda x: x
 
 
 def get_reducer(num_input_features: int, reducer_str: str) -> Tuple[ReducerFn, int]:
     if reducer_str == 'smash':
         reducer_fn = trunks.artless_smash
         num_input_features *= 8
-    elif reducer_str == 'first':
-        reducer_fn = lambda x: x[:, 0, :]
+    elif reducer_str in ('first', 'first-dim1'):
+        def reducer_fn(x):
+            if len(x.shape) == 3:
+                return x[:, 0, :].squeeze(dim=1)
+            elif len(x.shape) == 2:
+                return x[:, 0].squeeze()
+            else:
+                raise ValueError()
+    elif reducer_str == 'first-dim2':
+        reducer_fn = lambda x: x[:, :, 0].squeeze(dim=2)
     # elif reducer_str == 'mean':
     #     reducer_fn = lambda x: torch.mean(x)
     # elif reducer_str == 'sum':
@@ -161,6 +201,30 @@ def get_reducer(num_input_features: int, reducer_str: str) -> Tuple[ReducerFn, i
     else:
         reducer_fn = nn.Identity()
     return reducer_fn, num_input_features
+
+
+class SigmoidHead(Head):
+    def __init__(
+            self,
+            num_input_features: int,
+            hp: HeadParams,
+            metrics_dict=None,
+    ):
+        x_reducer, loss_reducer, num_input_features = self._get_reducers(num_input_features, hp)
+
+        num_classes = hp.num_classes
+        super().__init__(
+            num_input_features=num_input_features,
+            num_classes=num_classes,
+            metrics_dict=metrics_dict,
+        )
+        self.head = nn.Linear(num_input_features, num_classes)
+        self.loss_fn = nn.BCEWithLogitsLoss(reduction='none')
+
+        self.x_reducer_fn = x_reducer
+        self.loss_reducer_fn = loss_reducer
+
+        self.do_permute_head_out = hp.do_permute_head_out
 
 
 class _SoftmaxHead(Head):
@@ -198,14 +262,6 @@ class _SoftmaxHead(Head):
             loss = self.loss_reducer_fn(loss)
         return loss
 
-    # noinspection PyMethodMayBeStatic
-    def _get_reducers(self, num_input_features: int, hp: HeadParams) -> Tuple[ReducerFn, ReducerFn, int]:
-        x_reducer, num_input_features = \
-            get_reducer(num_input_features=num_input_features, reducer_str=hp.x_reducer_name)
-        loss_reducer, num_input_features = \
-            get_reducer(num_input_features=num_input_features, reducer_str=hp.loss_reducer_name)
-        return x_reducer, loss_reducer, num_input_features
-
 
 class AdaptiveSoftmaxHead(_SoftmaxHead):
     def __init__(
@@ -213,7 +269,7 @@ class AdaptiveSoftmaxHead(_SoftmaxHead):
             num_input_features: int,
             hp: HeadParams,
     ):
-        x_reducer, loss_reducer, num_input_features = self._get_reducers(num_input_features, hp)
+        x_reducer, loss_reducer, num_input_features = self._get_reducers(num_input_features=num_input_features, hp=hp)
 
         num_classes = hp.num_classes
         num_first_bin = round(num_classes / 20)
@@ -245,9 +301,13 @@ class LinearSoftmaxHead(_SoftmaxHead):
         head = nn.Linear(num_input_features, num_classes)
         super().__init__(num_input_features, num_classes, head, x_reducer, loss_reducer)
         self.lsm = nn.LogSoftmax(dim=1)
+        self.do_permute_head_out = hp.do_permute_head_out
 
     def postproc_head_out(self, head_output):
-        return self.lsm(head_output.permute(0, 2, 1))
+        if self.do_permute_head_out:
+            return self.lsm(head_output.permute(0, 2, 1))
+        else:
+            return self.lsm(head_output)
 
 
 YDP = TypeVar('YDP', bound=datapoints.YDatapoint)
@@ -319,7 +379,7 @@ class WeightedHead(Head):
             head_name_to_loss_metrics[head_name] = head.loss_metrics(y_hat_tensor, y_tensor, metas)
 
         losses = torch.stack(
-            [head_name_to_loss_metrics[head_name][self.LOSS_NAME] for head_name in self.heads.keys()],
+            [torch.tensor(head_name_to_loss_metrics[head_name][self.LOSS_NAME]) for head_name in self.heads.keys()],
             dim=0,
         )
         loss = self.losses_to_loss(losses)
@@ -387,6 +447,17 @@ class HeadMakerFactory:
                 )
 
             return fn
+        elif head_hp.type == 'sigmoid':
+            def fn(num_input_features: int):
+                return HeadedSlabNet(
+                    num_input_features=num_input_features,
+                    head=SigmoidHead(num_input_features, head_hp),
+                    neck_hp=neck_hp,
+                )
+
+            return fn
+        elif head_hp.type is None or head_hp.type == 'none':
+            return lambda _: EmptyHead()
         else:
             raise ValueError(f'Got unknown type: {head_hp.type}')
 
