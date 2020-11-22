@@ -278,9 +278,9 @@ class TuneRunner:
         utils.hprint("done with tune.run")
 
         param_hash = self.search_params.get_short_hash(num_chars=8)
-        analysis_file = self.search_params.logs.output_dir / f'tune_analysis_{param_hash}.pkl'
+        analysis_file = self.search_params.logs.output_dir / f'tune_analysis_{param_hash}.cloudpickle'
         print(f"Saving {analysis_file}")
-        utils.save_pickle(analysis_file, analysis)
+        utils.save_cloudpickle(analysis_file, analysis)
 
         best_trial = analysis.get_best_trial(
             self.search_params.opt.search_metric,
@@ -289,7 +289,6 @@ class TuneRunner:
         )
         print(f'best_trial.last_result: {best_trial.last_result}')
         print("Best trial config: {}".format(best_trial.config))
-        print("Best trial final search_metric: {}".format(best_trial.last_result[self.search_params.opt.search_metric]))
 
 
 if __name__ == '__main__':
@@ -313,7 +312,7 @@ if __name__ == '__main__':
 
     hp.opt.search_metric = 'valid/loss'
     hp.opt.search_mode = 'min'
-    hp.opt.num_epochs = 10
+    hp.opt.num_epochs = 4
     hp.opt.lr = 0.001
     hp.opt.patience = 10
 
@@ -378,7 +377,7 @@ if __name__ == '__main__':
     tune_hp = TuneParams()
     tune_hp.asha_grace_period = 4
     tune_hp.asha_reduction_factor = 2
-    tune_hp.num_hp_samples = 10
+    tune_hp.num_hp_samples = 2
 
     tune_runner = TuneRunner(
         model_hp=hp,

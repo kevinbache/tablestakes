@@ -15,7 +15,7 @@ import ray
 
 from tablestakes import utils, ocr, constants
 from tablestakes.create_fake_data import basic_document, color_matcher, etree_modifiers, df_modifiers,  doc_gen_params as dgp_mod
-from tablestakes.ml2.data import tablestakes_data, data_module
+from tablestakes.ml2.data import tablestakes_data
 
 
 @ray.remote
