@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import *
 
 import torch
@@ -8,6 +7,8 @@ from tablestakes import utils, constants
 from tablestakes.ml2 import factored
 from tablestakes.ml2.data import datapoints, tablestakes_data
 from tablestakes.ml2.factored import data_module, logs_mod, opt_mod, trunks, head_mod
+
+from chillpill import params
 
 
 class TablestakesHeadParams(head_mod.WeightedHeadParams):
@@ -19,8 +20,7 @@ class TablestakesHeadParams(head_mod.WeightedHeadParams):
         super().__init__(head_params=head_params, weights=[1.0, 1.0])
 
 
-@dataclass
-class TotalParams(utils.DataclassPlus):
+class TotalParams(params.ParameterSet):
     data: data_module.DataParams
     opt: opt_mod.OptParams = opt_mod.OptParams()
     exp: logs_mod.ExperimentParams = logs_mod.ExperimentParams()
@@ -36,8 +36,12 @@ class TotalParams(utils.DataclassPlus):
 
     verbose: bool = False
 
-    def __init__(self, data: data_module.DataParams, max_seq_len=1024, batch_size=32):
+    def __init__(self, data: data_module.DataParams = None, max_seq_len=1024, batch_size=32):
         super().__init__()
+        # TODO: hack.
+        if data is None:
+            data = data_module.DataParams()
+            data.data_name = 'DUMMY_DATASET'
         self.data = data
 
         self.embed.max_seq_len = self.data.max_seq_length = max_seq_len
@@ -156,7 +160,7 @@ def run(
     trainer = pl.Trainer(
         logger=True if fast_dev_run else logs_mod.get_pl_logger(hp.exp),
         default_root_dir=hp.logs.output_dir,
-        callbacks=[logs_mod.CounterTimerLrCallback()],
+        callbacks=[logs_mod.CounterTimerLrCallback(), logs_mod.VocabLengthCallback()],
         max_epochs=hp.opt.num_epochs,
         gpus=hp.data.num_gpus,
         weights_summary='full',
@@ -179,6 +183,24 @@ def run(
         trainer.fit(net, datamodule=dm)
 
     utils.hprint('Done with model run fn')
+
+
+class TablestakesBertConvTransTClassModel(ModelBertConvTransTClass2):
+    @classmethod
+    def from_hp(cls, hp):
+        dm = tablestakes_data.TablestakesHandlerDataModule(hp.data)
+        # noinspection PyTypeChecker
+        net = cls(
+            hp=hp,
+            dm=dm,
+            opt=opt_mod.OptimizersMaker(hp.opt),
+            head_maker=head_mod.HeadMakerFactory.create(
+                neck_hp=hp.neck,
+                head_hp=hp.head,
+            ),
+        )
+        return net
+
 
 
 if __name__ == '__main__':

@@ -35,7 +35,6 @@ META_PREFIX = f'{META_NAME}_'
 META_SHORT_BASE_NAME = f'short'
 META_ORIGINAL_DATA_DIR_COL_NAME = 'org_doc_dir'
 
-
 LOGGER_API_KEY_FILE = str(Path.home() / '.logger_api_key')
 NEPTUNE_USERNAME = 'kevinbache'
 

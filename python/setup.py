@@ -42,11 +42,14 @@ setup(
         'numpy',
         'scipy',
         'pandas',
+        'matplotlib',
+        'colorama',
         'keras',
         'google-cloud-storage',
         'yattag',
         'faker',
         'lxml',
+        'nltk',
         'cssselect',
         'pdf2image',
         'pdfkit',
@@ -59,6 +62,7 @@ setup(
         'transformers',
         's3fs',
         'neptune-client',
+        'boto3',
     ],
 
     classifiers=[

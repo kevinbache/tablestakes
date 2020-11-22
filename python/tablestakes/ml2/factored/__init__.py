@@ -3,17 +3,18 @@ from dataclasses import dataclass
 from typing import *
 
 import pytorch_lightning as pl
-import torch
 
 from tablestakes import constants, utils
 from tablestakes.ml2.data import datapoints, data_module
 from tablestakes.ml2.factored import opt_mod, head_mod, logs_mod
 
+from chillpill import params
+
 Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
 
 
 @dataclass
-class FactoredParams(utils.DataclassPlus):
+class FactoredParams(params.ParameterSet):
     opt: opt_mod.OptParams
     logs: logs_mod.LoggingParams
     exp: logs_mod.ExperimentParams
@@ -48,7 +49,7 @@ class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
             self,
             batch: datapoints.XYMetaDatapoint,
             batch_idx: int,
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, Union[float, Dict[str, Any]]]:
         y_hats = self(batch.x)
         return self.head.loss_metrics(y_hats, batch.y, batch.meta)
 
@@ -66,14 +67,14 @@ class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
         d = self.forward_plus_lossmetrics(batch, batch_idx)
         self.log_lossmetrics_dict(utils.Phase.test, d)
 
-    def log_lossmetrics_dict(self, phase: utils.Phase, d: Dict[str, Any]):
+    def log_lossmetrics_dict(self, phase: utils.Phase, d: Dict[str, Any]) -> None:
         # if phase == utils.Phase.train:
         #     self.log(name=self.LOSS_NAME, value=d[self.LOSS_NAME], prog_bar=True)
         d = {phase.name: d}
         d = utils.sanitize_tensors(d)
         d = utils.flatten_dict(d, delimiter='/')
         prog_bar = phase == utils.Phase.train
-        return self.log_dict(d, prog_bar=prog_bar)
+        self.log_dict(d, prog_bar=prog_bar)
 
     #######
     # OPT #
@@ -100,13 +101,13 @@ class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
             self.logger.log_metrics(metrics=d, step=self.global_step)
 
 
-class TablestakesBertTransConvTClass(FactoredLightningModule):
-    def __init__(self, hp: FactoredParams, opt: opt_mod.OptimizersMaker):
-        super().__init__(hp, opt)
-
-    @classmethod
-    def from_hp(cls, hp: FactoredParams):
-        return cls(
-            hp=hp,
-            opt_maker=opt_mod.OptimizersMaker(hp.opt),
-        )
+# class TablestakesBertTransConvTClass(FactoredLightningModule):
+#     def __init__(self, hp: FactoredParams, opt: opt_mod.OptimizersMaker):
+#         super().__init__(hp, opt)
+#
+#     @classmethod
+#     def from_hp(cls, hp: FactoredParams):
+#         return cls(
+#             hp=hp,
+#             opt_maker=opt_mod.OptimizersMaker(hp.opt),
+#         )

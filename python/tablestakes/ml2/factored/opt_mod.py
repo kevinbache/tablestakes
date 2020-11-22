@@ -6,9 +6,11 @@ from torch import optim
 
 from tablestakes import utils
 
+from chillpill import params
+
 
 @dataclass
-class OptParams(utils.DataclassPlus):
+class OptParams(params.ParameterSet):
     num_epochs: int = 10
     batch_size: int = 32
     lr: float = 0.001

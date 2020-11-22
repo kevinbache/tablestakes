@@ -1,5 +1,4 @@
 import abc
-from dataclasses import dataclass, field
 from typing import *
 
 import torch
@@ -12,6 +11,8 @@ import pytorch_lightning as pl
 
 from tablestakes import utils, constants
 from tablestakes.ml import ablation
+
+from chillpill import params
 
 
 class SizedSequential(nn.Sequential):
@@ -58,8 +59,7 @@ def resnet_conv1_block(
 
 
 class BertEmbedder(pl.LightningModule):
-    @dataclass
-    class ModelParams(utils.DataclassPlus):
+    class ModelParams(params.ParameterSet):
         dim: int = 64
         max_seq_len: int = 1024
         requires_grad: bool = True
@@ -107,8 +107,7 @@ class FullyConv1Resnet(pl.LightningModule):
     DROP_SUFFIX = '_drop'
     BLOCK_SUFFIX = ''
 
-    @dataclass
-    class ModelParams(utils.DataclassPlus):
+    class ModelParams(params.ParameterSet):
         num_groups: int = 32
         num_blocks_per_residual: int = 2
         num_blocks_per_dropout: int = 2
@@ -197,8 +196,7 @@ class FullyConv1Resnet(pl.LightningModule):
 class ConvBlock(pl.LightningModule):
     SKIP_SUFFIX = '_skip'
 
-    @dataclass
-    class ModelParams(utils.DataclassPlus):
+    class ModelParams(params.ParameterSet):
         num_layers: int = 8
         num_features: int = 32
         kernel_size: int = 3
@@ -288,8 +286,7 @@ class ConvBlock(pl.LightningModule):
 class SlabNet(FullyConv1Resnet):
     """A fully convolutional resnet with constant number of features across layers."""
 
-    @dataclass
-    class ModelParams(utils.DataclassPlus):
+    class ModelParams(params.ParameterSet):
         num_features: int = 32
         num_layers: int = 4
         num_groups: int = 32
@@ -299,10 +296,10 @@ class SlabNet(FullyConv1Resnet):
         activation: nn.Module = nn.LeakyReLU
         do_include_first_norm: bool = True
         requires_grad: bool = True
-        makers: dict = field(default_factory=lambda: {
+        makers: dict = {
             constants.Y_WHICH_KV_BASE_NAME: 'linear',
             constants.Y_KORV_BASE_NAME: 'linear',
-        })
+        }
 
     def __init__(
             self,
@@ -463,8 +460,7 @@ def build_ablatable_trans_block(
 
 
 class TransBlockBuilder(abc.ABC):
-    @dataclass
-    class ModelParams(utils.DataclassPlus):
+    class ModelParams(params.ParameterSet):
         impl: str = 'fast-favor'
         num_layers: int = 2
         num_heads: int = 8

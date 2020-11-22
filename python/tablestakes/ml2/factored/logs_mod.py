@@ -1,16 +1,21 @@
 from argparse import Namespace
-from dataclasses import dataclass, field
 import glob
 import time
 from typing import *
 
+
 import torch
+from pytorch_lightning.metrics.utils import _input_format_classification
+from tablestakes.ml2.data import datapoints
+from torch import nn
 import pytorch_lightning as pl
 from pytorch_lightning import loggers as pl_loggers
 
 from ray import tune
 
 from tablestakes import constants, utils
+
+from chillpill import params
 
 CURRENT_EPOCH_NAME = 'current_epoch'
 PARAM_COUNT_NAME = 'param_count'
@@ -19,14 +24,13 @@ TIME_PERF_NAME = 'train_time_perf'
 TIME_PROCESS_NAME = 'train_time_process'
 
 
-@dataclass
-class LoggingParams(utils.DataclassPlus):
+class LoggingParams(params.ParameterSet):
     num_steps_per_histogram_log: int = 10
     num_steps_per_metric_log: int = 10
     output_dir: str = 'output'
 
 
-class LogCopierCallback(pl.Callback):
+class TuneLogCopierCallback(pl.Callback):
     @staticmethod
     def _get_metrics_dict(trainer, pl_module):
         d = trainer.logged_metrics
@@ -53,6 +57,64 @@ class LogCopierCallback(pl.Callback):
         d = self._get_metrics_dict(trainer, pl_module)
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
         tune.report(**d)
+
+
+class VocabLengthCallback(pl.Callback):
+    VOCAB_PAD_VALUE = utils.VOCAB_PAD_VALUE
+
+    def __init__(self, doc_dim=1):
+        self._valid_counts = []
+        self._invalid_counts = []
+
+        self.doc_dim = doc_dim
+
+    def _reset(self):
+        self._valid_counts = []
+        self._invalid_counts = []
+
+    def on_train_epoch_start(self, trainer, pl_module):
+        self._reset()
+
+    def on_train_batch_start(self, trainer, pl_module: pl.LightningModule, batch: datapoints.XYMetaDatapoint, batch_idx, dataloader_idx):
+        vocab = batch.x.vocab
+
+        is_invalid = (vocab == self.VOCAB_PAD_VALUE).int()
+        is_valid = 1 - is_invalid
+
+        valid_counts = is_valid.sum(dim=self.doc_dim)
+        invalid_counts = is_invalid.sum(dim=self.doc_dim)
+        self._valid_counts.append(valid_counts)
+        self._invalid_counts.append(invalid_counts)
+
+    def on_train_epoch_end(self, trainer, pl_module, outputs):
+
+        valid_counts = torch.cat(self._valid_counts)
+        invalid_counts = torch.cat(self._invalid_counts)
+
+        batch_lens = valid_counts + invalid_counts
+        num_total = batch_lens.sum()
+
+        p_valids = valid_counts / batch_lens
+
+        trainer.logger.log_metrics(
+            metrics={
+                'p_tokens_is_valid': valid_counts.sum() / num_total,
+                'num_tokens_total': num_total,
+
+                'p_valids_min': p_valids.min(),
+                'p_valids_median': p_valids.median(),
+                'p_valids_max': p_valids.max(),
+
+                'min_num_valid_tokens_per_doc': valid_counts.min(),
+                'median_num_valid_tokens_per_doc': valid_counts.median(),
+                'max_num_valid_tokens_per_doc': valid_counts.max(),
+
+                'min_num_wasted_tokens_per_doc': invalid_counts.min(),
+                'median_num_wasted_tokens_per_doc': invalid_counts.median(),
+                'max_num_wasted_tokens_per_doc': invalid_counts.max(),
+            },
+            step=trainer.global_step,
+        )
 
 
 class CounterTimerLrCallback(pl.Callback):
@@ -82,7 +144,7 @@ class CounterTimerLrCallback(pl.Callback):
 
     def _get_lr_dict(self, pl_module) -> Dict[str, float]:
         lrs = [float(param_group['lr']) for param_group in pl_module.optimizers().param_groups]
-        assert(all([lr == lrs[0] for lr in lrs]))
+        assert (all([lr == lrs[0] for lr in lrs]))
         lr = lrs[0]
 
         return {
@@ -111,19 +173,48 @@ class BetterAccuracy(pl.metrics.Accuracy):
     Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
 
     """PyTorch Lightning's += lines cause warnings about transferring lots of scalars between cpu / gpu"""
+
+    def update(self, preds: torch.Tensor, target: torch.Tensor):
+        preds, target = _input_format_classification(preds, target, self.threshold)
+        assert preds.shape == target.shape
+
+        try:
+            self.correct = self.correct + torch.sum(preds.eq(target))
+        except RuntimeError as e:
+            print(f'preds.shape: {preds.shape}, target.shape: {target.shape}')
+            raise e
+
+        self.total = self.total + target.numel() - target.eq(self.Y_VALUE_TO_IGNORE).sum()
+
+
+class SigmoidBetterAccuracy(pl.metrics.Accuracy):
+    Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
+
+    def __init__(self):
+        super().__init__(
+            threshold=0.5,
+            compute_on_step=True,
+            dist_sync_on_step=False,
+            process_group=None,
+            dist_sync_fn=None,
+        )
+        self.s = nn.Sigmoid()
+
+    """PyTorch Lightning's += lines cause warnings about transferring lots of scalars between cpu / gpu"""
+
     def update(self, preds: torch.Tensor, target: torch.Tensor):
         # preds = preds.argmax(dim=1)
         # target = target.squeeze(1)
-        assert preds.shape == target.shape,  f"preds.shape: {preds.shape}, target.shape: {target.shape}"
+        preds = self.s(preds)
+        assert preds.shape == target.shape, f"preds.shape: {preds.shape}, target.shape: {target.shape}"
         self.correct = self.correct + torch.sum(preds.eq(target))
         self.total = self.total + target.numel() - target.eq(self.Y_VALUE_TO_IGNORE).sum()
 
 
-@dataclass
-class ExperimentParams(utils.DataclassPlus):
+class ExperimentParams(params.ParameterSet):
     project_name: str = 'my_project'
     experiment_name: str = 'my_experiment'
-    experiment_tags: str = field(default_factory=lambda: ['testing'])
+    experiment_tags: str = ('testing', )
     sources_glob_str: str = '*.py'
     offline_mode: bool = False
 

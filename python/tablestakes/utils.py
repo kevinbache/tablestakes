@@ -1,10 +1,11 @@
 import copy
+import hashlib
 from dataclasses import dataclass, fields, asdict
 import enum
 import itertools
 
 import torch
-from glob2 import glob
+from glob import glob
 import json
 import os
 from pathlib import Path
@@ -35,6 +36,11 @@ class Phase(enum.Enum):
     valid = 1
     test = 2
 
+
+import transformers
+# too slow for contants
+VOCAB_PAD_VALUE = transformers.BertTokenizer.from_pretrained(constants.BERT_MODEL_NAME).mask_token_id
+print(f'utils.VOCAB_PAD_VALUE: {VOCAB_PAD_VALUE}')
 
 def to_list(v: Any):
     if isinstance(v, str):
@@ -365,7 +371,7 @@ class DataclassPlus:
     """dataclass with a few dict methods and a fancy __str__.
 
     Subclasess of DataclassPlus should still use the @dataclass decorator so that __init__s work.
-        Double check this.
+        (Double check this.)
 
     Class members need type annotations in order to be dataclass fields.
     """
