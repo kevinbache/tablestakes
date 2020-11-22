@@ -82,9 +82,8 @@ class BaseVocabXHandler(SubtypeCsvHandler[datapoints.BaseVocabDatapoint]):
         super().__init__(subtype_name='x', patterns=['**/x_*.csv'], glob_recursive=True)
 
     def _files_to_subtype(self, subname_to_file: Dict[str, Path]) -> datapoints.BaseVocabDatapoint:
-        print(f'BaseVocabXHandler subname_to_file:')
-        utils.print_dict(subname_to_file)
-
+        # print(f'BaseVocabXHandler subname_to_file:')
+        # utils.print_dict(subname_to_file)
         return datapoints.BaseVocabDatapoint(
             base=utils.load_csv(subname_to_file[constants.X_BASE_BASE_NAME]),
             vocab=utils.load_csv(subname_to_file[constants.X_VOCAB_BASE_NAME]),

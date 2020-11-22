@@ -1,6 +1,5 @@
 import abc
-from abc import ABC
-from dataclasses import dataclass, asdict, fields
+from dataclasses import dataclass
 from typing import *
 
 import numpy as np
@@ -56,6 +55,7 @@ class Datapoint(utils.DataclassPlus, abc.ABC):
         pass
 
     def transfer_to_device(self, device: torch.device):
+        """Recurses on members."""
         def _inner(obj: Any, device: torch.device):
             if hasattr(obj, 'to'):
                 return obj.to(device)
@@ -109,13 +109,16 @@ class BaseVocabDatapoint(Datapoint):
             arrays=[dp.vocab.values for dp in dps],
             dtype=torch.long,
             max_seq_len=max_seq_len,
-            pad_val=BertTokenizer.from_pretrained(constants.BERT_MODEL_NAME).mask_token_id,
+            pad_val=utils.VOCAB_PAD_VALUE,
         ).squeeze(2)
 
         return cls(
             base=base,
             vocab=vocab,
         )
+
+    def get_batch_lens(self):
+        return np.where(self.vocab == utils.VOCAB_PAD_VALUE)[0]
 
 
 @dataclass

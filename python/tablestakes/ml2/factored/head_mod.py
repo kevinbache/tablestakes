@@ -12,6 +12,8 @@ from tablestakes import constants, utils
 from tablestakes.ml2.factored import trunks, logs_mod
 from tablestakes.ml2.data import datapoints
 
+from chillpill import params
+
 Loss = Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
 
 
@@ -103,12 +105,14 @@ class LossMetrics:
 
 
 @dataclass
-class HeadParams(utils.DataclassPlus):
+class HeadParams(params.ParameterSet):
     type: str
     num_classes: int
+    """See get_reducer() for options"""
     x_reducer_name: str = ''
-    loss_reducer_name: str = 'mean'
+    loss_reducer_name: str = 'mean-0'
     do_permute_head_out: bool = True
+    class_weights: Optional[torch.Tensor] = None
 
 
 @dataclass
@@ -145,7 +149,11 @@ class Head(LossMetrics, pl.LightningModule, abc.ABC):
     def metrics(self, y_hat: torch.Tensor, y: torch.Tensor, metas: List[Any]) -> Dict[str, torch.Tensor]:
         d = {}
         for metric_name, metric in self.metrics_dict.items():
-            d[metric_name] = metric(y_hat, y)
+            try:
+                d[metric_name] = metric(y_hat, y)
+            except BaseException as e:
+                print(f"y_hat.shape: {y_hat.shape}, y.shape: {y.shape}")
+                raise e
         return d
 
     def loss(self, y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
@@ -194,10 +202,10 @@ def get_reducer(num_input_features: int, reducer_str: str) -> Tuple[ReducerFn, i
                 raise ValueError()
     elif reducer_str == 'first-dim2':
         reducer_fn = lambda x: x[:, :, 0].squeeze(dim=2)
-    # elif reducer_str == 'mean':
-    #     reducer_fn = lambda x: torch.mean(x)
-    # elif reducer_str == 'sum':
-    #     reducer_fn = lambda x: torch.sum(x)
+    elif reducer_str == 'mean-0':
+        reducer_fn = lambda x: x.mean(dim=0).squeeze()
+    elif reducer_str == 'sum':
+        reducer_fn = lambda x: torch.sum(x)
     else:
         reducer_fn = nn.Identity()
     return reducer_fn, num_input_features
@@ -212,6 +220,11 @@ class SigmoidHead(Head):
     ):
         x_reducer, loss_reducer, num_input_features = self._get_reducers(num_input_features, hp)
 
+        if metrics_dict is None:
+            metrics_dict = {
+                'sacc': logs_mod.SigmoidBetterAccuracy(),
+            }
+
         num_classes = hp.num_classes
         super().__init__(
             num_input_features=num_input_features,
@@ -221,10 +234,24 @@ class SigmoidHead(Head):
         self.head = nn.Linear(num_input_features, num_classes)
         self.loss_fn = nn.BCEWithLogitsLoss(reduction='none')
 
+        self.num_classes = num_classes
+
+        class_weights = hp.class_weights or torch.ones(num_classes, dtype=torch.float)
+        self.register_buffer('class_weights', torch.tensor(class_weights, dtype=torch.float))
+        self.class_weights /= self.class_weights.sum()
+
         self.x_reducer_fn = x_reducer
         self.loss_reducer_fn = loss_reducer
 
         self.do_permute_head_out = hp.do_permute_head_out
+
+    def loss(self, y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        loss = self.loss_fn(y_hat, y)
+        if self.loss_reducer_fn is not None:
+            loss = self.loss_reducer_fn(loss)
+        assert loss.shape == torch.Size([self.num_classes]), \
+            f'loss.size: {loss.shape}, torch.Size([self.num_classes]): {torch.Size([self.num_classes])}'
+        return loss.dot(self.class_weights)
 
 
 class _SoftmaxHead(Head):
@@ -314,7 +341,7 @@ YDP = TypeVar('YDP', bound=datapoints.YDatapoint)
 
 
 @dataclass
-class WeightedHeadParams(utils.DataclassPlus):
+class WeightedHeadParams(params.ParameterSet):
     weights: Dict[str, float]
     head_params: Dict[str, HeadParams]
     type: str = 'weighted'
@@ -324,7 +351,8 @@ class WeightedHead(Head):
     LOSS_NAME = constants.LOSS_NAME
     """Multiheaded head with weights for loss."""
 
-    def __init__(self, num_input_features: int, heads: Dict[str, Head], weights: Dict[str, float], y_dp_class: YDP):
+    # def __init__(self, num_input_features: int, heads: Dict[str, Head], weights: Dict[str, float], y_dp_class: YDP):
+    def __init__(self, num_input_features: int, heads: Dict[str, Head], weights: Dict[str, float]):
         super().__init__(num_input_features=num_input_features, num_classes=-1, metrics_dict={})
 
         assert heads.keys() == weights.keys()
@@ -334,13 +362,14 @@ class WeightedHead(Head):
         weight_vals = [weights[head_name] for head_name in self.heads.keys()]
         self.register_buffer('head_weights', torch.tensor(weight_vals, dtype=torch.float))
 
-        self.y_dp_class = y_dp_class
+        # self.y_dp_class = y_dp_class
 
-    def forward(self, x: torch.Tensor) -> datapoints.YDatapoint:
+    def forward(self, x: torch.Tensor) -> Dict[str, Any]:
         y_hats_dict = {}
         for head_name, head in self.heads.items():
             y_hats_dict[head_name] = head(x)
-        return self.y_dp_class.from_dict(y_hats_dict)
+        # return self.y_dp_class.from_dict(y_hats_dict)
+        return y_hats_dict
 
     def losses_to_loss(self, losses: torch.Tensor) -> torch.Tensor:
         return losses.dot(self.head_weights)
@@ -357,20 +386,21 @@ class WeightedHead(Head):
             y_hat: datapoints.YDatapoint,
             y: datapoints.YDatapoint,
             metas: List[Any],
-    ) -> datapoints.YDatapoint:
+    ) -> Dict[str, Dict[str, Any]]:
         d = {}
         for head_name, head in self.heads:
             y_tensor = y[head_name]
             y_hat_tensor = y_hat[head_name]
             d[head_name] = head.metrcis(y_hat_tensor, y_tensor, metas)
-        return y.from_dict(d)
+        # return y.from_dict(d)
+        return d
 
     def loss_metrics(
             self,
             y_hat: datapoints.YDatapoint,
             y: datapoints.YDatapoint,
             metas: List[Any],
-    ) -> Dict[str, torch.Tensor]:
+    ) -> Dict[str, Union[float, Dict[str, torch.Tensor]]]:
 
         head_name_to_loss_metrics = {}
         for head_name, head in self.heads.items():
@@ -379,7 +409,7 @@ class WeightedHead(Head):
             head_name_to_loss_metrics[head_name] = head.loss_metrics(y_hat_tensor, y_tensor, metas)
 
         losses = torch.stack(
-            [torch.tensor(head_name_to_loss_metrics[head_name][self.LOSS_NAME]) for head_name in self.heads.keys()],
+            [head_name_to_loss_metrics[head_name][self.LOSS_NAME] for head_name in self.heads.keys()],
             dim=0,
         )
         loss = self.losses_to_loss(losses)
@@ -392,28 +422,38 @@ class WeightedHead(Head):
             cls,
             head_makers: Dict[str, Head],
             head_weights: Dict[str, float],
-            y_dp_class: YDP,
+            # y_dp_class: YDP,
     ) -> HeadMaker:
+
         def head_maker(num_input_features):
-            heads = {head_name: hm(num_input_features) for head_name, hm in head_makers.items()}
-            return cls(num_input_features=num_input_features, heads=heads, weights=head_weights, y_dp_class=y_dp_class)
+            heads = {}
+            head_weights_out = {}
+            for head_name, hm in head_makers.items():
+                if head_weights[head_name] != 0.0:
+                    heads[head_name] = hm(num_input_features)
+                    head_weights_out[head_name] = head_weights[head_name]
+            return WeightedHead(
+                num_input_features=num_input_features,
+                heads=heads,
+                weights=head_weights_out,
+                # y_dp_class=y_dp_class,
+            )
 
         return head_maker
 
 
 class HeadMakerFactory:
-    """Heads need to be manufactured from neck_hp dict so it's got to be things that are easily serializable like strs."""
-
+    """Heads need to be manufactured from neck_hp dict so it's got to be things that are easily serializable like
+    strs."""
     @classmethod
     def create(
             cls,
             neck_hp: trunks.SlabNet.ModelParams,
             head_hp: Union[WeightedHeadParams, HeadParams],
-            y_dp_class: YDP,
     ) -> HeadMaker:
         if head_hp.type == 'weighted':
             subhead_makers = {
-                head_name: cls.create(neck_hp, subhead_hp, y_dp_class)
+                head_name: cls.create(neck_hp, subhead_hp)
                 for head_name, subhead_hp in head_hp.head_params.items()
             }
 
@@ -423,7 +463,6 @@ class HeadMakerFactory:
                     head=WeightedHead.maker_from_makers(
                         head_makers=subhead_makers,
                         head_weights=head_hp.weights,
-                        y_dp_class=y_dp_class,
                     )(num_input_features),
                     neck_hp=neck_hp,
                 )

@@ -11,9 +11,10 @@ from torch.utils.data import DataLoader
 
 from tablestakes.ml2 import data
 
+from chillpill import params
 
-@dataclass
-class DataParams(utils.DataclassPlus):
+
+class DataParams(params.ParameterSet):
     dataset_name: utils.DirtyPath
     docs_root_dir: utils.DirtyPath = constants.DOCS_DIR
     dataset_root_dir: utils.DirtyPath = constants.DATASETS_DIR
@@ -31,6 +32,10 @@ class DataParams(utils.DataclassPlus):
     max_seq_length = 4096
     batch_size = 32
 
+    def __init__(self, dataset_name='DUMMY_DATASET_NAME'):
+        self.dataset_name = dataset_name
+        super().__init__()
+
     def __post_init__(self):
         self.docs_root_dir = Path(self.docs_root_dir)
         self.dataset_root_dir = Path(self.dataset_root_dir)
@@ -46,7 +51,7 @@ class XYMetaHandlerDatasetModule(pl.LightningDataModule):
         self.verbose = verbose
 
         self.ds = self.get_dataset(hp)
-        assert isinstance(self.ds, data.XYMetaDirHandlerDataset)
+        assert isinstance(self.ds, data.XYMetaDirHandlerDataset), f'{type(self.ds)}, hp: {hp}'
         dims = self.ds.get_num_features()
 
         self.num_x_base_dims = dims.x.base
