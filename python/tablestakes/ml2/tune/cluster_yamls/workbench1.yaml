@@ -2,8 +2,8 @@ cluster_name: workbench-1x
 
 provider:
     type: aws
-    region: us-west-1
-    availability_zone: us-west-1a,us-west-1b,us-west-1c
+    region: us-west-2
+    availability_zone: us-west-2a,us-west-12,us-west-2c
 auth:
     ssh_user: ubuntu
 
@@ -43,8 +43,8 @@ head_node:
 
 # Remote -> Local
 file_mounts: {
-    "/tmp/chillpill_current_branch_sha": "~/projects/chillpill/.git/refs/sub_losses/master",
-    "/tmp/tablestakes_current_branch_sha": "~/projects/tablestakes/.git/refs/sub_losses/master",
+    "/tmp/chillpill_current_branch_sha": "~/projects/chillpill/.git/refs/heads/master",
+    "/tmp/tablestakes_current_branch_sha": "~/projects/tablestakes/.git/refs/heads/master",
     ~/.logger_api_key: ~/.logger_api_key,
     "~/lib/": "~/projects/tablestakes/python/lib/",
     "~/data/tablestakes/datasets/": "~/data/tablestakes/datasets/",

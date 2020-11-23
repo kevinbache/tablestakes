@@ -378,7 +378,7 @@ if __name__ == '__main__':
         tune_hp=tune_hp,
         factored_lightning_module_class=model.TablestakesBertConvTransTClassModel,
         extra_pl_callbacks=None,
-        ray_local_mode=True,
+        ray_local_mode=False,
     )
     tune_runner.run(
         fast_dev_run=False,

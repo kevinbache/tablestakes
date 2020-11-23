@@ -2,8 +2,8 @@ cluster_name: workbench-4x
 
 provider:
     type: aws
-    region: us-west-1
-    availability_zone: us-west-1a,us-west-1b,us-west-1c
+    region: us-west-2
+    availability_zone: us-west-2a,us-west-2b,us-west-2c
 auth:
     ssh_user: ubuntu
 
@@ -43,15 +43,15 @@ head_node:
 
 # Remote -> Local
 file_mounts: {
-    "/tmp/chillpill_current_branch_sha": "~/projects/chillpill/.git/refs/sub_losses/master",
-    "/tmp/tablestakes_current_branch_sha": "~/projects/tablestakes/.git/refs/sub_losses/master",
+    "/tmp/chillpill_current_branch_sha": "~/projects/chillpill/.git/refs/heads/master",
+    "/tmp/tablestakes_current_branch_sha": "~/projects/tablestakes/.git/refs/heads/master",
     ~/.logger_api_key: ~/.logger_api_key,
     "~/lib/": "~/projects/tablestakes/python/lib/",
     "~/data/tablestakes/datasets/": "~/data/tablestakes/datasets/",
 }
 
 setup_commands:
-    - rm -rf /home/ubuntu/anaconda3/lib/python3.7/site-packages/s3transfer*
+#    - rm -rf /home/ubuntu/anaconda3/lib/python3.7/site-packages/s3transfer*
 
     # deep learning stuff.  custom torch.
     - conda install -y -c anaconda openmpi=4.0.2 s3transfer=0.3.3 docutils=0.15.2 boto3=1.16.0 botocore=1.19.1
@@ -93,3 +93,40 @@ setup_commands:
 head_start_ray_commands:
     - ray stop
     - ulimit -n 65536; ray start --head --port=6379 --object-manager-port=8076 --autoscaling-config=~/ray_bootstrap_config.yaml
+
+
+# Custom commands that will be run on the head node after common setup.
+head_setup_commands:
+    # temp bugfix
+    - rm -rf /home/ubuntu/anaconda3/lib/python3.7/site-packages/s3transfer*
+
+    # cpu torch et al
+    - source /home/ubuntu/.dlamirc && conda install -y -c pytorch -c anaconda boto3>=1.10.44 botocore=1.19.1 cpuonly=1.0-0 docutils=0.15.2 libuv=1.40.0 ninja=1.10.1 pytorch=1.7.0 s3transfer=0.3.3 torchvision=0.8.1 openmpi=4.0.2 openssl=1.1.1
+    - source /home/ubuntu/.dlamirc && pip install tabulate tensorboard tensorboardX \
+        pytorch-lightning \
+        hyperopt neptune-client neptune-contrib[viz] mlflow hiplot \
+        jupyter ipywidgets bokeh
+
+    # ray
+    - source /home/ubuntu/.dlamirc && pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-1.1.0.dev0-cp37-cp37m-manylinux1_x86_64.whl
+    - source /home/ubuntu/.dlamirc && pip install ray[all]
+    #  for https://docs.ray.io/en/stable/webui.html
+    - source /home/ubuntu/.dlamirc && jupyter nbextension enable --py --sys-prefix widgetsnbextension
+
+    # my stuff
+    - source /home/ubuntu/.dlamirc && mkdir -p ~/projects
+
+    #  fast transformers
+    - source /home/ubuntu/.dlamirc && pip install lib/pytorch_fast_transformers-0.3.0-cp37-cp37m-linux_x86_64.whl
+    - source /home/ubuntu/.dlamirc && pip install --upgrade "cloudpickle>=1.6.0"
+
+    #  chillpill
+    - test -e projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
+    - cd projects/chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
+    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/chillpill/
+
+    #  tablestakes
+    - test -e projects/tablestakes/python || git clone https://github.com/kevinbache/tablestakes.git ~/projects/tablestakes
+    - cd projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
+    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/tablestakes/python/
+

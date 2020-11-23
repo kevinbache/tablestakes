@@ -1,9 +1,10 @@
-cluster_name: cluster-ami
+cluster_name: cluster-ami-2
 
 provider:
     type: aws
     region: us-west-2
     availability_zone: us-west-2a,us-west-2b
+#    cache_stopped_nodes: False
 auth:
     ssh_user: ubuntu
 
@@ -39,14 +40,24 @@ worker_nodes:
 
 # Remote -> Local
 file_mounts: {
-    "/tmp/chillpill_current_branch_sha": "~/projects/chillpill/.git/refs/sub_losses/master",
-    "/tmp/tablestakes_current_branch_sha": "~/projects/tablestakes/.git/refs/sub_losses/master",
-    ~/.logger_api_key: ~/.logger_api_key,
-#    "~/lib/": "~/projects/tablestakes/python/lib/",
+    "/tmp/chillpill_current_branch_sha": "~/projects/chillpill/.git/refs/heads/master",
+    "/tmp/tablestakes_current_branch_sha": "~/projects/tablestakes/.git/refs/heads/master",
+    "~/.logger_api_key": "~/.logger_api_key",
+    "~/lib/": "~/projects/tablestakes/python/lib/",
     "~/data/tablestakes/datasets/": "~/data/tablestakes/datasets/",
+    # 'limits.conf' prevents us having to run "ulimit -n 65535" in ray start commands
+#    "/etc/security/limits.conf": "~/projects/tablestakes/python/tablestakes/ml2/tune/cluster_yamls/ami_files/limits.conf",
+#    "/etc/security/limits.conf": "./ami_files/limits.conf",
 }
 
+#setup_commands: []
+
 setup_commands:
+    #  pytorch lightning
+    - test -e projects/pytorch_lightning || git clone https://github.com/PyTorchLightning/pytorch-lightning.git ~/projects/pytorch-lightning
+    - cd ~/projects/pytorch-lightning && git pull
+    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/pytorch-lightning/
+
     #  chillpill
     - test -e projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
     - cd projects/chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
@@ -57,11 +68,98 @@ setup_commands:
     - cd projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
     - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/tablestakes/python/
 
+## Custom commands that will be run on the head node after common setup.
+#head_setup_commands:
+#    # cpu torch et al
+##    - source /home/ubuntu/.dlamirc && conda install -y -c pytorch -c anaconda boto3>=1.10.44 botocore=1.19.1 cpuonly=1.0-0 docutils=0.15.2 libuv=1.40.0 ninja=1.10.1 pytorch=1.7.0 s3transfer=0.3.3 torchvision=0.8.1 openmpi=4.0.2 openssl=1.1.1
+#    - source /home/ubuntu/.dlamirc && conda install -y -c pytorch -c anaconda cpuonly=1.0-0 pytorch-nightly boto3>=1.10.44 botocore=1.19.1 docutils=0.15.2 libuv=1.40.0 ninja=1.10.1 s3transfer=0.3.3 torchvision=0.8.1 openmpi=4.0.2 openssl=1.1.1
+#    - source /home/ubuntu/.dlamirc && pip install tabulate tensorboard tensorboardX \
+#        hyperopt neptune-client neptune-contrib[viz] mlflow hiplot \
+#        jupyter ipywidgets bokeh
+#
+#    # ray
+#    - source /home/ubuntu/.dlamirc && pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-1.1.0.dev0-cp37-cp37m-manylinux1_x86_64.whl
+#    - source /home/ubuntu/.dlamirc && pip install ray[all]
+#    #  for https://docs.ray.io/en/stable/webui.html
+#    - source /home/ubuntu/.dlamirc && jupyter nbextension enable --py --sys-prefix widgetsnbextension
+#
+#    # my stuff
+#    - source /home/ubuntu/.dlamirc && mkdir -p ~/projects
+#
+#    #  pytorch lightning
+#    - test -e projects/pytorch_lightning || git clone https://github.com/PyTorchLightning/pytorch-lightning.git ~/projects/pytorch-lightning
+#    - cd ~/projects/pytorch-lightning && git pull
+#    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/pytorch-lightning/
+#
+#    #  fast transformers
+#    - source /home/ubuntu/.dlamirc && pip install lib/pytorch_fast_transformers-0.3.0-cp37-cp37m-linux_x86_64.whl
+#    - source /home/ubuntu/.dlamirc && pip install --upgrade "cloudpickle>=1.6.0"
+#
+#    #  dotfiles
+#    - test -e projects/dotfiles || git clone https://github.com/kevinbache/dotfiles.git ~/projects/dotfiles
+#    - cd projects/dotfiles && git fetch && git checkout `cat /tmp/dotfiles_current_branch_sha`
+#    - python ~/projects/dotfiles/link_files.py
+#
+#    #  chillpill
+#    - test -e projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
+#    - cd projects/chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
+#    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/chillpill/
+#
+#    #  tablestakes
+#    - test -e projects/tablestakes/python || git clone https://github.com/kevinbache/tablestakes.git ~/projects/tablestakes
+#    - cd projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
+#    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/tablestakes/python/
+#
+#
+## Custom commands that will be run on the head node after common setup.
+#worker_setup_commands:
+##    - source /home/ubuntu/.dlamirc && conda install -y -c pytorch -c anaconda boto3>=1.10.44 botocore=1.19.1 cpuonly=1.0-0 docutils=0.15.2 libuv=1.40.0 ninja=1.10.1 pytorch=1.7.0 s3transfer=0.3.3 torchvision=0.8.1 openmpi=4.0.2 openssl=1.1.1
+#    - source /home/ubuntu/.dlamirc && conda install -y -c pytorch -c anaconda boto3>=1.10.44 botocore=1.19.1 docutils=0.15.2 libuv=1.40.0 ninja=1.10.1 s3transfer=0.3.3 torchvision=0.8.1 openmpi=4.0.2 openssl=1.1.1
+#    - source /home/ubuntu/.dlamirc && pip install lib/torch-1.8.0a0-cp37-cp37m-linux_x86_64.whl
+#    - source /home/ubuntu/.dlamirc && pip install tabulate tensorboard tensorboardX \
+#        hyperopt neptune-client neptune-contrib[viz] mlflow hiplot \
+#        jupyter ipywidgets bokeh
+#
+#    # ray
+#    - source /home/ubuntu/.dlamirc && pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-1.1.0.dev0-cp37-cp37m-manylinux1_x86_64.whl
+#    - source /home/ubuntu/.dlamirc && pip install ray[all]
+#    #  for https://docs.ray.io/en/stable/webui.html
+#    - source /home/ubuntu/.dlamirc && jupyter nbextension enable --py --sys-prefix widgetsnbextension
+#
+#    # my stuff
+#    - source /home/ubuntu/.dlamirc && mkdir -p ~/projects
+#
+#    #  pytorch lightning from source
+#    - test -e projects/pytorch_lightning || git clone https://github.com/PyTorchLightning/pytorch-lightning.git ~/projects/pytorch-lightning
+#    - cd projects/pytorch_lightning && git pull
+#    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/pytorch-lightning/
+#
+#    #  fast transformers
+#    - source /home/ubuntu/.dlamirc && pip install lib/pytorch_fast_transformers-0.3.0-cp37-cp37m-linux_x86_64.whl
+#    - source /home/ubuntu/.dlamirc && pip install --upgrade "cloudpickle>=1.6.0"
+#
+#    #  dotfiles
+#    - test -e projects/dotfiles || git clone https://github.com/kevinbache/dotfiles.git ~/projects/dotfiles
+#    - cd projects/dotfiles && git fetch && git checkout `cat /tmp/dotfiles_current_branch_sha`
+#    - python ~/projects/dotfiles/link_files.py
+#
+#    #  chillpill
+#    - test -e projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
+#    - cd projects/chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
+#    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/chillpill/
+#
+#    #  tablestakes
+#    - test -e projects/tablestakes/python || git clone https://github.com/kevinbache/tablestakes.git ~/projects/tablestakes
+#    - cd projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
+#    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/tablestakes/python/
+
 
 head_start_ray_commands:
     - source /home/ubuntu/.dlamirc && ray stop
-    - ulimit -n 65536; source /home/ubuntu/.dlamirc && ray start --head --port=6379 --object-manager-port=8076 --autoscaling-config=~/ray_bootstrap_config.yaml
+#    - sudo ulimit -n 65536; source /home/ubuntu/.dlamirc && ray start --head --port=6379 --object-manager-port=8076 --autoscaling-config=~/ray_bootstrap_config.yaml
+    - source /home/ubuntu/.dlamirc && ray start --head --port=6379 --object-manager-port=8076 --autoscaling-config=~/ray_bootstrap_config.yaml
 
 worker_start_ray_commands:
     - ray stop
-    - ulimit -n 65536; source /home/ubuntu/.dlamirc && ray start --address=$RAY_HEAD_IP:6379 --object-manager-port=8076
+#    - sudo ulimit -n 65536; source /home/ubuntu/.dlamirc && ray start --address=$RAY_HEAD_IP:6379 --object-manager-port=8076
+    - source /home/ubuntu/.dlamirc && ray start --address=$RAY_HEAD_IP:6379 --object-manager-port=8076
