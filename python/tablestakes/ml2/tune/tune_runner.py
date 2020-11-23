@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 import argparse
 import os
 import socket
@@ -25,7 +23,6 @@ from chillpill import params
 REGION = 'us-west-2'
 
 
-@dataclass
 class TuneParams(params.ParameterSet):
     asha_grace_period = 4
     asha_reduction_factor = 2
@@ -305,7 +302,7 @@ if __name__ == '__main__':
     hp.data.do_ignore_cached_dataset = False
     hp.data.seed = 42
     hp.data.num_workers = 4
-    hp.data.num_gpus = 0
+    hp.data.num_gpus = 1
     hp.data.num_cpus = 4
 
     hp.opt.search_metric = 'valid/loss'
@@ -320,7 +317,7 @@ if __name__ == '__main__':
 
     hp.exp.project_name = 'tablestakes'
     hp.exp.experiment_name = 'korv_which'
-    hp.exp.experiment_tags = ['korv_which', 'conv', 'sharp', 'testing']
+    hp.exp.experiment_tags = ['korv_which']
     hp.exp.sources_glob_str = constants.THIS_DIR.parent.parent / '**/*.py'
     hp.exp.offline_mode = False
 

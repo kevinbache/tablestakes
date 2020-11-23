@@ -1,4 +1,4 @@
-cluster_name: cluster-ami-3
+cluster_name: cluster-ami-4
 
 provider:
     type: aws
@@ -168,4 +168,6 @@ head_start_ray_commands:
 worker_start_ray_commands:
     - unset RAY_OVERRIDE_RESOURCES && source /home/ubuntu/.dlamirc && ray stop
 #    - sudo ulimit -n 65536; source /home/ubuntu/.dlamirc && ray start --address=$RAY_HEAD_IP:6379 --object-manager-port=8076
-    - unset RAY_OVERRIDE_RESOURCES && source /home/ubuntu/.dlamirc && ray start --address=$RAY_HEAD_IP:6379 --object-manager-port=8076
+
+#    - unset RAY_OVERRIDE_RESOURCES && source /home/ubuntu/.dlamirc && ray start --address=$RAY_HEAD_IP:6379 --object-manager-port=8076
+    - ray start --address=$RAY_HEAD_IP:6379 --object-manager-port=8076
