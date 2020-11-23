@@ -1,4 +1,4 @@
-cluster_name: cluster-ami-2
+cluster_name: cluster-ami-3
 
 provider:
     type: aws
@@ -54,18 +54,18 @@ file_mounts: {
 
 setup_commands:
     #  pytorch lightning
-    - test -e projects/pytorch_lightning || git clone https://github.com/PyTorchLightning/pytorch-lightning.git ~/projects/pytorch-lightning
+    - test -e ~/projects/pytorch-lightning || git clone https://github.com/PyTorchLightning/pytorch-lightning.git ~/projects/pytorch-lightning
     - cd ~/projects/pytorch-lightning && git pull
     - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/pytorch-lightning/
 
     #  chillpill
-    - test -e projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
-    - cd projects/chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
+    - test -e ~/projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
+    - cd ~/projects/chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
     - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/chillpill/
 
     #  tablestakes
-    - test -e projects/tablestakes/python || git clone https://github.com/kevinbache/tablestakes.git ~/projects/tablestakes
-    - cd projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
+    - test -e ~/projects/tablestakes/python || git clone https://github.com/kevinbache/tablestakes.git ~/projects/tablestakes
+    - cd ~/projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
     - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/tablestakes/python/
 
 ## Custom commands that will be run on the head node after common setup.
@@ -87,7 +87,7 @@ setup_commands:
 #    - source /home/ubuntu/.dlamirc && mkdir -p ~/projects
 #
 #    #  pytorch lightning
-#    - test -e projects/pytorch_lightning || git clone https://github.com/PyTorchLightning/pytorch-lightning.git ~/projects/pytorch-lightning
+#    - test -e ~/projects/pytorch-lightning || git clone https://github.com/PyTorchLightning/pytorch-lightning.git ~/projects/pytorch-lightning
 #    - cd ~/projects/pytorch-lightning && git pull
 #    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/pytorch-lightning/
 #
@@ -96,18 +96,18 @@ setup_commands:
 #    - source /home/ubuntu/.dlamirc && pip install --upgrade "cloudpickle>=1.6.0"
 #
 #    #  dotfiles
-#    - test -e projects/dotfiles || git clone https://github.com/kevinbache/dotfiles.git ~/projects/dotfiles
-#    - cd projects/dotfiles && git fetch && git checkout `cat /tmp/dotfiles_current_branch_sha`
+#    - test -e ~/projects/dotfiles || git clone https://github.com/kevinbache/dotfiles.git ~/projects/dotfiles
+#    - cd ~/projects/dotfiles && git fetch && git checkout `cat /tmp/dotfiles_current_branch_sha`
 #    - python ~/projects/dotfiles/link_files.py
 #
 #    #  chillpill
-#    - test -e projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
-#    - cd projects/chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
+#    - test -e ~/projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
+#    - cd ~/projects/chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
 #    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/chillpill/
 #
 #    #  tablestakes
-#    - test -e projects/tablestakes/python || git clone https://github.com/kevinbache/tablestakes.git ~/projects/tablestakes
-#    - cd projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
+#    - test -e ~/projects/tablestakes/python || git clone https://github.com/kevinbache/tablestakes.git ~/projects/tablestakes
+#    - cd ~/projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
 #    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/tablestakes/python/
 #
 #
@@ -130,8 +130,8 @@ setup_commands:
 #    - source /home/ubuntu/.dlamirc && mkdir -p ~/projects
 #
 #    #  pytorch lightning from source
-#    - test -e projects/pytorch_lightning || git clone https://github.com/PyTorchLightning/pytorch-lightning.git ~/projects/pytorch-lightning
-#    - cd projects/pytorch_lightning && git pull
+#    - test -e ~/projects/pytorch-lightning || git clone https://github.com/PyTorchLightning/pytorch-lightning.git ~/projects/pytorch-lightning
+#    - cd ~/projects/pytorch-lightning && git pull
 #    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/pytorch-lightning/
 #
 #    #  fast transformers
@@ -139,27 +139,27 @@ setup_commands:
 #    - source /home/ubuntu/.dlamirc && pip install --upgrade "cloudpickle>=1.6.0"
 #
 #    #  dotfiles
-#    - test -e projects/dotfiles || git clone https://github.com/kevinbache/dotfiles.git ~/projects/dotfiles
-#    - cd projects/dotfiles && git fetch && git checkout `cat /tmp/dotfiles_current_branch_sha`
+#    - test -e ~/projects/dotfiles || git clone https://github.com/kevinbache/dotfiles.git ~/projects/dotfiles
+#    - cd ~/projects/dotfiles && git fetch && git checkout `cat /tmp/dotfiles_current_branch_sha`
 #    - python ~/projects/dotfiles/link_files.py
 #
 #    #  chillpill
-#    - test -e projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
-#    - cd projects/chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
+#    - test -e ~/projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
+#    - cd ~/projects/chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
 #    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/chillpill/
 #
 #    #  tablestakes
-#    - test -e projects/tablestakes/python || git clone https://github.com/kevinbache/tablestakes.git ~/projects/tablestakes
-#    - cd projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
+#    - test -e ~/projects/tablestakes/python || git clone https://github.com/kevinbache/tablestakes.git ~/projects/tablestakes
+#    - cd ~/projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
 #    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/tablestakes/python/
 
 
 head_start_ray_commands:
     - source /home/ubuntu/.dlamirc && ray stop
 #    - sudo ulimit -n 65536; source /home/ubuntu/.dlamirc && ray start --head --port=6379 --object-manager-port=8076 --autoscaling-config=~/ray_bootstrap_config.yaml
-    - source /home/ubuntu/.dlamirc && ray start --head --port=6379 --object-manager-port=8076 --autoscaling-config=~/ray_bootstrap_config.yaml
+    - unset RAY_OVERRIDE_RESOURCES && source /home/ubuntu/.dlamirc && ray start --head --port=6379 --object-manager-port=8076 --autoscaling-config=~/ray_bootstrap_config.yaml
 
 worker_start_ray_commands:
     - ray stop
 #    - sudo ulimit -n 65536; source /home/ubuntu/.dlamirc && ray start --address=$RAY_HEAD_IP:6379 --object-manager-port=8076
-    - source /home/ubuntu/.dlamirc && ray start --address=$RAY_HEAD_IP:6379 --object-manager-port=8076
+    - unset RAY_OVERRIDE_RESOURCES && source /home/ubuntu/.dlamirc && ray start --address=$RAY_HEAD_IP:6379 --object-manager-port=8076

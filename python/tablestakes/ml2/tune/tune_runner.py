@@ -30,6 +30,8 @@ class TuneParams(params.ParameterSet):
     asha_grace_period = 4
     asha_reduction_factor = 2
     num_hp_samples = 10
+    log_to_file = False
+    ray_local_mode = False
 
 
 class TuneRunner:
@@ -360,7 +362,14 @@ if __name__ == '__main__':
         constants.Y_WHICH_KV_BASE_NAME: 0.3,
     }
 
-    hp.verbose = False
+    hp.verbose = True
+
+    tune_hp = TuneParams()
+    tune_hp.asha_grace_period = 4
+    tune_hp.asha_reduction_factor = 2
+    tune_hp.num_hp_samples = 2
+    tune_hp.log_to_file = False
+    tune_hp.ray_local_mode = False
 
     hostname = socket.gethostname()
     is_local_run = hostname.endswith('.local')
@@ -368,22 +377,17 @@ if __name__ == '__main__':
     utils.hprint('About to start model run:')
     utils.print_dict(hp.to_dict())
 
-    tune_hp = TuneParams()
-    tune_hp.asha_grace_period = 4
-    tune_hp.asha_reduction_factor = 2
-    tune_hp.num_hp_samples = 2
-
     tune_runner = TuneRunner(
         model_hp=hp,
         tune_hp=tune_hp,
         factored_lightning_module_class=model.TablestakesBertConvTransTClassModel,
         extra_pl_callbacks=None,
-        ray_local_mode=False,
+        ray_local_mode=tune_hp.ray_local_mode,
     )
     tune_runner.run(
         fast_dev_run=False,
         use_gpus=not is_local_run,
-        log_to_file=True,
+        log_to_file=tune_hp.log_to_file,
     )
 
     utils.hprint("done with tune_runner.run")

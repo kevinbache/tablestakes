@@ -1,5 +1,4 @@
 import abc
-from dataclasses import dataclass
 from typing import *
 
 import numpy as np
@@ -104,19 +103,16 @@ class LossMetrics:
         return d
 
 
-@dataclass
 class HeadParams(params.ParameterSet):
     type: str = 'DEFAULT_TYPE'
-    type: str = 'DEFAULT_TYPE'
     num_classes: int = -1
-    """See get_reducer() for options"""
+    """See get_reducer() for x_ and loss_ reducer options"""
     x_reducer_name: str = ''
     loss_reducer_name: str = 'mean-0'
     do_permute_head_out: bool = True
     class_weights: Optional[torch.Tensor] = None
 
 
-@dataclass
 class EmptyHeadParams(HeadParams):
     type: str = 'none'
     num_classes: int = -1
@@ -341,7 +337,6 @@ class LinearSoftmaxHead(_SoftmaxHead):
 YDP = TypeVar('YDP', bound=datapoints.YDatapoint)
 
 
-@dataclass
 class WeightedHeadParams(params.ParameterSet):
     weights: Dict[str, float]
     head_params: Dict[str, HeadParams]

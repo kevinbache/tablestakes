@@ -14,8 +14,8 @@ from chillpill import params
 class TablestakesHeadParams(head_mod.WeightedHeadParams):
     def __init__(self):
         head_params = {
-            constants.Y_KORV_BASE_NAME: head_mod.HeadParams('linear', num_classes=2),
-            constants.Y_WHICH_KV_BASE_NAME: head_mod.HeadParams('linear', num_classes=11),
+            constants.Y_KORV_BASE_NAME: head_mod.HeadParams(type='linear', num_classes=2),
+            constants.Y_WHICH_KV_BASE_NAME: head_mod.HeadParams(type='linear', num_classes=11),
         }
         super().__init__(head_params=head_params, weights=[1.0, 1.0])
 
