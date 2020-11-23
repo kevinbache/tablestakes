@@ -282,8 +282,11 @@ class TuneRunner:
             self.search_params.opt.search_mode,
             "last-5-avg"
         )
-        print(f'best_trial.last_result: {best_trial.last_result}')
-        print("Best trial config: {}".format(best_trial.config))
+        utils.hprint('best_trial.last_result', do_include_pre_break_line=True)
+        utils.print_dict(best_trial.last_result)
+
+        utils.hprint('best_trial.last_result', do_include_pre_break_line=True)
+        utils.print_dict(best_trial.config)
 
 
 if __name__ == '__main__':
