@@ -101,19 +101,17 @@ class TuneRunner:
         args = parser.parse_args()
         return str(args.address)
 
-    def get_pl_callbacks_for_tune(self):
+    @staticmethod
+    def get_pl_callbacks_for_tune():
         return [
             pl_tune.TuneReportCallback(
-                # metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.TRAIN_PHASE_NAME),
                 on='train_end',
             ),
             pl_tune.TuneReportCheckpointCallback(
-                # metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.VALID_PHASE_NAME),
                 filename=constants.CHECKPOINT_FILE_BASENAME,
                 on='validation_end',
             ),
             pl_tune.TuneReportCallback(
-                # metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.TEST_PHASE_NAME),
                 on='test_end',
             ),
         ]
