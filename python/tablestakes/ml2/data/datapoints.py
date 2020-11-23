@@ -36,15 +36,12 @@ def _pad_arrays(arrays: List[np.array], dtype, max_seq_len, pad_val=0):
 
 
 def _get_df_or_tensor_num_features(e: Union[pd.DataFrame, torch.Tensor]):
-    utils.hprint('ml2.data.datapoints._get_df_or_tensor_num_features')
-    print(type(e))
-    print(e)
     if hasattr(e, 'get_num_features'):
         return e.get_num_features()
     elif isinstance(e, (pd.DataFrame, torch.Tensor)):
         return e.shape[-1]
     else:
-        raise NotImplementedError
+        raise NotImplementedError(f'type: {type(e)}, e: {e}')
 
 
 class Datapoint(utils.DataclassPlus, abc.ABC):

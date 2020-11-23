@@ -180,7 +180,8 @@ def join_and_split_and_save_dfs(
         else:
             df.to_csv(final_data_dir / f'{name}.csv', index=False)
 
-    pd.DataFrame([{'original_data_dir': this_doc_dir}]).to_csv(final_data_dir / f'meta_short.csv', index=False)
+    meta_short_df = pd.DataFrame([{constants.META_ORIGINAL_DATA_DIR_COL_NAME: this_doc_dir}])
+    meta_short_df.to_csv(final_data_dir / f'meta_short.csv', index=False)
 
     return len(y_korv_cols), len(y_which_kv_cols)
 
@@ -214,7 +215,7 @@ if __name__ == '__main__':
         doc_gen_params=doc_gen_params,
         doc_prep_params=doc_prep_params,
     )
-    doc_settings.num_docs = 1001
+    doc_settings.num_docs = 1000
     # doc_settings.doc_gen_params.num_extra_fields = 0
 
     fast_test = False

@@ -285,7 +285,7 @@ class TuneRunner:
         utils.hprint('best_trial.last_result', do_include_pre_break_line=True)
         utils.print_dict(best_trial.last_result)
 
-        utils.hprint('best_trial.last_result', do_include_pre_break_line=True)
+        utils.hprint('best_trial.config', do_include_pre_break_line=True)
         utils.print_dict(best_trial.config)
 
 
@@ -362,7 +362,7 @@ if __name__ == '__main__':
         constants.Y_WHICH_KV_BASE_NAME: 0.3,
     }
 
-    hp.verbose = True
+    hp.verbose = False
 
     tune_hp = TuneParams()
     tune_hp.asha_grace_period = 4
