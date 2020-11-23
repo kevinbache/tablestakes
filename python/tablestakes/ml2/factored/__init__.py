@@ -71,10 +71,10 @@ class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
         # if phase == utils.Phase.train:
         #     self.log(name=self.LOSS_NAME, value=d[self.LOSS_NAME], prog_bar=True)
         d = {phase.name: d}
-        d = utils.sanitize_tensors(d)
+        d = utils.detach_tensors(d)
         d = utils.flatten_dict(d, delimiter='/')
-        prog_bar = phase == utils.Phase.train
-        self.log_dict(d, prog_bar=prog_bar)
+        do_log_to_progbar = phase == utils.Phase.train
+        self.log_dict(d, prog_bar=do_log_to_progbar)
 
     #######
     # OPT #

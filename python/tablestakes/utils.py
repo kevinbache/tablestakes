@@ -37,10 +37,11 @@ class Phase(enum.Enum):
     test = 2
 
 
+# # too slow for contants
 import transformers
-# too slow for contants
 VOCAB_PAD_VALUE = transformers.BertTokenizer.from_pretrained(constants.BERT_MODEL_NAME).mask_token_id
-print(f'utils.VOCAB_PAD_VALUE: {VOCAB_PAD_VALUE}')
+# VOCAB_PAD_VALUE = 103
+
 
 def to_list(v: Any):
     if isinstance(v, str):
@@ -399,7 +400,7 @@ class DataclassPlus:
         return iter(d.items())
 
     def to_dict(self) -> Dict:
-        return sanitize_tensors(self)
+        return detach_tensors(self)
 
     def _str_inner(self, obj):
         typestr = obj.__class__.__name__
@@ -432,18 +433,18 @@ def tensor_is_singleton(t: torch.Tensor):
     return t.view(-1).shape == torch.Size([1])
 
 
-def sanitize_tensors(obj: Any) -> Any:
+def detach_tensors(obj: Any) -> Any:
     if isinstance(obj, DataclassPlus):
-        return {k: sanitize_tensors(v) for k, v in obj}
+        return {k: detach_tensors(v) for k, v in obj}
     elif isinstance(obj, torch.Tensor):
         if tensor_is_singleton(obj):
-            return obj.detach().item()
+            return obj.detach()
         else:
             return obj.detach().numpy()
     elif isinstance(obj, dict):
-        return {k: sanitize_tensors(v) for k, v in obj.items()}
+        return {k: detach_tensors(v) for k, v in obj.items()}
     elif isinstance(obj, list):
-        return [sanitize_tensors(o) for o in obj]
+        return [detach_tensors(o) for o in obj]
     else:
         return obj
 

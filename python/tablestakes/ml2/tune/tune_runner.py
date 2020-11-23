@@ -41,7 +41,6 @@ class TuneRunner:
             extra_pl_callbacks: Optional[List[pl.callbacks.Callback]] = None,
             ray_local_mode=False,
     ):
-
         self.include_gpus = None
 
         # if you leave this at the default false, then every call to tune.report needs to have all
@@ -53,9 +52,6 @@ class TuneRunner:
         self.hp = model_hp
         self.tune_hp = tune_hp
         self.search_params = self.hp
-        # assert hasattr(self.search_params, 'tune')
-        # noinspection PyUnresolvedReferences
-        # assert isinstance(self.search_params.tune, self.TuneParams)
 
         self._model_param_class = model_hp.__class__
 
@@ -105,21 +101,21 @@ class TuneRunner:
         args = parser.parse_args()
         return str(args.address)
 
-    def get_tune_callbacks(self):
+    def get_pl_callbacks_for_tune(self):
         return [
-            # pl_tune.TuneReportCallback(
-            #     metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.TRAIN_PHASE_NAME),
-            #     on='train_end',
-            # ),
+            pl_tune.TuneReportCallback(
+                # metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.TRAIN_PHASE_NAME),
+                on='train_end',
+            ),
             pl_tune.TuneReportCheckpointCallback(
                 # metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.VALID_PHASE_NAME),
                 filename=constants.CHECKPOINT_FILE_BASENAME,
                 on='validation_end',
             ),
-            # tune_pl.TuneReportCallback(
-            #     metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.TEST_PHASE_NAME),
-            #     on='test_end',
-            # ),
+            pl_tune.TuneReportCallback(
+                # metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.TEST_PHASE_NAME),
+                on='test_end',
+            ),
         ]
 
     @staticmethod
@@ -154,7 +150,7 @@ class TuneRunner:
         trainer = pl.Trainer(
             logger=logs_mod.get_pl_logger(hp=hp.exp, tune=tune),
             default_root_dir=tune.get_trial_dir(),
-            callbacks=self.extra_pl_callbacks + self.get_tune_callbacks(),
+            callbacks=self.extra_pl_callbacks + self.get_pl_callbacks_for_tune(),
             max_epochs=hp.opt.num_epochs,
             gpus=hp.data.num_gpus if include_gpus else None,
             weights_summary='full',
@@ -318,7 +314,7 @@ if __name__ == '__main__':
     hp.opt.lr = params.Discrete([1e-5, 3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2, 1e-1])
     hp.opt.patience = 10
 
-    hp.logs.num_steps_per_histogram_log = 5
+    hp.logs.num_steps_per_histogram_log = 100
     hp.logs.num_steps_per_metric_log = 5
     hp.logs.output_dir = constants.OUTPUT_DIR
 
