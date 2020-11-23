@@ -184,7 +184,10 @@ class FullyConv1Resnet(pl.LightningModule):
                 x += block(old_x)
                 old_x = x
             else:
-                x = block(x)
+                try:
+                    x = block(x)
+                except BaseException as e:
+                    raise e
 
         x = x.permute(0, 2, 1)
         return x

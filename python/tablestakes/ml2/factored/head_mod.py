@@ -106,8 +106,9 @@ class LossMetrics:
 
 @dataclass
 class HeadParams(params.ParameterSet):
-    type: str
-    num_classes: int
+    type: str = 'DEFAULT_TYPE'
+    type: str = 'DEFAULT_TYPE'
+    num_classes: int = -1
     """See get_reducer() for options"""
     x_reducer_name: str = ''
     loss_reducer_name: str = 'mean-0'
@@ -443,8 +444,8 @@ class WeightedHead(Head):
 
 
 class HeadMakerFactory:
-    """Heads need to be manufactured from neck_hp dict so it's got to be things that are easily serializable like
-    strs."""
+    """Heads need to be manufactured from neck_hp dict so it's got
+    to be things that are easily serializable like strs."""
     @classmethod
     def create(
             cls,
@@ -463,7 +464,7 @@ class HeadMakerFactory:
                     head=WeightedHead.maker_from_makers(
                         head_makers=subhead_makers,
                         head_weights=head_hp.weights,
-                    )(num_input_features),
+                    )(neck_hp.num_features),
                     neck_hp=neck_hp,
                 )
 
@@ -472,7 +473,7 @@ class HeadMakerFactory:
             def fn(num_input_features: int):
                 return HeadedSlabNet(
                     num_input_features=num_input_features,
-                    head=LinearSoftmaxHead(num_input_features, head_hp),
+                    head=LinearSoftmaxHead(neck_hp.num_features, head_hp),
                     neck_hp=neck_hp,
                 )
 
@@ -481,7 +482,7 @@ class HeadMakerFactory:
             def fn(num_input_features: int):
                 return HeadedSlabNet(
                     num_input_features=num_input_features,
-                    head=AdaptiveSoftmaxHead(num_input_features, head_hp),
+                    head=AdaptiveSoftmaxHead(neck_hp.num_features, head_hp),
                     neck_hp=neck_hp,
                 )
 
@@ -490,7 +491,7 @@ class HeadMakerFactory:
             def fn(num_input_features: int):
                 return HeadedSlabNet(
                     num_input_features=num_input_features,
-                    head=SigmoidHead(num_input_features, head_hp),
+                    head=SigmoidHead(neck_hp.num_features, head_hp),
                     neck_hp=neck_hp,
                 )
 

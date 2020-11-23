@@ -151,7 +151,7 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
 
 def run(
         net: pl.LightningModule,
-        dm: pl.LightningDataModule,
+        # dm: pl.LightningDataModule,
         hp: TotalParams,
         fast_dev_run=False,
         do_find_lr=False,
@@ -175,12 +175,12 @@ def run(
 
     if do_find_lr:
         utils.hprint("Starting trainer.tune:")
-        lr_tune_out = trainer.tune(net, datamodule=dm)
+        lr_tune_out = trainer.tune(net, datamodule=net.dm)
         print(f'  Tune out: {lr_tune_out}')
     else:
         utils.hprint("Starting trainer.fit:")
         print(f'  Dataset file: {hp.data.dataset_file}')
-        trainer.fit(net, datamodule=dm)
+        trainer.fit(net, datamodule=net.dm)
 
     utils.hprint('Done with model run fn')
 
@@ -224,7 +224,7 @@ if __name__ == '__main__':
 
     hp.opt.search_metric = 'valid/loss'
     hp.opt.search_mode = 'min'
-    hp.opt.num_epochs = 10
+    hp.opt.num_epochs = 4
     hp.opt.lr = 0.001
     hp.opt.patience = 10
 
@@ -272,26 +272,16 @@ if __name__ == '__main__':
     hp.neck.requires_grad = True
 
     hp.head.weights = {
-        constants.Y_KORV_BASE_NAME: 1.0,
-        constants.Y_WHICH_KV_BASE_NAME: 0.3,
+        constants.Y_KORV_BASE_NAME: 0.3,
+        constants.Y_WHICH_KV_BASE_NAME: 1.0,
     }
 
     hp.verbose = False
 
-    dm = tablestakes_data.TablestakesHandlerDataModule(hp.data)
-    # noinspection PyTypeChecker
-    net = ModelBertConvTransTClass2(
-        hp=hp,
-        dm=dm,
-        opt=opt_mod.OptimizersMaker(hp.opt),
-        head_maker=head_mod.HeadMakerFactory.create(
-            neck_hp=hp.neck,
-            head_hp=hp.head,
-            y_dp_class=datapoints.KorvWhichDatapoint,
-        ),
-    )
+    net = TablestakesBertConvTransTClassModel.from_hp(hp)
 
     utils.hprint('About to start model run:')
     utils.print_dict(hp.to_dict())
 
-    run(net, dm, hp, fast_dev_run, do_find_lr=False)
+    # run(net, net.dm, hp, fast_dev_run, do_find_lr=False)
+    run(net, hp, fast_dev_run, do_find_lr=False)

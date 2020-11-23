@@ -3,6 +3,8 @@ from dataclasses import dataclass
 import argparse
 import os
 import socket
+
+from ray.tune.integration import pytorch_lightning as pl_tune
 from tablestakes.ml2.data import data_module, tablestakes_data, datapoints
 from tablestakes.ml2.factored import model, opt_mod, head_mod, FactoredParams, logs_mod
 from tablestakes.ml2 import data, factored
@@ -105,15 +107,15 @@ class TuneRunner:
 
     def get_tune_callbacks(self):
         return [
-            # tune_pl.TuneReportCallback(
+            # pl_tune.TuneReportCallback(
             #     metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.TRAIN_PHASE_NAME),
             #     on='train_end',
             # ),
-            # tune_pl.TuneReportCheckpointCallback(
-            #     metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.VALID_PHASE_NAME),
-            #     filename=constants.CHECKPOINT_FILE_BASENAME,
-            #     on='validation_end',
-            # ),
+            pl_tune.TuneReportCheckpointCallback(
+                # metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.VALID_PHASE_NAME),
+                filename=constants.CHECKPOINT_FILE_BASENAME,
+                on='validation_end',
+            ),
             # tune_pl.TuneReportCallback(
             #     metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.TEST_PHASE_NAME),
             #     on='test_end',
@@ -300,7 +302,7 @@ if __name__ == '__main__':
     )
     hp = model.TotalParams(
         max_seq_len=8192,
-        batch_size=32,
+        batch_size=params.Discrete([4, 8, 16, 32, 64, 128, 256]),
         data=dp,
     )
 
@@ -313,7 +315,7 @@ if __name__ == '__main__':
     hp.opt.search_metric = 'valid/loss'
     hp.opt.search_mode = 'min'
     hp.opt.num_epochs = 4
-    hp.opt.lr = 0.001
+    hp.opt.lr = params.Discrete([1e-5, 3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2, 1e-1])
     hp.opt.patience = 10
 
     hp.logs.num_steps_per_histogram_log = 5
@@ -321,42 +323,42 @@ if __name__ == '__main__':
     hp.logs.output_dir = constants.OUTPUT_DIR
 
     hp.exp.project_name = 'tablestakes'
-    hp.exp.experiment_name = 'korv which'
+    hp.exp.experiment_name = 'korv_which'
     hp.exp.experiment_tags = ['korv_which', 'conv', 'sharp', 'testing']
     hp.exp.sources_glob_str = constants.THIS_DIR.parent.parent / '**/*.py'
     hp.exp.offline_mode = False
 
-    hp.embed.dim = 15
+    hp.embed.dim = params.Discrete([15+16, 15+32, 15+64, 15+128, 15+256])
     hp.embed.requires_grad = True
 
-    hp.conv.num_features = 128
-    hp.conv.num_layers = 4
+    hp.conv.num_features = params.Discrete([32, 64, 128, 256])
+    hp.conv.num_layers = params.Integer(min_value=1, max_value=3)
     hp.conv.kernel_size = 3
-    hp.conv.num_groups = 16
+    hp.conv.num_groups = params.Discrete([16, 32, 64])
     hp.conv.num_blocks_per_pool = 20
     hp.conv.requires_grad = True
 
     hp.trans.impl = 'fast-favor'
     # neck_hp.trans.impl = 'fast'
-    hp.trans.num_heads = 8
-    hp.trans.num_layers = 6
+    hp.trans.num_heads = params.Discrete([2, 4, 8, 16])
+    hp.trans.num_layers = params.Integer(min_value=1, max_value=3)
     hp.trans.num_query_features = None
-    hp.trans.fc_dim_mult = 2
-    hp.trans.p_dropout = 0.1
-    hp.trans.p_attention_dropout = 0.1
+    hp.trans.fc_dim_mult = params.Integer(min_value=2, max_value=5)
+    hp.trans.p_dropout = params.Float(min_value=0.05, max_value=0.2)
+    hp.trans.p_attention_dropout = params.Float(min_value=0.05, max_value=0.2)
 
-    hp.fc.num_features = 128
-    hp.fc.num_layers = 2
-    hp.fc.num_groups = 16
-    hp.fc.num_blocks_per_residual = 2
-    hp.fc.num_blocks_per_dropout = 2
+    hp.fc.num_features = params.Discrete([32, 64, 128, 256])
+    hp.fc.num_layers = params.Integer(min_value=1, max_value=3)
+    hp.fc.num_groups = params.Discrete([16, 32, 64])
+    hp.fc.num_blocks_per_residual = params.Integer(min_value=1, max_value=5)
+    hp.fc.num_blocks_per_dropout = params.Integer(min_value=1, max_value=5)
     hp.fc.requires_grad = True
 
-    hp.neck.num_features = 128
-    hp.neck.num_layers = 4
-    hp.neck.num_groups = 16
-    hp.neck.num_blocks_per_residual = 2
-    hp.neck.num_blocks_per_dropout = 2
+    hp.neck.num_features = params.Discrete([32, 64, 128, 256])
+    hp.neck.num_layers = params.Integer(min_value=1, max_value=3)
+    hp.neck.num_groups = params.Discrete([16, 32, 64])
+    hp.neck.num_blocks_per_residual = params.Integer(min_value=1, max_value=5)
+    hp.neck.num_blocks_per_dropout = params.Integer(min_value=1, max_value=5)
     hp.neck.requires_grad = True
 
     hp.head.weights = {
@@ -368,8 +370,6 @@ if __name__ == '__main__':
 
     hostname = socket.gethostname()
     is_local_run = hostname.endswith('.local')
-
-    net = model.TablestakesBertConvTransTClassModel.from_hp(hp)
 
     utils.hprint('About to start model run:')
     utils.print_dict(hp.to_dict())
@@ -384,7 +384,7 @@ if __name__ == '__main__':
         tune_hp=tune_hp,
         factored_lightning_module_class=model.TablestakesBertConvTransTClassModel,
         extra_pl_callbacks=None,
-        ray_local_mode=False,
+        ray_local_mode=True,
     )
     tune_runner.run(
         fast_dev_run=False,
