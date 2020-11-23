@@ -63,6 +63,7 @@ setup(
         's3fs',
         'neptune-client',
         'boto3',
+        'dataclasses',
     ],
 
     classifiers=[
