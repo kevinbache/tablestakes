@@ -368,7 +368,7 @@ if __name__ == '__main__':
     tune_hp.asha_grace_period = 4
     tune_hp.asha_reduction_factor = 2
     tune_hp.num_hp_samples = 2
-    tune_hp.log_to_file = False
+    tune_hp.log_to_file = True
     tune_hp.ray_local_mode = False
 
     hostname = socket.gethostname()
