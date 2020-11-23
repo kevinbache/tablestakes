@@ -1,4 +1,4 @@
-cluster_name: cluster-ami-4
+cluster_name: cluster-ami-6
 
 provider:
     type: aws
@@ -52,7 +52,7 @@ file_mounts: {
     "~/data/tablestakes/datasets/": "~/data/tablestakes/datasets/",
 }
 
-#setup_commands: []
+setup_commands: []
 
 #setup_commands:
 #    #  pytorch lightning
