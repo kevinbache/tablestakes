@@ -156,6 +156,8 @@ def run(
         fast_dev_run=False,
         do_find_lr=False,
 ):
+    utils.set_seeds(hp.data.seed)
+
     print("model run about to create trainer")
     trainer = pl.Trainer(
         logger=True if fast_dev_run else logs_mod.get_pl_logger(hp.exp),

@@ -240,6 +240,8 @@ class TuneRunner:
         )
 
     def run(self, fast_dev_run=False, use_gpus=False, log_to_file=False):
+        utils.set_seeds(self.search_params.data.seed)
+
         search_dict = self.search_params.to_ray_tune_search_dict()
         # see tune.utils.UtilMonitor
         search_dict['log_sys_usage'] = True

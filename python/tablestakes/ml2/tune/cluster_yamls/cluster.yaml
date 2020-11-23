@@ -16,13 +16,12 @@ autoscaling_mode: default
 target_utilization_fraction: 0.8
 idle_timeout_minutes: 20
 
-#
+# look here for ami info
 # https://aws.amazon.com/marketplace/server/configuration?productId=039d985d-abfb-4433-b75e-a302b018c668&ref_=psb_cfg_continue
 
 head_node:
     InstanceType: m4.large
-#    ImageId: latest_dlami
-    ImageId: ami-0bc87a16c757a7f07
+    ImageId: ami-0bc87a16c757a7f07   # dlami v36 us-west-2
 #    ImageId: ami-0c528fc50c922876d  # my ami
     BlockDeviceMappings:
         - DeviceName: /dev/sda1
@@ -36,7 +35,7 @@ head_node:
 worker_nodes:
     InstanceType: g4dn.xlarge
 #    ImageId: latest_dlami
-    ImageId: ami-0bc87a16c757a7f07
+    ImageId: ami-0bc87a16c757a7f07   # dlami v36 us-west-2
 #    ImageId: ami-0539bf2eed8e613a3  # my ami
     InstanceMarketOptions:
         MarketType: spot
@@ -54,27 +53,8 @@ file_mounts: {
 
 setup_commands: []
 
-#setup_commands:
-#    #  pytorch lightning
-#    - test -e ~/projects/pytorch-lightning || git clone https://github.com/PyTorchLightning/pytorch-lightning.git ~/projects/pytorch-lightning
-#    - cd ~/projects/pytorch-lightning && git pull
-#    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/pytorch-lightning/
-#
-#    #  chillpill
-#    - test -e ~/projects/chillpill || git clone https://github.com/kevinbache/chillpill.git ~/projects/chillpill
-#    - cd ~/projects/chillpill && git fetch && git checkout `cat /tmp/chillpill_current_branch_sha`
-#    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/chillpill/
-#
-#    #  tablestakes
-#    - test -e ~/projects/tablestakes/python || git clone https://github.com/kevinbache/tablestakes.git ~/projects/tablestakes
-#    - cd ~/projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
-#    - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/tablestakes/python/
-
 # Custom commands that will be run on the head node after common setup.
 head_setup_commands:
-    # cpu torch et al
-#    - source /home/ubuntu/.dlamirc && conda install -y -c pytorch -c anaconda boto3>=1.10.44 botocore=1.19.1 cpuonly=1.0-0 docutils=0.15.2 libuv=1.40.0 ninja=1.10.1 pytorch=1.7.0 s3transfer=0.3.3 torchvision=0.8.1 openmpi=4.0.2 openssl=1.1.1
-#    - source /home/ubuntu/.dlamirc && conda install -y -c pytorch -c anaconda cpuonly=1.0-0 pytorch-nightly boto3>=1.10.44 botocore=1.19.1 docutils=0.15.2 libuv=1.40.0 ninja=1.10.1 s3transfer=0.3.3 torchvision=0.8.1 openmpi=4.0.2 openssl=1.1.1
     - source /home/ubuntu/.dlamirc && pip install --pre torch torchvision torchaudio -f https://download.pytorch.org/whl/nightly/cpu/torch_nightly.html
     - source /home/ubuntu/.dlamirc && pip install tabulate tensorboard tensorboardX \
         hyperopt neptune-client neptune-contrib[viz] mlflow hiplot \
@@ -116,12 +96,7 @@ head_setup_commands:
 
 # Custom commands that will be run on the head node after common setup.
 worker_setup_commands:
-#    - source /home/ubuntu/.dlamirc && conda install -y -c pytorch -c anaconda boto3>=1.10.44 botocore=1.19.1 cpuonly=1.0-0 docutils=0.15.2 libuv=1.40.0 ninja=1.10.1 pytorch=1.7.0 s3transfer=0.3.3 torchvision=0.8.1 openmpi=4.0.2 openssl=1.1.1
-#    - source /home/ubuntu/.dlamirc && conda install -y -c pytorch -c anaconda boto3>=1.10.44 botocore=1.19.1 docutils=0.15.2 libuv=1.40.0 ninja=1.10.1 s3transfer=0.3.3 torchvision=0.8.1 openmpi=4.0.2 openssl=1.1.1
-#    - source /home/ubuntu/.dlamirc && pip install lib/torch-1.8.0a0-cp37-cp37m-linux_x86_64.whl
-#    - pip install numpy
     - source /home/ubuntu/.dlamirc && pip install --pre torch torchvision torchaudio -f https://download.pytorch.org/whl/nightly/cu100/torch_nightly.html
-#    - source /home/ubuntu/.dlamirc && conda install pytorch torchvision torchaudio cudatoolkit=10.2 -c pytorch-nightly
     - source /home/ubuntu/.dlamirc && pip install tabulate tensorboard tensorboardX \
         hyperopt neptune-client neptune-contrib[viz] mlflow hiplot \
         jupyter ipywidgets bokeh "pandas>=1.1"
@@ -168,9 +143,8 @@ head_start_ray_commands:
     - source /home/ubuntu/.dlamirc && ray start --head --port=6379 --object-manager-port=8076 --autoscaling-config=~/ray_bootstrap_config.yaml
 
 worker_start_ray_commands:
-    - source /home/ubuntu/.dlamirc && ray stop
-    - ray start --address=$RAY_HEAD_IP:6379 --object-manager-port=8076
 #    - unset RAY_OVERRIDE_RESOURCES && source /home/ubuntu/.dlamirc && ray stop
 #    - sudo ulimit -n 65536; source /home/ubuntu/.dlamirc && ray start --address=$RAY_HEAD_IP:6379 --object-manager-port=8076
-
 #    - unset RAY_OVERRIDE_RESOURCES && source /home/ubuntu/.dlamirc && ray start --address=$RAY_HEAD_IP:6379 --object-manager-port=8076
+    - source /home/ubuntu/.dlamirc && ray stop
+    - source /home/ubuntu/.dlamirc && ray start --address=$RAY_HEAD_IP:6379 --object-manager-port=8076
