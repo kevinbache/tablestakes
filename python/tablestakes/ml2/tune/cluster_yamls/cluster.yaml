@@ -22,21 +22,14 @@ idle_timeout_minutes: 20
 head_node:
     InstanceType: m4.large
     ImageId: ami-0bc87a16c757a7f07   # dlami v36 us-west-2
-#    ImageId: ami-0c528fc50c922876d  # my ami
     BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
               VolumeSize: 200
-#    InstanceMarketOptions:
-#        MarketType: spot
-#        SpotOptions:
-#            MaxPrice: "0.30"
 
 worker_nodes:
     InstanceType: g4dn.xlarge
-#    ImageId: latest_dlami
     ImageId: ami-0bc87a16c757a7f07   # dlami v36 us-west-2
-#    ImageId: ami-0539bf2eed8e613a3  # my ami
     InstanceMarketOptions:
         MarketType: spot
         SpotOptions:

@@ -62,14 +62,14 @@ class TuneLogCopierCallback(pl.Callback):
         d['pid'] = pid
         tune.report(**d)
 
-    def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
+    def on_train_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
         self._inner(trainer, pl_module)
 
-    def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
+    def on_validation_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
         self._checkpoint(trainer)
         self._inner(trainer, pl_module)
 
-    def on_test_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
+    def on_test_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
         self._inner(trainer, pl_module)
 
 
