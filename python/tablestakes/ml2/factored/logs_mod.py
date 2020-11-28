@@ -231,7 +231,7 @@ class SigmoidBetterAccuracy(pl.metrics.Accuracy):
 class ExperimentParams(params.ParameterSet):
     project_name: str = 'my_project'
     experiment_name: str = 'my_experiment'
-    experiment_tags: str = ('testing', )
+    experiment_tags: List[str] = ['testing', ]
     sources_glob_str: str = '*.py'
     offline_mode: bool = False
 
@@ -242,9 +242,6 @@ class ExperimentParams(params.ParameterSet):
 # noinspection PyProtectedMember
 class MyLightningNeptuneLogger(pl_loggers.NeptuneLogger):
     def __init__(self, hp: ExperimentParams, version: str = '', offline_mode=False):
-        source_files = glob.glob(str(hp.sources_glob_str), recursive=True)
-        utils.hprint(f'MyLightningNeptuneLogger.sources_files: {source_files}')
-
         self.offline_mode = offline_mode
 
         super().__init__(
@@ -255,7 +252,7 @@ class MyLightningNeptuneLogger(pl_loggers.NeptuneLogger):
             experiment_name=f'pl_log-{version}',
             params=hp.to_dict(),
             tags=hp.experiment_tags,
-            upload_source_files=source_files,
+            upload_source_files=hp.sources_glob_str,
         )
         self.append_tags(hp.experiment_tags)
 
