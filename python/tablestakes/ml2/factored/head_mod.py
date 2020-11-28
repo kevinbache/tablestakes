@@ -465,12 +465,14 @@ class HeadMakerFactory:
             neck_hp: trunks_mod.SlabNet.ModelParams,
             head_hp: Union[WeightedHeadParams, HeadParams],
     ) -> HeadMaker:
+
+        num_head_inputs = max(neck_hp.num_features, neck_hp.num_groups)
+
         if head_hp.type == 'weighted':
             subhead_makers = {
                 head_name: cls.create(neck_hp, subhead_hp)
                 for head_name, subhead_hp in head_hp.head_params.items()
             }
-
             def fn(num_input_features: int):
                 head_maker = WeightedHead.maker_from_makers(
                     head_makers=subhead_makers,
@@ -482,34 +484,30 @@ class HeadMakerFactory:
                 #     neck_hp=neck_hp,
                 # )
                 return head_maker(num_input_features)
-
             return fn
         elif head_hp.type == 'linear':
             def fn(num_input_features: int):
                 return HeadedSlabNet(
                     num_input_features=num_input_features,
-                    head=LinearSoftmaxHead(neck_hp.num_features, head_hp),
+                    head=LinearSoftmaxHead(num_head_inputs, head_hp),
                     neck_hp=neck_hp,
                 )
-
             return fn
         elif head_hp.type == 'softmax':
             def fn(num_input_features: int):
                 return HeadedSlabNet(
                     num_input_features=num_input_features,
-                    head=AdaptiveSoftmaxHead(neck_hp.num_features, head_hp),
+                    head=AdaptiveSoftmaxHead(num_head_inputs, head_hp),
                     neck_hp=neck_hp,
                 )
-
             return fn
         elif head_hp.type == 'sigmoid':
             def fn(num_input_features: int):
                 return HeadedSlabNet(
                     num_input_features=num_input_features,
-                    head=SigmoidHead(neck_hp.num_features, head_hp),
+                    head=SigmoidHead(num_head_inputs, head_hp),
                     neck_hp=neck_hp,
                 )
-
             return fn
         elif head_hp.type is None or head_hp.type == 'none':
             return lambda _: EmptyHead()
