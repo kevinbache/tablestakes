@@ -104,19 +104,19 @@ class TuneRunner(torch_mod.Parameterized['factored.FactoredLightningModule.Facto
 
     def get_tune_callbacks(self):
         return [
-            tune_pl.TuneReportCallback(
-                metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.TRAIN_PHASE_NAME),
-                on='train_end',
-            ),
+            # tune_pl.TuneReportCallback(
+            #     metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.TRAIN_PHASE_NAME),
+            #     on='train_end',
+            # ),
             tune_pl.TuneReportCheckpointCallback(
                 metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.VALID_PHASE_NAME),
                 filename=constants.CHECKPOINT_FILE_BASENAME,
                 on='validation_end',
             ),
-            tune_pl.TuneReportCallback(
-                metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.TEST_PHASE_NAME),
-                on='test_end',
-            ),
+            # tune_pl.TuneReportCallback(
+            #     metrics=self._metrics_tracker_class.get_all_metric_names_for_phase(constants.TEST_PHASE_NAME),
+            #     on='test_end',
+            # ),
         ]
 
     @staticmethod

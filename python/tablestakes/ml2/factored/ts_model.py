@@ -153,7 +153,6 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
 
 def run(
         net: pl.LightningModule,
-        # dm: pl.LightningDataModule,
         hp: TotalParams,
         fast_dev_run=False,
         do_find_lr=False,
@@ -314,5 +313,4 @@ if __name__ == '__main__':
     utils.hprint('About to start model run:')
     utils.print_dict(hp.to_dict())
 
-    # run(net, net.dm, hp, fast_dev_run, do_find_lr=False)
     run(net, hp, fast_dev_run, do_find_lr=False)
