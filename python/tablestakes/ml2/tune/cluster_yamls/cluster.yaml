@@ -51,15 +51,10 @@ file_mounts: {
     "~/data/tablestakes/datasets/": "~/data/tablestakes/datasets/",
 }
 
-setup_commands: []
 
-# Custom commands that will be run on the head node after common setup.
-head_setup_commands:
-    - source /home/ubuntu/.dlamirc && pip install --pre torch torchvision torchaudio \
-        -f https://download.pytorch.org/whl/nightly/cpu/torch_nightly.html
-    - source /home/ubuntu/.dlamirc && pip install tabulate tensorboard tensorboardX \
-        hyperopt neptune-client neptune-contrib[viz] mlflow hiplot \
-        jupyter ipywidgets bokeh "pandas>=1.1"
+setup_commands:
+    # my stuff
+    - mkdir -p ~/projects
 
     # ray
     - source /home/ubuntu/.dlamirc && pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-1.1.0.dev0-cp37-cp37m-manylinux1_x86_64.whl
@@ -67,8 +62,14 @@ head_setup_commands:
     #  for https://docs.ray.io/en/stable/webui.html
     - source /home/ubuntu/.dlamirc && jupyter nbextension enable --py --sys-prefix widgetsnbextension
 
-    # my stuff
-    - mkdir -p ~/projects
+
+# Custom commands that will be run on the head node after common setup.
+head_setup_commands:
+    # torch
+    - source /home/ubuntu/.dlamirc && pip install --pre torch torchvision torchaudio -f https://download.pytorch.org/whl/nightly/cpu/torch_nightly.html
+    - source /home/ubuntu/.dlamirc && pip install tabulate tensorboard tensorboardX \
+        hyperopt neptune-client neptune-contrib[viz] mlflow hiplot \
+        jupyter ipywidgets bokeh "pandas>=1.1"
 
     #  pytorch lightning
     - test -e ~/projects/pytorch-lightning || git clone https://github.com/PyTorchLightning/pytorch-lightning.git ~/projects/pytorch-lightning
@@ -97,20 +98,11 @@ head_setup_commands:
 
 # Custom commands that will be run on the head node after common setup.
 worker_setup_commands:
-    - source /home/ubuntu/.dlamirc && pip install --pre torch torchvision torchaudio \
-        -f https://download.pytorch.org/whl/nightly/cu100/torch_nightly.html
+    # torch
+    - source /home/ubuntu/.dlamirc && pip install --pre torch torchvision torchaudio -f https://download.pytorch.org/whl/nightly/cu100/torch_nightly.html
     - source /home/ubuntu/.dlamirc && pip install tabulate tensorboard tensorboardX \
         hyperopt neptune-client neptune-contrib[viz] mlflow hiplot \
         jupyter ipywidgets bokeh "pandas>=1.1"
-
-    # ray
-    - source /home/ubuntu/.dlamirc && pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-1.1.0.dev0-cp37-cp37m-manylinux1_x86_64.whl
-    - source /home/ubuntu/.dlamirc && pip install ray[all]
-    #  for https://docs.ray.io/en/stable/webui.html
-    - source /home/ubuntu/.dlamirc && jupyter nbextension enable --py --sys-prefix widgetsnbextension
-
-    # my stuff
-    - source /home/ubuntu/.dlamirc && mkdir -p ~/projects
 
     #  pytorch lightning from source
     - test -e ~/projects/pytorch-lightning || git clone https://github.com/PyTorchLightning/pytorch-lightning.git ~/projects/pytorch-lightning
