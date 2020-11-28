@@ -102,16 +102,16 @@ class TuneRunner:
     @staticmethod
     def get_pl_callbacks_for_tune():
         return [
-            pl_tune.TuneReportCallback(
-                on='train_end',
-            ),
+            # pl_tune.TuneReportCallback(
+            #     on='train_end',
+            # ),
             pl_tune.TuneReportCheckpointCallback(
                 filename=constants.CHECKPOINT_FILE_BASENAME,
                 on='validation_end',
             ),
-            pl_tune.TuneReportCallback(
-                on='test_end',
-            ),
+            # pl_tune.TuneReportCallback(
+            #     on='test_end',
+            # ),
         ]
 
     @staticmethod
