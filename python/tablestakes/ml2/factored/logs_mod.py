@@ -52,7 +52,7 @@ class TuneLogCopierCallback(pl.Callback):
 
         for k, v in d.items():
             if isinstance(v, torch.Tensor):
-                d[k] = v.detach()
+                d[k] = v.item()
         return d
 
     def _inner(self, trainer, pl_module):
