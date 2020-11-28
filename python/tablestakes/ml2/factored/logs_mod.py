@@ -33,41 +33,44 @@ class LoggingParams(params.ParameterSet):
 
 
 class TuneLogCopierCallback(pl.Callback):
+    def __init__(self, filename='checkpoint'):
+        super().__init__()
+        self._filename = filename
+
+    def _checkpoint(self, trainer):
+        if trainer.running_sanity_check:
+            return
+        with tune.checkpoint_dir(step=trainer.global_step) as checkpoint_dir:
+            trainer.save_checkpoint(
+                os.path.join(checkpoint_dir, self._filename))
+
     @staticmethod
     def _get_metrics_dict(trainer, pl_module):
         d = trainer.logged_metrics
         d.update(trainer.callback_metrics)
         d.update(trainer.progress_bar_metrics)
-        # d.update(pl_module.metrics_tracker.metrics_to_log_for_tune)
 
         for k, v in d.items():
             if isinstance(v, torch.Tensor):
                 d[k] = v.detach()
         return d
 
-    def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
+    def _inner(self, trainer, pl_module):
         d = self._get_metrics_dict(trainer, pl_module)
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
         pid = os.getpid()
         d['pid'] = pid
-        trainer.callback_metrics['pid'] = pid
         tune.report(**d)
+
+    def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
+        self._inner(trainer, pl_module)
 
     def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        d = self._get_metrics_dict(trainer, pl_module)
-        d[CURRENT_EPOCH_NAME] = trainer.current_epoch
-        pid = os.getpid()
-        d['pid'] = pid
-        trainer.callback_metrics['pid'] = pid
-        tune.report(**d)
+        self._checkpoint(trainer)
+        self._inner(trainer, pl_module)
 
     def on_test_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-        d = self._get_metrics_dict(trainer, pl_module)
-        d[CURRENT_EPOCH_NAME] = trainer.current_epoch
-        pid = os.getpid()
-        d['pid'] = pid
-        trainer.callback_metrics['pid'] = pid
-        tune.report(**d)
+        self._inner(trainer, pl_module)
 
 
 class VocabLengthCallback(pl.Callback):
@@ -148,6 +151,7 @@ class CounterTimerLrCallback(pl.Callback):
         d = {
             PARAM_COUNT_NAME: self._count_params(pl_module),
             TRAINABLE_PARAM_COUNT_NAME: self._count_trainable_params(pl_module),
+            'pid': os.getpid(),
         }
 
         # noinspection PyTypeChecker
@@ -176,6 +180,7 @@ class CounterTimerLrCallback(pl.Callback):
         d = self._get_lr_dict(pl_module)
         d[TIME_PERF_NAME] = time.process_time() - self._train_start_process
         d[TIME_PROCESS_NAME] = time.process_time() - self._train_start_process
+        d['pid'] = os.getpid()
 
         trainer.logger.log_metrics(d, step=trainer.global_step)
 
