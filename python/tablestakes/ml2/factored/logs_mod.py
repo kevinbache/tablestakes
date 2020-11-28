@@ -5,17 +5,19 @@ import time
 from typing import *
 
 import torch
-from pytorch_lightning.metrics.utils import _input_format_classification
-from tablestakes.ml2.data import datapoints
 from torch import nn
+
+from pytorch_lightning.metrics.utils import _input_format_classification
 import pytorch_lightning as pl
 from pytorch_lightning import loggers as pl_loggers
 
 from ray import tune
 
-from tablestakes import constants, utils
-
 from chillpill import params
+
+from tablestakes import constants, utils
+from tablestakes.ml2.data import datapoints
+
 
 CURRENT_EPOCH_NAME = 'current_epoch'
 PARAM_COUNT_NAME = 'param_count'
