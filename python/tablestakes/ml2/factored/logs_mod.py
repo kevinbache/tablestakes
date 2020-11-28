@@ -189,6 +189,7 @@ class BetterAccuracy(pl.metrics.Accuracy):
 
 class SigmoidBetterAccuracy(pl.metrics.Accuracy):
     Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
+    THRESHOLD = 0.5
 
     def __init__(self):
         super().__init__(
@@ -203,10 +204,10 @@ class SigmoidBetterAccuracy(pl.metrics.Accuracy):
     """PyTorch Lightning's += lines cause warnings about transferring lots of scalars between cpu / gpu"""
 
     def update(self, preds: torch.Tensor, target: torch.Tensor):
-        # preds = preds.argmax(dim=1)
-        # target = target.squeeze(1)
         preds = self.s(preds)
-        assert preds.shape == target.shape, f"preds.shape: {preds.shape}, target.shape: {target.shape}"
+        preds = preds > self.THRESHOLD
+        # preds, target = _input_format_classification(preds, target, self.threshold)
+        # assert preds.shape == target.shape, f"preds.shape: {preds.shape}, target.shape: {target.shape}"
         self.correct = self.correct + torch.sum(preds.eq(target))
         self.total = self.total + target.numel() - target.eq(self.Y_VALUE_TO_IGNORE).sum()
 

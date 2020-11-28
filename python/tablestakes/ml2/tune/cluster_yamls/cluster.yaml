@@ -1,4 +1,4 @@
-cluster_name: cluster-ami-6
+cluster_name: cluster-ami
 
 provider:
     type: aws
@@ -55,7 +55,8 @@ setup_commands: []
 
 # Custom commands that will be run on the head node after common setup.
 head_setup_commands:
-    - source /home/ubuntu/.dlamirc && pip install --pre torch torchvision torchaudio -f https://download.pytorch.org/whl/nightly/cpu/torch_nightly.html
+    - source /home/ubuntu/.dlamirc && pip install --pre torch torchvision torchaudio \
+        -f https://download.pytorch.org/whl/nightly/cpu/torch_nightly.html
     - source /home/ubuntu/.dlamirc && pip install tabulate tensorboard tensorboardX \
         hyperopt neptune-client neptune-contrib[viz] mlflow hiplot \
         jupyter ipywidgets bokeh "pandas>=1.1"
@@ -67,7 +68,7 @@ head_setup_commands:
     - source /home/ubuntu/.dlamirc && jupyter nbextension enable --py --sys-prefix widgetsnbextension
 
     # my stuff
-    - source /home/ubuntu/.dlamirc && mkdir -p ~/projects
+    - mkdir -p ~/projects
 
     #  pytorch lightning
     - test -e ~/projects/pytorch-lightning || git clone https://github.com/PyTorchLightning/pytorch-lightning.git ~/projects/pytorch-lightning
@@ -96,7 +97,8 @@ head_setup_commands:
 
 # Custom commands that will be run on the head node after common setup.
 worker_setup_commands:
-    - source /home/ubuntu/.dlamirc && pip install --pre torch torchvision torchaudio -f https://download.pytorch.org/whl/nightly/cu100/torch_nightly.html
+    - source /home/ubuntu/.dlamirc && pip install --pre torch torchvision torchaudio \
+        -f https://download.pytorch.org/whl/nightly/cu100/torch_nightly.html
     - source /home/ubuntu/.dlamirc && pip install tabulate tensorboard tensorboardX \
         hyperopt neptune-client neptune-contrib[viz] mlflow hiplot \
         jupyter ipywidgets bokeh "pandas>=1.1"

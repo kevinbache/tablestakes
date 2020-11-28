@@ -6,33 +6,23 @@ import pytorch_lightning as pl
 from tablestakes import utils, constants
 from tablestakes.ml2 import factored
 from tablestakes.ml2.data import datapoints, tablestakes_data
-from tablestakes.ml2.factored import data_module, logs_mod, opt_mod, trunks, head_mod
+from tablestakes.ml2.factored import data_module, logs_mod, opt_mod, trunks_mod, head_mod
 
 from chillpill import params
-
-
-class TablestakesHeadParams(head_mod.WeightedHeadParams):
-    def __init__(self):
-        head_params = {
-            constants.Y_KORV_BASE_NAME: head_mod.HeadParams(type='linear', num_classes=2),
-            constants.Y_WHICH_KV_BASE_NAME: head_mod.HeadParams(type='linear', num_classes=11),
-        }
-        super().__init__(head_params=head_params, weights=[1.0, 1.0])
 
 
 class TotalParams(params.ParameterSet):
     data: data_module.DataParams
     opt: opt_mod.OptParams = opt_mod.OptParams()
     exp: logs_mod.ExperimentParams = logs_mod.ExperimentParams()
-    # data: data_module.DataParams = data_module.DataParams(dataset_name='num=100_8163')
     logs: logs_mod.LoggingParams = logs_mod.LoggingParams()
 
-    embed: trunks.BertEmbedder.ModelParams = trunks.BertEmbedder.ModelParams()
-    conv: trunks.ConvBlock.ModelParams = trunks.ConvBlock.ModelParams()
-    trans: trunks.TransBlockBuilder.ModelParams = trunks.TransBlockBuilder.ModelParams()
-    fc: trunks.SlabNet.ModelParams = trunks.SlabNet.ModelParams()
+    embed: trunks_mod.BertEmbedder.ModelParams = trunks_mod.BertEmbedder.ModelParams()
+    conv: trunks_mod.ConvBlock.ModelParams = trunks_mod.ConvBlock.ModelParams()
+    trans: trunks_mod.TransBlockBuilder.ModelParams = trunks_mod.TransBlockBuilder.ModelParams()
+    fc: trunks_mod.SlabNet.ModelParams = trunks_mod.SlabNet.ModelParams()
     neck: head_mod.HeadedSlabNet.ModelParams = head_mod.HeadedSlabNet.ModelParams()
-    head: TablestakesHeadParams = TablestakesHeadParams()
+    head: head_mod.WeightedHeadParams = head_mod.WeightedHeadParams(weights={}, head_mod={})
 
     verbose: bool = False
 
@@ -44,8 +34,10 @@ class TotalParams(params.ParameterSet):
             data.data_name = 'DUMMY_DATASET'
         self.data = data
 
-        self.embed.max_seq_len = self.data.max_seq_length = max_seq_len
-        self.data.batch_size = self.opt.batch_size = batch_size
+        self.embed.max_seq_len = max_seq_len
+        self.data.max_seq_length = max_seq_len
+        self.data.batch_size = batch_size
+        self.opt.batch_size = batch_size
 
 
 class ModelBertConvTransTClass2(factored.FactoredLightningModule):
@@ -70,7 +62,7 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
 
         ###############################################################
         # MODEL
-        self.embed = trunks.BertEmbedder(self.hp.embed)
+        self.embed = trunks_mod.BertEmbedder(self.hp.embed)
 
         # cat here
         num_embedcat_features = self.hp.embed.dim + num_x_base_features
@@ -79,7 +71,7 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
             self.conv = None
             num_conv_features = 0
         else:
-            self.conv = trunks.ConvBlock(
+            self.conv = trunks_mod.ConvBlock(
                 num_input_features=num_embedcat_features,
                 hp=self.hp.conv,
             )
@@ -89,11 +81,11 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
             self.trans = None
             num_trans_features = 0
         else:
-            self.trans = trunks.TransBlockBuilder.build(hp=hp.trans, num_input_features=num_embedcat_features)
+            self.trans = trunks_mod.TransBlockBuilder.build(hp=hp.trans, num_input_features=num_embedcat_features)
             num_trans_features = num_embedcat_features
 
         num_fc_features = num_x_base_features + num_trans_features + num_conv_features
-        self.fc = trunks.SlabNet(
+        self.fc = trunks_mod.SlabNet(
             num_input_features=num_fc_features,
             hp=self.hp.fc,
         )
@@ -189,9 +181,8 @@ def run(
 
 class TablestakesBertConvTransTClassModel(ModelBertConvTransTClass2):
     @classmethod
-    def from_hp(cls, hp):
+    def from_hp(cls, hp: TotalParams):
         dm = tablestakes_data.TablestakesHandlerDataModule(hp.data)
-        # noinspection PyTypeChecker
         net = cls(
             hp=hp,
             dm=dm,
@@ -204,7 +195,6 @@ class TablestakesBertConvTransTClassModel(ModelBertConvTransTClass2):
         return net
 
 
-
 if __name__ == '__main__':
     fast_dev_run = False
 
@@ -213,9 +203,9 @@ if __name__ == '__main__':
         dataset_name='num=1000_2cfc',
     )
     hp = TotalParams(
+        data=dp,
         max_seq_len=8192,
         batch_size=32,
-        data=dp,
     )
 
     hp.data.do_ignore_cached_dataset = False
@@ -230,18 +220,19 @@ if __name__ == '__main__':
     hp.opt.lr = 0.001
     hp.opt.patience = 10
 
-    hp.logs.num_steps_per_histogram_log = 5
+    hp.logs.num_steps_per_histogram_log = 20
     hp.logs.num_steps_per_metric_log = 5
     hp.logs.output_dir = constants.OUTPUT_DIR
 
     hp.exp.project_name = 'tablestakes'
     hp.exp.experiment_name = 'korv which'
-    hp.exp.experiment_tags = ['korv_which', 'conv', 'sharp', 'testing']
+    hp.exp.experiment_tags = ['korv_which', 'testing']
     hp.exp.sources_glob_str = constants.THIS_DIR.parent.parent / '**/*.py'
     hp.exp.offline_mode = False
 
     hp.embed.dim = 15
     hp.embed.requires_grad = True
+    hp.embed.position_embedding_requires_grad = False
 
     hp.conv.num_features = 128
     hp.conv.num_layers = 4
@@ -273,12 +264,40 @@ if __name__ == '__main__':
     hp.neck.num_blocks_per_dropout = 2
     hp.neck.requires_grad = True
 
-    hp.head.weights = {
-        constants.Y_KORV_BASE_NAME: 0.3,
-        constants.Y_WHICH_KV_BASE_NAME: 1.0,
-    }
+    hp.head = head_mod.WeightedHeadParams(
+        weights={
+            constants.Y_KORV_BASE_NAME: 0.3,
+            constants.Y_WHICH_KV_BASE_NAME: 1.0,
+        },
+        head_params={
+            constants.Y_KORV_BASE_NAME: head_mod.HeadParams(type='linear', num_classes=2),
+            constants.Y_WHICH_KV_BASE_NAME: head_mod.HeadParams(type='linear', num_classes=11),
+        },
+    )
 
     hp.verbose = False
+
+    # utils.hprint('tablestakes.model.hp before to_dict:')
+    # print(hp)
+    # hpd = hp.to_dict()
+    # utils.hprint('tablestakes.model.hp after to_dict:')
+    # print(hp)
+    #
+    # utils.hprint('hpd:')
+    # utils.print_dict(hpd)
+    #
+    # utils.hprint('tablestakes.model.hp before from_dict:')
+    # print(hp)
+    #
+    # hprt = TotalParams.from_dict(hpd)
+    # utils.hprint('tablestakes.model.hp after from_dict:')
+    # print(hp)
+    #
+    # utils.hprint('tablestakes.model.hprt:')
+    # print(hprt)
+    # utils.hprint('tablestakes.model.hp after all:')
+    # print(hp)
+    #
 
     net = TablestakesBertConvTransTClassModel.from_hp(hp)
 

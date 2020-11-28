@@ -304,11 +304,11 @@ class TuneFactoredParams(factored.FactoredLightningModule.FactoredParams):
         hp.tune = tune_params
         return hp
 
-from tablestakes.ml2.factored import model
+from tablestakes.ml2.factored import ts_model
 
 # noinspection DuplicatedCode
 if __name__ == '__main__':
-    hp = model.TotalParams(
+    hp = ts_model.TotalParams(
         max_seq_len=2 ** 11,
         batch_size=32,
     )

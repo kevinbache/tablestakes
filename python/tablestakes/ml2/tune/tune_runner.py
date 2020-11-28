@@ -4,7 +4,7 @@ import socket
 
 from ray.tune.integration import pytorch_lightning as pl_tune
 from tablestakes.ml2.data import data_module, tablestakes_data, datapoints
-from tablestakes.ml2.factored import model, opt_mod, head_mod, FactoredParams, logs_mod
+from tablestakes.ml2.factored import ts_model, opt_mod, head_mod, FactoredParams, logs_mod
 from tablestakes.ml2 import data, factored
 from typing import *
 
@@ -38,7 +38,6 @@ class TuneRunner:
             tune_hp: TuneParams,
             factored_lightning_module_class: type,
             extra_pl_callbacks: Optional[List[pl.callbacks.Callback]] = None,
-            ray_local_mode=False,
     ):
         self.include_gpus = None
 
@@ -78,10 +77,10 @@ class TuneRunner:
             'address': None if is_running_on_local_machine else 'auto',
             'ignore_reinit_error': True,
             'include_dashboard': True,
-            'local_mode': ray_local_mode,
+            'local_mode': tune_hp.ray_local_mode,
         }
-        if ray_local_mode:
-            args['num_cpus'] = hp.data.num_cpus
+        if tune_hp.ray_local_mode:
+            args['num_cpus'] = model_hp.data.num_cpus
         print("About to init ray...")
         ray.init(**args)
         print("Done with ray init")
@@ -134,11 +133,13 @@ class TuneRunner:
 
         hp = self._model_param_class.from_dict(config)
         assert isinstance(hp, self._model_param_class)
+        print('  hp:', hp)
 
         if checkpoint_dir:
             # see https://docs.ray.io/en/master/tune/user-guide.html#checkpointing
             raise NotImplementedError(f"Got checkpoint_dir in trian_fn: {checkpoint_dir}")
 
+        utils.hprint("About to create net in TuneRunner")
         net = self._factored_lightning_module_class.from_hp(hp=hp)
 
         utils.set_seeds(hp.data.seed)
@@ -157,9 +158,8 @@ class TuneRunner:
             deterministic=True,
             log_every_n_steps=hp.logs.num_steps_per_metric_log,
         )
+        utils.hprint('About to start tune_runner\'s trainer.fit...')
         fit_out = trainer.fit(net, datamodule=net.dm)
-
-        utils.print_dict(config)
         utils.hprint('Done with tune_runner._train_fn')
 
         return fit_out
@@ -239,7 +239,7 @@ class TuneRunner:
             reduction_factor=tune_hp.asha_reduction_factor,
         )
 
-    def run(self, fast_dev_run=False, use_gpus=False, log_to_file=False):
+    def run(self, fast_dev_run=False, use_gpus=False):
         utils.set_seeds(self.search_params.data.seed)
 
         search_dict = self.search_params.to_ray_tune_search_dict()
@@ -252,7 +252,6 @@ class TuneRunner:
         else:
             sync_config = None
 
-        # noinspection PyTypeChecker
         analysis = tune.run(
             run_or_experiment=self._get_train_fn(fast_dev_run=fast_dev_run, include_gpus=use_gpus),
             name=self.search_params.exp.get_project_exp_name(),
@@ -262,7 +261,7 @@ class TuneRunner:
             num_samples=self.tune_hp.num_hp_samples,
             sync_config=sync_config,
             loggers=self.get_tune_loggers(),
-            log_to_file=log_to_file,
+            log_to_file=self.tune_hp.log_to_file and not self.tune_hp.ray_local_mode,
             keep_checkpoints_num=2,
             checkpoint_score_attr=f'{self.search_params.opt.search_mode}-{self.search_params.opt.search_metric}',
             fail_fast=False,
@@ -298,10 +297,10 @@ if __name__ == '__main__':
         # dataset_name='num=100_057b',
         dataset_name='num=1000_2cfc',
     )
-    hp = model.TotalParams(
+    hp = ts_model.TotalParams(
+        data=dp,
         max_seq_len=8192,
         batch_size=params.Discrete([4, 8, 16, 32, 64, 128, 256]),
-        data=dp,
     )
 
     hp.data.do_ignore_cached_dataset = False
@@ -316,7 +315,7 @@ if __name__ == '__main__':
     hp.opt.lr = params.Discrete([1e-5, 3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2, 1e-1])
     hp.opt.patience = 10
 
-    hp.logs.num_steps_per_histogram_log = 100
+    hp.logs.num_steps_per_histogram_log = 20
     hp.logs.num_steps_per_metric_log = 5
     hp.logs.output_dir = constants.OUTPUT_DIR
 
@@ -326,8 +325,10 @@ if __name__ == '__main__':
     hp.exp.sources_glob_str = constants.THIS_DIR.parent.parent / '**/*.py'
     hp.exp.offline_mode = False
 
-    hp.embed.dim = params.Discrete([15+16, 15+32, 15+64, 15+128, 15+256])
+    base_dim = 15
+    hp.embed.dim = params.Discrete([base_dim + 16, base_dim + 32, base_dim + 64, base_dim + 128, base_dim + 256])
     hp.embed.requires_grad = True
+    hp.embed.position_embedding_requires_grad = False
 
     hp.conv.num_features = params.Discrete([32, 64, 128, 256])
     hp.conv.num_layers = params.Integer(min_value=1, max_value=3)
@@ -359,10 +360,16 @@ if __name__ == '__main__':
     hp.neck.num_blocks_per_dropout = params.Integer(min_value=1, max_value=5)
     hp.neck.requires_grad = True
 
-    hp.head.weights = {
-        constants.Y_KORV_BASE_NAME: 1.0,
-        constants.Y_WHICH_KV_BASE_NAME: 0.3,
-    }
+    hp.head = head_mod.WeightedHeadParams(
+        weights={
+            constants.Y_KORV_BASE_NAME: 0.3,
+            constants.Y_WHICH_KV_BASE_NAME: 1.0,
+        },
+        head_params={
+            constants.Y_KORV_BASE_NAME: head_mod.HeadParams(type='linear', num_classes=2),
+            constants.Y_WHICH_KV_BASE_NAME: head_mod.HeadParams(type='linear', num_classes=11),
+        },
+    )
 
     hp.verbose = False
 
@@ -370,7 +377,7 @@ if __name__ == '__main__':
     tune_hp.asha_grace_period = 4
     tune_hp.asha_reduction_factor = 2
     tune_hp.num_hp_samples = 2
-    tune_hp.log_to_file = True
+    tune_hp.log_to_file = False
     tune_hp.ray_local_mode = False
 
     hostname = socket.gethostname()
@@ -382,14 +389,12 @@ if __name__ == '__main__':
     tune_runner = TuneRunner(
         model_hp=hp,
         tune_hp=tune_hp,
-        factored_lightning_module_class=model.TablestakesBertConvTransTClassModel,
+        factored_lightning_module_class=ts_model.TablestakesBertConvTransTClassModel,
         extra_pl_callbacks=None,
-        ray_local_mode=tune_hp.ray_local_mode,
     )
     tune_runner.run(
         fast_dev_run=False,
         use_gpus=not is_local_run,
-        log_to_file=tune_hp.log_to_file,
     )
 
     utils.hprint("done with tune_runner.run")

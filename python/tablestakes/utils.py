@@ -61,9 +61,9 @@ def dict_to_str(d: Dict, indent_width=2, extra_key_width=0, do_norm_key_width=Tr
     lens = [len(k) for k in d.keys()]
     if do_norm_key_width:
         k_width = max(lens) + extra_key_width
-        return '\n'.join(f'{indent}{k:{k_width}}: {v}{line_end}' for k, v in d.items())
+        return '\n'.join(f'{indent}{k:{k_width}}: {str(v)}{line_end}' for k, v in d.items())
     else:
-        return '\n'.join(f'{indent}{k}: {v}{line_end}' for k, v in d.items())
+        return '\n'.join(f'{indent}{k}: {str(v)}{line_end}' for k, v in d.items())
 
 
 def print_dict(d: Dict, indent_width=2, extra_key_width=0, do_norm_key_width=True, line_end=''):

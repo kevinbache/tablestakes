@@ -8,7 +8,7 @@ from torch import nn
 import pytorch_lightning as pl
 
 from tablestakes import constants, utils
-from tablestakes.ml2.factored import trunks, logs_mod
+from tablestakes.ml2.factored import trunks_mod, logs_mod
 from tablestakes.ml2.data import datapoints
 
 from chillpill import params
@@ -149,6 +149,7 @@ class Head(LossMetrics, pl.LightningModule, abc.ABC):
             try:
                 d[metric_name] = metric(y_hat, y)
             except BaseException as e:
+                print(f'y_hat: {y_hat}, y: {y}')
                 print(f"y_hat.shape: {y_hat.shape}, y.shape: {y.shape}")
                 raise e
         return d
@@ -187,7 +188,7 @@ class EmptyHead(Head):
 
 def get_reducer(num_input_features: int, reducer_str: str) -> Tuple[ReducerFn, int]:
     if reducer_str == 'smash':
-        reducer_fn = trunks.artless_smash
+        reducer_fn = trunks_mod.artless_smash
         num_input_features *= 8
     elif reducer_str in ('first', 'first-dim1'):
         def reducer_fn(x):
@@ -233,7 +234,7 @@ class SigmoidHead(Head):
 
         self.num_classes = num_classes
 
-        class_weights = hp.class_weights or torch.ones(num_classes, dtype=torch.float)
+        class_weights = hp.class_weights or np.ones(num_classes)
         self.register_buffer('class_weights', torch.tensor(class_weights, dtype=torch.float))
         self.class_weights /= self.class_weights.sum()
 
@@ -338,16 +339,26 @@ YDP = TypeVar('YDP', bound=datapoints.YDatapoint)
 
 
 class WeightedHeadParams(params.ParameterSet):
-    weights: Dict[str, float]
-    head_params: Dict[str, HeadParams]
+    weights: Dict[str, float] = {}
+    head_params: Dict[str, HeadParams] = {}
     type: str = 'weighted'
 
+    @classmethod
+    def from_dict(cls, d: Dict):
+        obj = cls()
+        assert 'weights' in d
+        obj.weights = d['weights']
+        assert 'head_params' in d
+        assert isinstance(d['head_params'], dict)
+        obj.head_params = {k: HeadParams.from_dict(v) for k, v in d['head_params'].items()}
+        assert 'type' in d
+        obj.type = d['type']
+        return obj
 
 class WeightedHead(Head):
     LOSS_NAME = constants.LOSS_NAME
     """Multiheaded head with weights for loss."""
 
-    # def __init__(self, num_input_features: int, heads: Dict[str, Head], weights: Dict[str, float], y_dp_class: YDP):
     def __init__(self, num_input_features: int, heads: Dict[str, Head], weights: Dict[str, float]):
         super().__init__(num_input_features=num_input_features, num_classes=-1, metrics_dict={})
 
@@ -357,8 +368,6 @@ class WeightedHead(Head):
 
         weight_vals = [weights[head_name] for head_name in self.heads.keys()]
         self.register_buffer('head_weights', torch.tensor(weight_vals, dtype=torch.float))
-
-        # self.y_dp_class = y_dp_class
 
     def forward(self, x: torch.Tensor) -> Dict[str, Any]:
         y_hats_dict = {}
@@ -416,9 +425,8 @@ class WeightedHead(Head):
     @classmethod
     def maker_from_makers(
             cls,
-            head_makers: Dict[str, Head],
+            head_makers: Dict[str, HeadMaker],
             head_weights: Dict[str, float],
-            # y_dp_class: YDP,
     ) -> HeadMaker:
 
         def head_maker(num_input_features):
@@ -432,7 +440,6 @@ class WeightedHead(Head):
                 num_input_features=num_input_features,
                 heads=heads,
                 weights=head_weights_out,
-                # y_dp_class=y_dp_class,
             )
 
         return head_maker
@@ -444,7 +451,7 @@ class HeadMakerFactory:
     @classmethod
     def create(
             cls,
-            neck_hp: trunks.SlabNet.ModelParams,
+            neck_hp: trunks_mod.SlabNet.ModelParams,
             head_hp: Union[WeightedHeadParams, HeadParams],
     ) -> HeadMaker:
         if head_hp.type == 'weighted':
@@ -454,14 +461,16 @@ class HeadMakerFactory:
             }
 
             def fn(num_input_features: int):
-                return HeadedSlabNet(
-                    num_input_features=num_input_features,
-                    head=WeightedHead.maker_from_makers(
-                        head_makers=subhead_makers,
-                        head_weights=head_hp.weights,
-                    )(neck_hp.num_features),
-                    neck_hp=neck_hp,
+                head_maker = WeightedHead.maker_from_makers(
+                    head_makers=subhead_makers,
+                    head_weights=head_hp.weights,
                 )
+                # return HeadedSlabNet(
+                #     num_input_features=num_input_features,
+                #     head=head_maker(neck_hp.num_features),
+                #     neck_hp=neck_hp,
+                # )
+                return head_maker(num_input_features)
 
             return fn
         elif head_hp.type == 'linear':
@@ -497,7 +506,7 @@ class HeadMakerFactory:
             raise ValueError(f'Got unknown type: {head_hp.type}')
 
 
-class HeadedSlabNet(trunks.SlabNet, LossMetrics):
+class HeadedSlabNet(trunks_mod.SlabNet, LossMetrics):
     """A slabnet with a head containing num_output_features."""
 
     def __init__(
@@ -505,10 +514,10 @@ class HeadedSlabNet(trunks.SlabNet, LossMetrics):
             num_input_features: int,
             head: Optional[Head],
             head_maker: Optional[HeadMaker] = None,
-            neck_hp: Optional[trunks.SlabNet.ModelParams] = trunks.SlabNet.ModelParams(),
+            neck_hp: Optional[trunks_mod.SlabNet.ModelParams] = trunks_mod.SlabNet.ModelParams(),
     ):
         # TODO: omg, this is terrible
-        trunks.SlabNet.__init__(
+        trunks_mod.SlabNet.__init__(
             self,
             num_input_features=num_input_features,
             hp=neck_hp,

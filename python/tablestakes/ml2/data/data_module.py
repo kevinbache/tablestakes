@@ -32,9 +32,9 @@ class DataParams(params.ParameterSet):
     max_seq_length = 4096
     batch_size = 32
 
-    def __init__(self, dataset_name='DUMMY_DATASET_NAME'):
+    def __init__(self, dataset_name='DUMMY_DATASET_NAME', **kwargs):
         self.dataset_name = dataset_name
-        super().__init__()
+        super().__init__(**kwargs)
 
     def __post_init__(self):
         self.docs_root_dir = Path(self.docs_root_dir)

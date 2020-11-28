@@ -215,7 +215,7 @@ class ConvBlock(pl.LightningModule):
     def __init__(
             self,
             num_input_features: int,
-            hp: ModelParams,
+            hp: 'ConvBlock.ModelParams',
             do_error_if_group_div_off: bool = False,
     ):
         super().__init__()
@@ -299,10 +299,6 @@ class SlabNet(FullyConv1Resnet):
         activation: nn.Module = nn.LeakyReLU
         do_include_first_norm: bool = True
         requires_grad: bool = True
-        makers: dict = {
-            constants.Y_WHICH_KV_BASE_NAME: 'linear',
-            constants.Y_KORV_BASE_NAME: 'linear',
-        }
 
     def __init__(
             self,

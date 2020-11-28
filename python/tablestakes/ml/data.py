@@ -487,7 +487,7 @@ class TablestakesDataModule(XYDocumentDataModule):
 
     def get_example_input_array(self) -> Dict[str, torch.Tensor]:
         num_example_batch_size = 32
-        num_example_words = 30000
+        num_example_words = self.hp.max_seq_length
 
         return {
             constants.X_BASE_BASE_NAME:

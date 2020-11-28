@@ -22,7 +22,7 @@ def _rnn_pad_tensors(seqs: List[torch.Tensor], max_seq_len: int, pad_value=0):
     seq_dim = 1
     padded = torch.nn.utils.rnn.pad_sequence(seqs, batch_first=True, padding_value=pad_value)
     seq_len = padded.shape[seq_dim]
-    if seq_len >= max_seq_len:
+    if seq_len > max_seq_len:
         padded = padded.narrow(dim=seq_dim, start=0, length=max_seq_len)
     return padded
 

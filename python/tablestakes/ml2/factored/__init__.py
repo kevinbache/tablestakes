@@ -6,7 +6,7 @@ import pytorch_lightning as pl
 
 from tablestakes import constants, utils
 from tablestakes.ml2.data import datapoints, data_module
-from tablestakes.ml2.factored import opt_mod, head_mod, logs_mod
+from tablestakes.ml2.factored import opt_mod, head_mod, logs_mod, trunks_mod
 
 from chillpill import params
 

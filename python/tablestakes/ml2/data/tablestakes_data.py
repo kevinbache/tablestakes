@@ -58,8 +58,8 @@ class TablestakesHandledDatasetLoadMaker(load_makers.LoadMaker[TablestakesHandle
 class TablestakesHandlerDataModule(data_module.XYMetaHandlerDatasetModule):
     def get_example_input_array(self) -> datapoints.BaseVocabDatapoint:
         num_example_batch_size = 32
-        num_example_words = 4096
-        num_vocab = 1000
+        num_example_words = self.hp.max_seq_length
+        num_vocab = 30000
 
         return datapoints.BaseVocabDatapoint(
             base=torch.tensor(
