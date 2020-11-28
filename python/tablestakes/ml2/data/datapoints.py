@@ -134,7 +134,7 @@ class YDatapoint(Datapoint, abc.ABC):
             if isinstance(v, pd.DataFrame):
                 d[k] = v.values.max() + 1
             elif isinstance(v, torch.Tensor):
-                d[k] = v.max().item() + 1
+                d[k] = v.max().detach() + 1
 
         # noinspection PyArgumentList
         return self.__class__(**d)

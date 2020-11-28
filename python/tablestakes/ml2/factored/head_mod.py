@@ -141,7 +141,20 @@ class Head(LossMetrics, pl.LightningModule, abc.ABC):
         self.loss_reducer_fn = lambda x: x
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.postproc_head_out(self.head(self.x_reducer_fn(x.squeeze(1))))
+        try:
+            x = self.x_reducer_fn(x.squeeze(1))
+        except BaseException as e:
+            print('********************** error on reducer_fn. x.shape:', x.shape)
+            raise e
+
+        try:
+            x = self.postproc_head_out(self.head(x))
+        except BaseException as e:
+            print('********************** error on head. x.shape:', x.shape)
+            print('********************** error on head. self.head:', self.head)
+            raise e
+
+        return x
 
     def metrics(self, y_hat: torch.Tensor, y: torch.Tensor, metas: List[Any]) -> Dict[str, torch.Tensor]:
         d = {}
@@ -274,9 +287,6 @@ class _SoftmaxHead(Head):
 
         self.head = head
         self.loss_fn = nn.NLLLoss(reduction='mean', ignore_index=constants.Y_VALUE_TO_IGNORE)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.postproc_head_out(self.head(self.x_reducer_fn(x.squeeze(1))))
 
     def loss(self, y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         try:

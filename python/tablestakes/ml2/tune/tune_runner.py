@@ -149,7 +149,7 @@ class TuneRunner:
         trainer = pl.Trainer(
             logger=logs_mod.get_pl_logger(hp=hp.exp, tune=tune),
             default_root_dir=tune.get_trial_dir(),
-            callbacks=self.extra_pl_callbacks + self.get_pl_callbacks_for_tune(),
+            callbacks=self.get_pl_callbacks_for_tune() + self.extra_pl_callbacks,
             max_epochs=hp.opt.num_epochs,
             gpus=hp.data.num_gpus if include_gpus else None,
             weights_summary='full',

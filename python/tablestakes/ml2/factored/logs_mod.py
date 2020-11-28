@@ -42,7 +42,7 @@ class TuneLogCopierCallback(pl.Callback):
 
         for k, v in d.items():
             if isinstance(v, torch.Tensor):
-                d[k] = v.item()
+                d[k] = v.detach()
         return d
 
     def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
