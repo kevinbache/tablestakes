@@ -252,7 +252,7 @@ class MyLightningNeptuneLogger(pl_loggers.NeptuneLogger):
             experiment_name=f'pl_log-{version}',
             params=hp.to_dict(),
             tags=hp.experiment_tags,
-            upload_source_files=hp.sources_glob_str,
+            upload_source_files=str(hp.sources_glob_str),
         )
         self.append_tags(hp.experiment_tags)
 
@@ -266,7 +266,7 @@ class MyLightningNeptuneLogger(pl_loggers.NeptuneLogger):
     def set_properties(self, new_properties: Dict):
         if self.offline_mode:
             import warnings
-            warnings.warn('log_mods.MyNeptuneLogger skipping set_properties')
+            warnings.warn('log_mods.MyLightningNeptuneLogger skipping set_properties')
             return
         else:
             properties = self.experiment._backend.get_experiment(self.experiment.internal_id).properties
