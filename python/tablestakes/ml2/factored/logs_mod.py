@@ -45,11 +45,11 @@ class TuneLogCopierCallback(pl.Callback):
                 d[k] = v.item()
         return d
 
-    # def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-    #     d = self._get_metrics_dict(trainer, pl_module)
-    #     d[CURRENT_EPOCH_NAME] = trainer.current_epoch
-    #     d['pid'] = os.getpid()
-    #     tune.report(**d)
+    def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
+        d = self._get_metrics_dict(trainer, pl_module)
+        d[CURRENT_EPOCH_NAME] = trainer.current_epoch
+        d['pid'] = os.getpid()
+        tune.report(**d)
 
     def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
         d = self._get_metrics_dict(trainer, pl_module)
@@ -57,11 +57,11 @@ class TuneLogCopierCallback(pl.Callback):
         d['pid'] = os.getpid()
         tune.report(**d)
 
-    # def on_test_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
-    #     d = self._get_metrics_dict(trainer, pl_module)
-    #     d[CURRENT_EPOCH_NAME] = trainer.current_epoch
-    #     d['pid'] = os.getpid()
-    #     tune.report(**d)
+    def on_test_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
+        d = self._get_metrics_dict(trainer, pl_module)
+        d[CURRENT_EPOCH_NAME] = trainer.current_epoch
+        d['pid'] = os.getpid()
+        tune.report(**d)
 
 
 class VocabLengthCallback(pl.Callback):
