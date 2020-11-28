@@ -379,11 +379,28 @@ def build_fast_trans_block(
         kwargs['attention_type'] = 'causal-linear'
         kwargs['cross_attention_type'] = 'linear'
         builder = builders.TransformerDecoderBuilder.from_kwargs(**kwargs)
+        builder.final_normalization = False
     else:
         kwargs['attention_type'] = 'linear'
         builder = builders.TransformerEncoderBuilder.from_kwargs(**kwargs)
+        builder.final_normalization = False
 
     return builder.get()
+
+
+class Appender(nn.Module):
+    """Append an array of zeros """
+    def __init__(self, num_extra_dims: int, append_dim=-1, dtype=torch.float):
+        super().__init__()
+        self.num_extra_dims = num_extra_dims
+        self.append_dim = append_dim
+        self.dtype = dtype
+
+    def forward(self, x):
+        shape = [e for e in x.shape]
+        shape[self.append_dim] = self.num_extra_dims
+        extra = torch.zeros(*shape, requires_grad=False, dtype=self.dtype)
+        return torch.cat(tensors=[x, extra], dim=self.append_dim)
 
 
 def build_performer_trans_block(
@@ -488,7 +505,7 @@ class TransBlockBuilder(abc.ABC):
         return enc_name.split(cls.IMPL_NAME_SPLIT_STR)
 
     @classmethod
-    def build(cls, hp: ModelParams, num_input_features: int, get_decoder=False) -> nn.Module:
+    def build(cls, hp: ModelParams, num_input_features: int, get_decoder=False) -> SizedSequential:
         base_name = TransBlockBuilder.split(hp.impl)[0]
 
         if base_name not in cls.KNOWN_ENCODER_BUILDERS:
@@ -496,4 +513,13 @@ class TransBlockBuilder(abc.ABC):
                              f"only have: {list(cls.KNOWN_ENCODER_BUILDERS.keys())}.")
 
         builder_fn = cls.KNOWN_ENCODER_BUILDERS[base_name]
-        return builder_fn(hp=hp, num_input_features=num_input_features, get_decoder=get_decoder)
+
+        remainder = num_input_features % hp.num_heads
+        num_extra_dims = hp.num_heads - remainder if remainder else 0
+        num_total_features = num_input_features + num_extra_dims
+
+        d = OrderedDict()
+        d['appender'] = Appender(num_extra_dims=num_extra_dims) if remainder else nn.Identity()
+        d['trans'] = builder_fn(hp=hp, num_input_features=num_total_features, get_decoder=get_decoder)
+
+        return SizedSequential(d, num_output_features=num_total_features)

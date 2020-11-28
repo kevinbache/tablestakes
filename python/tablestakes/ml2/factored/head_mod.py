@@ -355,6 +355,7 @@ class WeightedHeadParams(params.ParameterSet):
         obj.type = d['type']
         return obj
 
+
 class WeightedHead(Head):
     LOSS_NAME = constants.LOSS_NAME
     """Multiheaded head with weights for loss."""

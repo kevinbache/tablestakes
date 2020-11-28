@@ -67,6 +67,11 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
         # cat here
         num_embedcat_features = self.hp.embed.dim + num_x_base_features
 
+        if self.verbose:
+            print('ModelBertConvTransTClass2 self.hp.embed.dim:', self.hp.embed.dim)
+            print('ModelBertConvTransTClass2 num_x_base_features:', num_x_base_features)
+            print('ModelBertConvTransTClass2.num_embed_cat_features:', num_embedcat_features)
+
         if self.hp.conv.num_layers == 0:
             self.conv = None
             num_conv_features = 0
@@ -82,7 +87,7 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
             num_trans_features = 0
         else:
             self.trans = trunks_mod.TransBlockBuilder.build(hp=hp.trans, num_input_features=num_embedcat_features)
-            num_trans_features = num_embedcat_features
+            num_trans_features = self.trans.get_num_output_features()
 
         num_fc_features = num_x_base_features + num_trans_features + num_conv_features
         self.fc = trunks_mod.SlabNet(
@@ -108,7 +113,8 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
             print(f'base.shape: {base.shape}')
             print(f'vocab.shape: {vocab.shape}')
 
-        x = self.embed(vocab)
+        with utils.Timer('ts_model forward embed', do_print_outputs=self.hp.verbose):
+            x = self.embed(vocab)
 
         if self.verbose:
             print(f'x.shape after embed: {x.last_hidden_state.shape}')
@@ -120,8 +126,11 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
         if self.verbose:
             print(f'x.shape after base_cat: {x.shape}')
 
-        x_trans = self.trans(x) if self.trans else torch.zeros(num_batch, num_seq, 0, requires_grad=False)
-        x_conv = self.conv(x) if self.conv else torch.zeros(num_batch, num_seq, 0, requires_grad=False)
+        with utils.Timer('ts_model forward trans', do_print_outputs=self.hp.verbose):
+            x_trans = self.trans(x) if self.trans else torch.zeros(num_batch, num_seq, 0, requires_grad=False)
+
+        with utils.Timer('ts_model forward conv', do_print_outputs=self.hp.verbose):
+            x_conv = self.conv(x) if self.conv else torch.zeros(num_batch, num_seq, 0, requires_grad=False)
 
         if self.verbose:
             print(f'x_trans.shape: {x_trans.shape}')
@@ -133,12 +142,16 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
         if self.verbose:
             print('x shape after cat before fc: ', x.shape)
 
-        x = self.fc(x)
+        with utils.Timer('ts_model forward fc', do_print_outputs=self.hp.verbose):
+            x = self.fc(x)
 
         if self.verbose:
             print('x shape after fc before head: ', x.shape)
 
-        return self.head(x)
+        with utils.Timer('ts_model forward head', do_print_outputs=self.hp.verbose):
+            x = self.head(x)
+
+        return x
 
 
 def run(

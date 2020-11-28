@@ -1,11 +1,6 @@
 import argparse
 import os
 import socket
-
-from ray.tune.integration import pytorch_lightning as pl_tune
-from tablestakes.ml2.data import data_module, tablestakes_data, datapoints
-from tablestakes.ml2.factored import ts_model, opt_mod, head_mod, FactoredParams, logs_mod
-from tablestakes.ml2 import data, factored
 from typing import *
 
 import boto3
@@ -16,9 +11,14 @@ import ray
 from ray import tune
 from ray.tune import logger as tune_logger
 
-from tablestakes import constants, utils
-
 from chillpill import params
+
+from tablestakes import constants, utils
+from ray.tune.integration import pytorch_lightning as pl_tune
+from tablestakes.ml2.data import data_module, tablestakes_data, datapoints
+from tablestakes.ml2.factored import ts_model, opt_mod, head_mod, FactoredParams, logs_mod
+from tablestakes.ml2 import data, factored
+
 
 REGION = 'us-west-2'
 
@@ -130,6 +130,7 @@ class TuneRunner:
     def _train_fn(self, config: Dict, checkpoint_dir=None, fast_dev_run=False, include_gpus=False):
         utils.hprint('Starting train function with config:')
         utils.print_dict(config)
+        print()
 
         hp = self._model_param_class.from_dict(config)
         assert isinstance(hp, self._model_param_class)
