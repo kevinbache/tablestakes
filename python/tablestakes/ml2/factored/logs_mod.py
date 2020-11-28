@@ -243,6 +243,7 @@ class ExperimentParams(params.ParameterSet):
 class MyLightningNeptuneLogger(pl_loggers.NeptuneLogger):
     def __init__(self, hp: ExperimentParams, version: str = '', offline_mode=False):
         source_files = glob.glob(str(hp.sources_glob_str), recursive=True)
+        utils.hprint(f'MyLightningNeptuneLogger.sources_files: {source_files}')
 
         self.offline_mode = offline_mode
 
