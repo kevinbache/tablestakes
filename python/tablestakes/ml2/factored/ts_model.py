@@ -122,10 +122,12 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
             print(f'x.shape after base_cat: {x.shape}')
 
         with utils.Timer('ts_model forward trans', do_print_outputs=self.hp.verbose):
-            x_trans = self.trans(x) if self.trans else torch.zeros(num_batch, num_seq, 0, requires_grad=False)
+            x_trans = self.trans(x) if self.trans \
+                else torch.zeros(num_batch, num_seq, 0, requires_grad=False, device=self.device)
 
         with utils.Timer('ts_model forward conv', do_print_outputs=self.hp.verbose):
-            x_conv = self.conv(x) if self.conv else torch.zeros(num_batch, num_seq, 0, requires_grad=False)
+            x_conv = self.conv(x) if self.conv \
+                else torch.zeros(num_batch, num_seq, 0, requires_grad=False, device=self.device)
 
         if self.verbose:
             print(f'x_trans.shape: {x_trans.shape}')
