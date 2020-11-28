@@ -26,7 +26,7 @@ head_node:
     BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
-              VolumeSize: 100
+              VolumeSize: 200
 #    InstanceMarketOptions:
 #        MarketType: spot
 #        SpotOptions:

@@ -67,11 +67,6 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
         # cat here
         num_embedcat_features = self.hp.embed.dim + num_x_base_features
 
-        if self.verbose:
-            print('ModelBertConvTransTClass2 self.hp.embed.dim:', self.hp.embed.dim)
-            print('ModelBertConvTransTClass2 num_x_base_features:', num_x_base_features)
-            print('ModelBertConvTransTClass2.num_embed_cat_features:', num_embedcat_features)
-
         if self.hp.conv.num_layers == 0:
             self.conv = None
             num_conv_features = 0

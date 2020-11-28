@@ -1,8 +1,8 @@
 from argparse import Namespace
 import glob
+import os
 import time
 from typing import *
-
 
 import torch
 from pytorch_lightning.metrics.utils import _input_format_classification
@@ -46,16 +46,19 @@ class TuneLogCopierCallback(pl.Callback):
     def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
         d = self._get_metrics_dict(trainer, pl_module)
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
+        d['pid'] = os.getpid()
         tune.report(**d)
 
     def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
         d = self._get_metrics_dict(trainer, pl_module)
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
+        d['pid'] = os.getpid()
         tune.report(**d)
 
     def on_test_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs):
         d = self._get_metrics_dict(trainer, pl_module)
         d[CURRENT_EPOCH_NAME] = trainer.current_epoch
+        d['pid'] = os.getpid()
         tune.report(**d)
 
 

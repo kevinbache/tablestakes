@@ -12,8 +12,8 @@ class OptParams(params.ParameterSet):
     lr: float = 0.001
     min_lr: float = 1e-6
     patience: int = 10
-    search_metric: str = 'valid_loss_total'
-    search_mode: str = 'max'
+    search_metric: str = 'valid/loss'
+    search_mode: str = 'min'
     lr_reduction_factor: float = 0.5
 
 
