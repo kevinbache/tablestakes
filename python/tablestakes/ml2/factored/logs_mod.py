@@ -195,7 +195,8 @@ class PredictionSaver(pl.Callback):
                     print('logs.mod v:          ', v)
                     print('logs.mod l(dk):      ', len(do_keep))
                     print('logs.mod len(v):     ', len(v))
-                    print('logs.mod np.array(v):', np.array(v))
+                    print('logs.mod keep_inds:  ', keep_inds)
+                    # print('logs.mod np.array(v):', np.array(v))
                     raise e
 
             elif isinstance(v, torch.Tensor):
