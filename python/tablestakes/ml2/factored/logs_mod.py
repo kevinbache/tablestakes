@@ -188,7 +188,8 @@ class PredictionSaver(pl.Callback):
         for k, v in batch.y:
             if isinstance(v, list):
                 try:
-                    v = v[keep_inds]
+                    av = np.array(v)
+                    v = list(av[keep_inds])
                     # v = list(np.array(v)[do_keep])
                 except BaseException as e:
                     print('logs.mod do_keep:     ', do_keep)
@@ -200,6 +201,8 @@ class PredictionSaver(pl.Callback):
                     print('logs.mod t(keep_inds):', type(keep_inds))
                     print('logs.mod ki.shape:    ', keep_inds.shape)
                     print('logs.mod ki.dtype:    ', keep_inds.dtype)
+                    print('logs.mod ki.dtype:    ', keep_inds.dtype)
+                    print('logs.mod av:          ', av)
                     """
                       TypeError: only integer scalar arrays can be converted to a scalar index
                      
