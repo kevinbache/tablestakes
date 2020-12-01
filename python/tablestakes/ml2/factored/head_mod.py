@@ -375,6 +375,8 @@ class WeightedHeadParams(params.ParameterSet):
 
     @classmethod
     def from_dict(cls, d: Dict):
+        print("in head_mod.py WeightedHeadParams.from_dict() d:")
+        utils.print_dict(d)
         obj = cls()
         assert 'weights' in d
         obj.weights = d['weights']
