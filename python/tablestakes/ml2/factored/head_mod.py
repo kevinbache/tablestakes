@@ -402,9 +402,11 @@ class SigmoidConfusionMatrixCallback(pl.Callback):
 
     def __init__(self, hp: Union[HeadParams, WeightedHeadParams]):
         super().__init__()
+        print(f'SigmoidConfusionMatrixCallback.init hp:      {hp}')
         self.head_name_to_col_dicts = self._get_head_name_to_col_dicts(hp)
         self.cmdict_per_epoch = []
         self.hp = hp
+        print(f'SigmoidConfusionMatrixCallback.init self.hp: {self.hp}')
 
     @classmethod
     def _get_col_name_to_cm_for_sub_head(cls, sub_hp: HeadParams):
