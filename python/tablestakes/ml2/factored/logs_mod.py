@@ -201,20 +201,24 @@ class PredictionSaver(pl.Callback):
                 self.dir_to_head_outputs[meta_kept][head_name]['y'] = y
                 self.dir_to_head_outputs[meta_kept][head_name]['y_hats'].append(y_hat)
 
-    def get_df_dict(self):
+    def get_df_dict(self, as_csvs=False):
         d = {}
         for datapoint_dir, heads in self.dir_to_head_outputs.items():
             dd = {}
             for head_name, head_outs in heads.items():
-                dd[head_name] = pd.DataFrame(
+                df = pd.DataFrame(
                     [head_outs['y']] + head_outs['y_hats'],
                     columns=self.head_name_to_y_cols[head_name]
                 )
+                if as_csvs:
+                    df = df.to_csv()
+                dd[head_name] = df
             d[datapoint_dir] = dd
         return d
 
     def on_validation_epoch_end(self, trainer, pl_module):
-        pl_module.log_dict(self.get_df_dict(), prog_bar=False, reduce_fx='sum', tbptt_reduce_fx='sum')
+        d = self.get_df_dict(as_csvs=True)
+        pl_module.log_dict(d, prog_bar=False, reduce_fx='sum', tbptt_reduce_fx='sum')
 
     def print_preds(self):
         pd.set_option('display.width', 200)
