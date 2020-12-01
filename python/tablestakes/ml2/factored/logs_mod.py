@@ -230,7 +230,7 @@ class PredictionSaver(pl.Callback):
             for head_name, y_hat_per_head in y_hats_for_pred.items():
                 y_per_head = ys[head_name]
                 y = y_per_head[meta_idx].copy()
-                y_hat = y_hat_per_head[meta_idx].numpy().copy()
+                y_hat = y_hat_per_head[meta_idx].cpu().numpy().copy()
                 self.dir_to_head_outputs[meta_kept][head_name]['y'] = y
                 self.dir_to_head_outputs[meta_kept][head_name]['y_hats'].append(y_hat)
 
