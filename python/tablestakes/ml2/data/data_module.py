@@ -72,6 +72,9 @@ class XYMetaHandlerDatasetModule(pl.LightningDataModule):
     def get_dataset(self, hp: DataParams) -> data.XYMetaDirHandlerDataset:
         pass
 
+    def get_y_col_names(self):
+        return {name: df.columns for name, df in self.ds.datapoints[0].y}
+
     def setup(self, stage: Optional[str] = None):
         # called on one gpu
         self.hp.num_data_total = len(self.ds)

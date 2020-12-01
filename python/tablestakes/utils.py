@@ -61,13 +61,28 @@ def dict_to_str(d: Dict, indent_width=2, extra_key_width=0, do_norm_key_width=Tr
     lens = [len(k) for k in d.keys()]
     if do_norm_key_width:
         k_width = max(lens) + extra_key_width
-        return '\n'.join(f'{indent}{k:{k_width}}: {str(v)}{line_end}' for k, v in d.items())
+        subindent = ' ' * (k_width + 4)
+        l = []
+        for k, v in d.items():
+            strv = str(v).replace('\n', f'\n{subindent}')
+            l.append(f'{indent}{k:{k_width}}: {strv}{line_end}')
     else:
-        return '\n'.join(f'{indent}{k}: {str(v)}{line_end}' for k, v in d.items())
+        l = []
+        for k, v in d.items():
+            subindent = ' ' * (len(k) + 4)
+            strv = str(v).replace('\n', f'\n{subindent}')
+            l.append(f'{indent}{k}: {strv}{line_end}')
+    return '\n'.join(l)
 
 
 def print_dict(d: Dict, indent_width=2, extra_key_width=0, do_norm_key_width=True, line_end=''):
     print(dict_to_str(d, indent_width, extra_key_width, do_norm_key_width, line_end))
+
+
+def print_list(l: List, indent_width=2, line_end=''):
+    indent = ' ' * indent_width
+    for e in l:
+        print(f'{indent}{e}{line_end}')
 
 
 def split_dict(dict_to_split: Dict, keys_for_first) -> Tuple[Dict, Dict]:

@@ -121,17 +121,10 @@ worker_setup_commands:
     - cd ~/projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
     - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/tablestakes/python/
 
-
 head_start_ray_commands:
-#    - unset RAY_OVERRIDE_RESOURCES && source /home/ubuntu/.dlamirc && ray stop
-#    - sudo ulimit -n 65536; source /home/ubuntu/.dlamirc && ray start --head --port=6379 --object-manager-port=8076 --autoscaling-config=~/ray_bootstrap_config.yaml
-#    - unset RAY_OVERRIDE_RESOURCES && source /home/ubuntu/.dlamirc && ray start --head --port=6379 --object-manager-port=8076 --autoscaling-config=~/ray_bootstrap_config.yaml
-    - source /home/ubuntu/.dlamirc && ray stop
+    - source /home/ubuntu/.dlamirc && ray stop && sleep 1
     - source /home/ubuntu/.dlamirc && ray start --head --port=6379 --object-manager-port=8076 --autoscaling-config=~/ray_bootstrap_config.yaml
 
 worker_start_ray_commands:
-#    - unset RAY_OVERRIDE_RESOURCES && source /home/ubuntu/.dlamirc && ray stop
-#    - sudo ulimit -n 65536; source /home/ubuntu/.dlamirc && ray start --address=$RAY_HEAD_IP:6379 --object-manager-port=8076
-#    - unset RAY_OVERRIDE_RESOURCES && source /home/ubuntu/.dlamirc && ray start --address=$RAY_HEAD_IP:6379 --object-manager-port=8076
-    - source /home/ubuntu/.dlamirc && ray stop
+    - source /home/ubuntu/.dlamirc && ray stop && sleep 1
     - source /home/ubuntu/.dlamirc && ray start --address=$RAY_HEAD_IP:6379 --object-manager-port=8076

@@ -146,9 +146,9 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
             print('x shape after fc before head: ', x.shape)
 
         with utils.Timer('ts_model forward head', do_print_outputs=self.hp.verbose):
-            x = self.head(x)
+            x_for_loss, x_for_pred = self.head.forward_for_loss_and_pred(x)
 
-        return x
+        return x_for_loss, x_for_pred
 
 
 def run(
@@ -156,14 +156,21 @@ def run(
         hp: TotalParams,
         fast_dev_run=False,
         do_find_lr=False,
+        callbacks=None,
 ):
     utils.set_seeds(hp.data.seed)
+
+    if callbacks is None:
+        callbacks = [
+            logs_mod.CounterTimerLrCallback(),
+            logs_mod.VocabLengthCallback(),
+        ]
 
     print("model run about to create trainer")
     trainer = pl.Trainer(
         logger=True if fast_dev_run else logs_mod.get_pl_logger(hp.exp),
         default_root_dir=hp.logs.output_dir,
-        callbacks=[logs_mod.CounterTimerLrCallback(), logs_mod.VocabLengthCallback()],
+        callbacks=callbacks,
         max_epochs=hp.opt.num_epochs,
         gpus=hp.data.num_gpus,
         weights_summary='full',
@@ -279,8 +286,28 @@ if __name__ == '__main__':
             constants.Y_WHICH_KV_BASE_NAME: 1.0,
         },
         head_params={
-            constants.Y_KORV_BASE_NAME: head_mod.HeadParams(type='linear', num_classes=2),
-            constants.Y_WHICH_KV_BASE_NAME: head_mod.HeadParams(type='linear', num_classes=11),
+            constants.Y_KORV_BASE_NAME: head_mod.HeadParams(
+                type='linear',
+                num_classes=2,
+                class_names=('key', 'value'),
+            ),
+            constants.Y_WHICH_KV_BASE_NAME: head_mod.HeadParams(
+                type='linear',
+                num_classes=11,
+                class_names=(
+                    'to_address',
+                    'sale_address',
+                    'from_address',
+                    'date_sent',
+                    'date_received',
+                    'invoice_number',
+                    'total',
+                    'subtotal',
+                    'phone',
+                    'fax',
+                    'field_0',
+                ),
+            ),
         },
     )
 
@@ -306,7 +333,6 @@ if __name__ == '__main__':
     # print(hprt)
     # utils.hprint('tablestakes.model.hp after all:')
     # print(hp)
-    #
 
     net = TablestakesBertConvTransTClassModel.from_hp(hp)
 

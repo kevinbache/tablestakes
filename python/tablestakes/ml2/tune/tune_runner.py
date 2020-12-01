@@ -61,7 +61,6 @@ class TuneRunner:
         if extra_pl_callbacks is None:
             extra_pl_callbacks = [
                 logs_mod.CounterTimerLrCallback(),
-                logs_mod.TuneLogCopierCallback(),
             ]
         self.extra_pl_callbacks = extra_pl_callbacks
 
@@ -102,16 +101,7 @@ class TuneRunner:
     @staticmethod
     def get_pl_callbacks_for_tune():
         return [
-            # # pl_tune.TuneReportCallback(
-            # #     on='train_end',
-            # # ),
-            # pl_tune.TuneReportCheckpointCallback(
-            #     filename=constants.CHECKPOINT_FILE_BASENAME,
-            #     on='validation_end',
-            # ),
-            # # pl_tune.TuneReportCallback(
-            # #     on='test_end',
-            # # ),
+            logs_mod.TuneLogCopierCallback(),
         ]
 
     @staticmethod
@@ -150,7 +140,6 @@ class TuneRunner:
             logger=logs_mod.get_pl_logger(hp=hp.exp, tune=tune),
             default_root_dir=tune.get_trial_dir(),
             callbacks=self.extra_pl_callbacks + self.get_pl_callbacks_for_tune(),
-            # callbacks=self.extra_pl_callbacks,
             max_epochs=hp.opt.num_epochs,
             gpus=hp.data.num_gpus if include_gpus else None,
             weights_summary='full',
@@ -368,8 +357,28 @@ if __name__ == '__main__':
             constants.Y_WHICH_KV_BASE_NAME: 1.0,
         },
         head_params={
-            constants.Y_KORV_BASE_NAME: head_mod.HeadParams(type='linear', num_classes=2),
-            constants.Y_WHICH_KV_BASE_NAME: head_mod.HeadParams(type='linear', num_classes=11),
+            constants.Y_KORV_BASE_NAME: head_mod.HeadParams(
+                type='linear',
+                num_classes=2,
+                class_names=('key', 'value'),
+            ),
+            constants.Y_WHICH_KV_BASE_NAME: head_mod.HeadParams(
+                type='linear',
+                num_classes=11,
+                class_names=(
+                    'to_address',
+                    'sale_address',
+                    'from_address',
+                    'date_sent',
+                    'date_received',
+                    'invoice_number',
+                    'total',
+                    'subtotal',
+                    'phone',
+                    'fax',
+                    'field_0',
+                ),
+            ),
         },
     )
 

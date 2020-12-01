@@ -59,13 +59,10 @@ class SubtypeCsvHandler(Generic[DP], abc.ABC):
     def handle(self, datapoint_dir: Path) -> DP:
         files = utils.glob_multiple(datapoint_dir, self.patterns, self.glob_recursive)
         subname_to_filename = {self.filename_to_subtype_name(f): f for f in files}
-        # print('SubtypeCsvHandler handle files:,')
-        # print(files)
         return self._files_to_subtype(subname_to_filename)
 
     @staticmethod
     def _match_between_prefix_and_ext(filename: str, prefix: str) -> str:
-        # filename = str(Path(filename).name)
         m = re.match(fr'.*{prefix}(\w+).csv$', filename)
         after_prefix = m.groups()[0]
         if after_prefix.endswith('.csv'):

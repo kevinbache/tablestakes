@@ -384,13 +384,6 @@ class XYDocumentDataModule(pl.LightningDataModule):
         ys = self._transform_ys(ys)
         for k, v in ys.items():
             ys[k] = torch.nn.utils.rnn.pad_sequence(v, batch_first=True, padding_value=Y_VALUE_TO_IGNORE)
-            # if isinstance(v, MutableMapping):
-            #     ys[k] = {
-            #         sub_k: torch.nn.utils.rnn.pad_sequence(sub_v, batch_first=True, padding_value=Y_VALUE_TO_IGNORE)
-            #         for sub_v, sub_k in v.items()
-            #     }
-            # else:
-            #     ys[k] = torch.nn.utils.rnn.pad_sequence(v, batch_first=True, padding_value=Y_VALUE_TO_IGNORE)
 
         return xs, ys, metas
 

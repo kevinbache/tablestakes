@@ -2,6 +2,7 @@ import abc
 from typing import *
 
 import numpy as np
+import pandas as pd
 
 import torch
 from torch import nn
@@ -97,15 +98,22 @@ class LossMetrics:
     def metrics(self, y_hat: torch.Tensor, y: torch.Tensor, metas: List[Any]) -> Dict[str, torch.Tensor]:
         return {name: metric(y_hat, y, metas) for name, metric in self.metrics_dict.items()}
 
-    def loss_metrics(self, y_hat: torch.Tensor, y: torch.Tensor, metas: List[Any]) -> Dict[str, torch.Tensor]:
-        d = self.metrics(y_hat, y, metas)
-        d[self.LOSS_NAME] = self.loss(y_hat, y)
+    def loss_metrics(
+            self,
+            y_hats_for_loss: torch.Tensor,
+            y_hats_for_pred: torch.Tensor,
+            y: torch.Tensor,
+            metas: List[Any],
+    ) -> Dict[str, torch.Tensor]:
+        d = self.metrics(y_hats_for_pred, y, metas)
+        d[self.LOSS_NAME] = self.loss(y_hats_for_loss, y)
         return d
 
 
 class HeadParams(params.ParameterSet):
     type: str = 'DEFAULT_TYPE'
     num_classes: int = -1
+    class_names: Tuple[str] = ()
     """See get_reducer() for x_ and loss_ reducer options"""
     x_reducer_name: str = ''
     loss_reducer_name: str = 'mean-0'
@@ -141,42 +149,44 @@ class Head(LossMetrics, pl.LightningModule, abc.ABC):
         self.loss_reducer_fn = lambda x: x
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        try:
-            x = self.x_reducer_fn(x.squeeze(1))
-        except BaseException as e:
-            print('********************** error on reducer_fn. x.shape:', x.shape)
-            raise e
-
-        try:
-            x = self.postproc_head_out(self.head(x))
-        except BaseException as e:
-            print('********************** error on head. x.shape:', x.shape)
-            print('********************** error on head. self.head:', self.head)
-            raise e
-
+        x = self.x_reducer_fn(x.squeeze(1))
+        x = self.postproc_head_out_for_pred(self.head(x))
         return x
+
+    def forward_for_loss(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.x_reducer_fn(x.squeeze(1))
+        x = self.postproc_head_out_for_loss_fn(self.head(x))
+        return x
+
+    def forward_for_loss_and_pred(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        x = self.x_reducer_fn(x.squeeze(1))
+        x = self.head(x)
+        x_for_loss = self.postproc_head_out_for_loss_fn(x)
+        x_for_pred = self.postproc_head_out_for_pred(x)
+        return x_for_loss, x_for_pred
 
     def metrics(self, y_hat: torch.Tensor, y: torch.Tensor, metas: List[Any]) -> Dict[str, torch.Tensor]:
         d = {}
         for metric_name, metric in self.metrics_dict.items():
-            try:
-                d[metric_name] = metric(y_hat, y)
-            except BaseException as e:
-                print(f'y_hat: {y_hat}, y: {y}')
-                print(f"y_hat.shape: {y_hat.shape}, y.shape: {y.shape}")
-                raise e
+            d[metric_name] = metric(y_hat, y)
+            # try:
+            #     d[metric_name] = metric(y_hat, y)
+            # except BaseException as e:
+            #     print(f'y_hat: {y_hat}, y: {y}')
+            #     print(f"y_hat.shape: {y_hat.shape}, y.shape: {y.shape}")
+            #     raise e
         return d
 
     def loss(self, y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        try:
-            loss = self.loss_fn(y_hat, y)
-        except BaseException as e:
-            raise e
+        loss = self.loss_fn(y_hat, y)
         if self.loss_reducer_fn is not None:
             loss = self.loss_reducer_fn(loss)
         return loss
 
-    def postproc_head_out(self, head_out):
+    def postproc_head_out_for_loss_fn(self, head_out):
+        return self.postproc_head_out_for_pred(head_out)
+
+    def postproc_head_out_for_pred(self, head_out):
         return head_out
 
     # noinspection PyMethodMayBeStatic
@@ -234,6 +244,7 @@ class SigmoidHead(Head):
         if metrics_dict is None:
             metrics_dict = {
                 'sacc': logs_mod.SigmoidBetterAccuracy(),
+                # 'scm': logs_mod.SigmoidConfusionMatrix(hp.num_classes, hp.class_names),
             }
 
         num_classes = hp.num_classes
@@ -256,6 +267,8 @@ class SigmoidHead(Head):
 
         self.do_permute_head_out = hp.do_permute_head_out
 
+        self.s = nn.Sigmoid()
+
     def loss(self, y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         loss = self.loss_fn(y_hat, y)
         if self.loss_reducer_fn is not None:
@@ -263,6 +276,9 @@ class SigmoidHead(Head):
         assert loss.shape == torch.Size([self.num_classes]), \
             f'loss.size: {loss.shape}, torch.Size([self.num_classes]): {torch.Size([self.num_classes])}'
         return loss.dot(self.class_weights)
+
+    def postproc_head_out_for_pred(self, head_out):
+        return self.s(head_out)
 
 
 class _SoftmaxHead(Head):
@@ -319,7 +335,11 @@ class AdaptiveSoftmaxHead(_SoftmaxHead):
         )
         super().__init__(num_input_features, num_classes, head, x_reducer, loss_reducer)
 
-    def postproc_head_out(self, head_out):
+    def postproc_head_out_for_loss_fn(self, head_out):
+        # todo checkme
+        return head_out[0]
+
+    def postproc_head_out_for_pred(self, head_out):
         # todo checkme
         return head_out[0]
 
@@ -338,7 +358,7 @@ class LinearSoftmaxHead(_SoftmaxHead):
         self.lsm = nn.LogSoftmax(dim=1)
         self.do_permute_head_out = hp.do_permute_head_out
 
-    def postproc_head_out(self, head_output):
+    def postproc_head_out_for_loss_fn(self, head_output):
         if self.do_permute_head_out:
             return self.lsm(head_output.permute(0, 2, 1))
         else:
@@ -366,6 +386,62 @@ class WeightedHeadParams(params.ParameterSet):
         return obj
 
 
+class SigmoidConfusionMatrixCallback(pl.Callback):
+    """Maintain confusion matrices for each SigmoidHead"""
+    DEFAULT_HEAD_NAME = 'DEFAULT'
+
+    def __init__(self, hp: Union[HeadParams, WeightedHeadParams]):
+        super().__init__()
+        self.head_name_to_col_dicts = self._get_head_name_to_col_dicts(hp)
+        self.cmdict_per_epoch = []
+        self.hp = hp
+
+    @classmethod
+    def _get_col_name_to_cm_for_sub_head(cls, sub_hp: HeadParams):
+        col_name_to_cm = {}
+        if sub_hp.type == HeadMakerFactory.SIGMOID_TYPE_NAME:
+            col_name_to_cm = {
+                col_name: pl.metrics.ConfusionMatrix(
+                    num_classes=2,
+                    normalize=None,
+                    compute_on_step=False,
+                )
+                for col_name in sub_hp.class_names
+            }
+        return col_name_to_cm
+
+    @classmethod
+    def _get_head_name_to_col_dicts(cls, hp) -> Dict[str, Dict[str, pl.metrics.ConfusionMatrix]]:
+        head_name_to_col_dicts = {}
+        if isinstance(hp, WeightedHeadParams):
+            for head_name, sub_hp in hp.head_params.items():
+                col_name_to_cm = cls._get_col_name_to_cm_for_sub_head(sub_hp)
+                head_name_to_col_dicts[head_name] = col_name_to_cm
+        else:
+            col_name_to_cm = cls._get_col_name_to_cm_for_sub_head(hp)
+            head_name_to_col_dicts[cls.DEFAULT_HEAD_NAME] = col_name_to_cm
+        return head_name_to_col_dicts
+
+    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
+        _, head_to_y_hats = pl_module(batch.x)
+        for head_name, col_dict in self.head_name_to_col_dicts.items():
+            preds = head_to_y_hats[head_name]
+            target = batch.y[head_name]
+            for col_idx, (col_name, cm) in enumerate(col_dict.items()):
+                cm.update(preds[:, col_idx], target[:, col_idx])
+                self.head_name_to_col_dicts[head_name][col_name] = cm
+
+    def on_validation_epoch_end(self, trainer, pl_module):
+        for head_name, col_dict in self.head_name_to_col_dicts.items():
+            for col_name, cm in col_dict.items():
+                vals = cm.compute().numpy()
+                df = pd.DataFrame(vals, columns=['pred=0', 'pred=1'], index=['true=0', 'true=1'])
+                self.head_name_to_col_dicts[head_name][col_name] = df
+
+        self.cmdict_per_epoch.append(self.head_name_to_col_dicts)
+        self.head_name_to_col_dicts = self._get_head_name_to_col_dicts(self.hp)
+
+
 class WeightedHead(Head):
     LOSS_NAME = constants.LOSS_NAME
     """Multiheaded head with weights for loss."""
@@ -384,8 +460,20 @@ class WeightedHead(Head):
         y_hats_dict = {}
         for head_name, head in self.heads.items():
             y_hats_dict[head_name] = head(x)
-        # return self.y_dp_class.from_dict(y_hats_dict)
         return y_hats_dict
+
+    def forward_for_loss(self, x: torch.Tensor) -> Dict[str, Any]:
+        y_hats_dict = {}
+        for head_name, head in self.heads.items():
+            y_hats_dict[head_name] = head.forward_for_loss(x)
+        return y_hats_dict
+
+    def forward_for_loss_and_pred(self, x: torch.Tensor) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+        y_hats_for_loss_dict = {}
+        y_hats_for_pred_dict = {}
+        for head_name, head in self.heads.items():
+            y_hats_for_loss_dict[head_name], y_hats_for_pred_dict[head_name] = head.forward_for_loss_and_pred(x)
+        return y_hats_for_loss_dict, y_hats_for_pred_dict
 
     def losses_to_loss(self, losses: torch.Tensor) -> torch.Tensor:
         return losses.dot(self.head_weights)
@@ -408,12 +496,12 @@ class WeightedHead(Head):
             y_tensor = y[head_name]
             y_hat_tensor = y_hat[head_name]
             d[head_name] = head.metrcis(y_hat_tensor, y_tensor, metas)
-        # return y.from_dict(d)
         return d
 
     def loss_metrics(
             self,
-            y_hat: datapoints.YDatapoint,
+            y_hats_for_loss: datapoints.YDatapoint,
+            y_hats_for_pred: datapoints.YDatapoint,
             y: datapoints.YDatapoint,
             metas: List[Any],
     ) -> Dict[str, Union[float, Dict[str, torch.Tensor]]]:
@@ -421,8 +509,10 @@ class WeightedHead(Head):
         head_name_to_loss_metrics = {}
         for head_name, head in self.heads.items():
             y_tensor = y[head_name]
-            y_hat_tensor = y_hat[head_name]
-            head_name_to_loss_metrics[head_name] = head.loss_metrics(y_hat_tensor, y_tensor, metas)
+            y_hat_for_loss_tensor = y_hats_for_loss[head_name]
+            y_hat_for_pred_tensor = y_hats_for_pred[head_name]
+            head_name_to_loss_metrics[head_name] = \
+                head.loss_metrics(y_hat_for_loss_tensor, y_hat_for_pred_tensor, y_tensor, metas)
 
         losses = torch.stack(
             [head_name_to_loss_metrics[head_name][self.LOSS_NAME] for head_name in self.heads.keys()],
@@ -456,7 +546,39 @@ class WeightedHead(Head):
         return head_maker
 
 
+# class ConfusionMatrixCallback(pl.Callback):
+#     def __init__(self, hp: Union[WeightedHeadParams, HeadParams]):
+#         super().__init__()
+#         self.hp = hp
+#
+#         self.cm = torch.zeros(num_classes, num_classes)
+#
+#     def on_validation_batch_end(
+#             self,
+#             trainer,
+#             pl_module,
+#             outputs,
+#             batch: datapoints.XYMetaDatapoint,
+#             batch_idx,
+#             dataloader_idx,
+#     ):
+#         _, y_hats_for_pred = pl_module(batch.x)
+#         ys = batch.y
+#
+#         for head_name, y_hats in y_hats_for_pred.items():
+#             y = ys[head_name]
+#             confmat = confusion_matrix._confusion_matrix_update(y_hat, y, self.num_classes, self.threshold)
+#         self.confmat += confmat
+#
+#
+#     def on_validation_epoch_end(self, trainer, pl_module):
+#         pass
+
+
+
 class HeadMakerFactory:
+    SIGMOID_TYPE_NAME = 'sigmoid'
+
     """Heads need to be manufactured from neck_hp dict so it's got
     to be things that are easily serializable like strs."""
     @classmethod
@@ -501,7 +623,7 @@ class HeadMakerFactory:
                     neck_hp=neck_hp,
                 )
             return fn
-        elif head_hp.type == 'sigmoid':
+        elif head_hp.type == cls.SIGMOID_TYPE_NAME:
             def fn(num_input_features: int):
                 return HeadedSlabNet(
                     num_input_features=num_input_features,
@@ -543,14 +665,30 @@ class HeadedSlabNet(trunks_mod.SlabNet, LossMetrics):
         x = self.head(x)
         return x
 
+    def forward_for_loss(self, x: torch.Tensor) -> torch.Tensor:
+        x = super().forward(x)
+        x = self.head.forward_for_loss(x)
+        return x
+
+    def forward_for_loss_and_pred(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        x = super().forward(x)
+        x_for_loss, x_for_pred = self.head.forward_for_loss_and_pred(x)
+        return x_for_loss, x_for_pred
+
     def loss(self, y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         return self.head.loss(y_hat, y)
 
     def metrics(self, y_hat: torch.Tensor, y: torch.Tensor, metas: List[Any]) -> Dict[str, torch.Tensor]:
         return self.head.metrics(y_hat, y, metas)
 
-    def loss_metrics(self, y_hat: torch.Tensor, y: torch.Tensor, metas: List[Any]) -> Dict[str, torch.Tensor]:
-        return self.head.loss_metrics(y_hat, y, metas)
+    def loss_metrics(
+            self,
+            y_hat_for_loss: torch.Tensor,
+            y_hat_for_pred: torch.Tensor,
+            y: torch.Tensor,
+            metas: List[Any],
+    ) -> Dict[str, torch.Tensor]:
+        return self.head.loss_metrics(y_hat_for_loss, y_hat_for_pred, y, metas)
 
 # class StartEndHead(Head):
 #     """Predict the start and end location within a sequence.  Prediction must be positive."""

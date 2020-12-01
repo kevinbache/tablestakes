@@ -50,8 +50,8 @@ class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
             batch: datapoints.XYMetaDatapoint,
             batch_idx: int,
     ) -> Dict[str, Union[float, Dict[str, Any]]]:
-        y_hats = self(batch.x)
-        return self.head.loss_metrics(y_hats, batch.y, batch.meta)
+        y_hats_for_loss, y_hats_for_pred = self(batch.x)
+        return self.head.loss_metrics(y_hats_for_loss, y_hats_for_pred, batch.y, batch.meta)
 
     def training_step(self, batch, batch_idx):
         d = self.forward_plus_lossmetrics(batch, batch_idx)
@@ -101,13 +101,3 @@ class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
             self.logger.log_metrics(metrics=d, step=self.global_step)
 
 
-# class TablestakesBertTransConvTClass(FactoredLightningModule):
-#     def __init__(self, hp: FactoredParams, opt: opt_mod.OptimizersMaker):
-#         super().__init__(hp, opt)
-#
-#     @classmethod
-#     def from_hp(cls, hp: FactoredParams):
-#         return cls(
-#             hp=hp,
-#             opt_maker=opt_mod.OptimizersMaker(hp.opt),
-#         )
