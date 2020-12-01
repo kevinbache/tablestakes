@@ -405,7 +405,7 @@ class SigmoidConfusionMatrixCallback(pl.Callback):
         print(f'SigmoidConfusionMatrixCallback.init hp:      {hp}')
         self.head_name_to_col_dicts = self._get_head_name_to_col_dicts(hp)
         self.cmdict_per_epoch = []
-        self.hp = hp
+        self.hp = copy.deepcopy(hp)
         print(f'SigmoidConfusionMatrixCallback.init self.hp: {self.hp}')
 
     @classmethod
