@@ -218,7 +218,8 @@ class PredictionSaver(pl.Callback):
 
     def on_validation_epoch_end(self, trainer, pl_module):
         d = self.get_df_dict(as_csvs=True)
-        pl_module.log_dict(d, prog_bar=False, reduce_fx='sum', tbptt_reduce_fx='sum')
+        # pl_module.log_dict(d, prog_bar=False, reduce_fx='sum', tbptt_reduce_fx='sum')
+        pl_module.log_lossmetrics_dict(phase=utils.Phase.valid, d=d)
 
     def print_preds(self):
         pd.set_option('display.width', 200)
