@@ -171,12 +171,6 @@ class Head(LossMetrics, pl.LightningModule, abc.ABC):
         d = {}
         for metric_name, metric in self.metrics_dict.items():
             d[metric_name] = metric(y_hat, y)
-            # try:
-            #     d[metric_name] = metric(y_hat, y)
-            # except BaseException as e:
-            #     print(f'y_hat: {y_hat}, y: {y}')
-            #     print(f"y_hat.shape: {y_hat.shape}, y.shape: {y.shape}")
-            #     raise e
         return d
 
     def loss(self, y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
@@ -402,17 +396,13 @@ class SigmoidConfusionMatrixCallback(pl.Callback):
 
     def __init__(self, hp: Union[HeadParams, WeightedHeadParams]):
         super().__init__()
-        print(f'SigmoidConfusionMatrixCallback.init hp:      {hp}')
         self.head_name_to_col_dicts = self._get_head_name_to_col_dicts(hp)
         self.cmdict_per_epoch = []
         self.hp = copy.deepcopy(hp)
-        print(f'SigmoidConfusionMatrixCallback.init self.hp: {self.hp}')
 
     @classmethod
     def _get_col_name_to_cm_for_sub_head(cls, sub_hp: HeadParams):
         col_name_to_cm = {}
-        print(f'SigmoidConfusionMatrixCallback._get_col_name_to_cm_for_sub_head.sub_hp:    ', sub_hp)
-        print(f'SigmoidConfusionMatrixCallback._get_col_name_to_cm_for_sub_head.t(sub_hp): ', type(sub_hp))
         if sub_hp.type == HeadMakerFactory.SIGMOID_TYPE_NAME:
             col_name_to_cm = {
                 col_name: MyConfusionMatrix(
@@ -428,14 +418,10 @@ class SigmoidConfusionMatrixCallback(pl.Callback):
     def _get_head_name_to_col_dicts(cls, hp) -> Dict[str, Dict[str, pl.metrics.ConfusionMatrix]]:
         head_name_to_col_dicts = {}
         if isinstance(hp, WeightedHeadParams):
-            print("scm in whp hp.head_params:")
-            utils.print_dict(hp.head_params)
             for head_name, sub_hp in hp.head_params.items():
                 col_name_to_cm = cls._get_col_name_to_cm_for_sub_head(sub_hp)
                 head_name_to_col_dicts[head_name] = col_name_to_cm
         else:
-            print("scm in hp hp.head_params:")
-            print(hp)
             col_name_to_cm = cls._get_col_name_to_cm_for_sub_head(hp)
             head_name_to_col_dicts[cls.DEFAULT_HEAD_NAME] = col_name_to_cm
         return head_name_to_col_dicts
@@ -450,19 +436,11 @@ class SigmoidConfusionMatrixCallback(pl.Callback):
             dataloader_idx,
     ):
         batch = batch.transfer_to_device(pl_module.device)
-        try:
-            print(f'batch.y.doc_class.device: {batch.y.doc_class.device}')
-        except BaseException as e:
-            print(f'batch.y.doc_class: {batch.y.doc_class}')
-            raise e
 
         _, head_to_y_hats = pl_module(batch.x)
         for head_name, col_dict in self.head_name_to_col_dicts.items():
             preds: torch.Tensor = head_to_y_hats[head_name]
             target: torch.Tensor = batch.y[head_name]
-
-            print('preds.device:  ', preds.device)
-            print('target.device: ', target.device)
 
             for col_idx, (col_name, cm) in enumerate(col_dict.items()):
                 cm.update(preds[:, col_idx], target[:, col_idx])
