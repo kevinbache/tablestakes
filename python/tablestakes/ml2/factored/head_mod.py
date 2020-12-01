@@ -1,4 +1,5 @@
 import abc
+import copy
 from typing import *
 
 import numpy as np
@@ -377,7 +378,7 @@ class WeightedHeadParams(params.ParameterSet):
     def from_dict(cls, d: Dict):
         print("in head_mod.py WeightedHeadParams.from_dict() d:")
         utils.print_dict(d)
-        obj = cls()
+        obj = copy.deepcopy(cls())
         assert 'weights' in d
         obj.weights = d['weights']
         assert 'head_params' in d
