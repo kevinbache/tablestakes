@@ -210,8 +210,6 @@ class PredictionSaver(pl.Callback):
                     [head_outs['y']] + head_outs['y_hats'],
                     columns=self.head_name_to_y_cols[head_name]
                 )
-                if as_csvs:
-                    df = df.to_csv()
                 dd[head_name] = df
             d[datapoint_dir] = dd
         return d
