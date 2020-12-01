@@ -186,7 +186,7 @@ class PredictionSaver(pl.Callback):
             if isinstance(v, list):
                 v = list(np.array(v)[do_keep])
             elif isinstance(v, torch.Tensor):
-                v = list(v.numpy()[do_keep])
+                v = list(v.detach().numpy()[do_keep])
             ys[k] = v
         metas_kept = list(np.array(batch.meta.datapoint_dir)[do_keep])
 
