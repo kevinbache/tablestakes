@@ -432,11 +432,20 @@ class SigmoidConfusionMatrixCallback(pl.Callback):
             dataloader_idx,
     ):
         batch = batch.transfer_to_device(pl_module.device)
+        try:
+            print(f'batch.y.doc_class.device: {batch.y.doc_class.device}')
+        except BaseException as e:
+            print(f'batch.y.doc_class: {batch.y.doc_class}')
+            raise e
 
         _, head_to_y_hats = pl_module(batch.x)
         for head_name, col_dict in self.head_name_to_col_dicts.items():
-            preds = head_to_y_hats[head_name]
-            target = batch.y[head_name]
+            preds: torch.Tensor = head_to_y_hats[head_name]
+            target: torch.Tensor = batch.y[head_name]
+
+            print('preds.device:  ', preds.device)
+            print('target.device: ', target.device)
+
             for col_idx, (col_name, cm) in enumerate(col_dict.items()):
                 cm.update(preds[:, col_idx], target[:, col_idx])
                 self.head_name_to_col_dicts[head_name][col_name] = cm
