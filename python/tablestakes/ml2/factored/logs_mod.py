@@ -181,7 +181,13 @@ class PredictionSaver(pl.Callback):
 
         _, y_hats_for_pred = pl_module(batch.x)
         y_hats_for_pred = {k: v[do_keep] for k, v in y_hats_for_pred.items()}
-        ys = {k: list(np.array(v)[do_keep]) for k, v in batch.y}
+        ys = {}
+        for k, v in batch.y:
+            if isinstance(v, list):
+                v = list(np.array(v)[do_keep])
+            elif isinstance(v, torch.Tensor):
+                v = list(v.numpy()[do_keep])
+            ys[k] = v
         metas_kept = list(np.array(batch.meta.datapoint_dir)[do_keep])
 
         for meta_idx, meta_kept in enumerate(metas_kept):
