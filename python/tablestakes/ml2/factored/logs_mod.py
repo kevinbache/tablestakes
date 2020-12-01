@@ -182,10 +182,14 @@ class PredictionSaver(pl.Callback):
         _, y_hats_for_pred = pl_module(batch.x)
         y_hats_for_pred = {k: v[do_keep] for k, v in y_hats_for_pred.items()}
         ys = {}
+
+        keep_inds = np.where(do_keep)[0]
+
         for k, v in batch.y:
             if isinstance(v, list):
                 try:
-                    v = list(np.array(v)[do_keep])
+                    v = v[keep_inds]
+                    # v = list(np.array(v)[do_keep])
                 except BaseException as e:
                     print('logs.mod do_keep:    ', do_keep)
                     print('logs.mod v:          ', v)
