@@ -426,10 +426,14 @@ class SigmoidConfusionMatrixCallback(pl.Callback):
     def _get_head_name_to_col_dicts(cls, hp) -> Dict[str, Dict[str, pl.metrics.ConfusionMatrix]]:
         head_name_to_col_dicts = {}
         if isinstance(hp, WeightedHeadParams):
+            print("scm in whp hp.head_params:")
+            utils.print_dict(hp.head_params)
             for head_name, sub_hp in hp.head_params.items():
                 col_name_to_cm = cls._get_col_name_to_cm_for_sub_head(sub_hp)
                 head_name_to_col_dicts[head_name] = col_name_to_cm
         else:
+            print("scm in hp hp.head_params:")
+            print(hp)
             col_name_to_cm = cls._get_col_name_to_cm_for_sub_head(hp)
             head_name_to_col_dicts[cls.DEFAULT_HEAD_NAME] = col_name_to_cm
         return head_name_to_col_dicts
