@@ -184,11 +184,16 @@ class PredictionSaver(pl.Callback):
         ys = {}
         for k, v in batch.y:
             if isinstance(v, list):
-                print('logs.mod do_keep:', do_keep)
-                print('logs.mod l(dk):  ', len(do_keep))
-                print('logs.mod v:      ', v)
-                print('logs.mod len(v): ', len(v))
-                v = list(np.array(v)[do_keep])
+                try:
+                    v = list(np.array(v)[do_keep])
+                except BaseException as e:
+                    print('logs.mod do_keep:    ', do_keep)
+                    print('logs.mod v:          ', v)
+                    print('logs.mod l(dk):      ', len(do_keep))
+                    print('logs.mod len(v):     ', len(v))
+                    print('logs.mod np.array(v):', np.array(v))
+                    raise e
+
             elif isinstance(v, torch.Tensor):
                 v = list(v.cpu().numpy()[do_keep])
             ys[k] = v
