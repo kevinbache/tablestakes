@@ -158,7 +158,7 @@ class TuneRunner(torch_mod.Parameterized['factored.FactoredLightningModule.Facto
             weights_summary='full',
             fast_dev_run=fast_dev_run,
             accumulate_grad_batches=1,
-            profiler=True,
+            profiler='simple',
             deterministic=True,
             log_every_n_steps=hp.metrics.num_steps_per_metric_log,
         )

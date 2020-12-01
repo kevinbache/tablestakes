@@ -422,7 +422,17 @@ class SigmoidConfusionMatrixCallback(pl.Callback):
             head_name_to_col_dicts[cls.DEFAULT_HEAD_NAME] = col_name_to_cm
         return head_name_to_col_dicts
 
-    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
+    def on_validation_batch_end(
+            self,
+            trainer: pl.Trainer,
+            pl_module: pl.LightningModule,
+            outputs,
+            batch: datapoints.XYMetaDatapoint,
+            batch_idx,
+            dataloader_idx,
+    ):
+        batch = batch.transfer_to_device(pl_module.device)
+
         _, head_to_y_hats = pl_module(batch.x)
         for head_name, col_dict in self.head_name_to_col_dicts.items():
             preds = head_to_y_hats[head_name]
