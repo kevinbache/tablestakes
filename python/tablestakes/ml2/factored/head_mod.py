@@ -425,7 +425,7 @@ class SigmoidConfusionMatrixCallback(pl.Callback):
     def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
         _, head_to_y_hats = pl_module(batch.x)
         for head_name, col_dict in self.head_name_to_col_dicts.items():
-            preds = head_to_y_hats[head_name]
+            preds = head_to_y_hats[head_name].cpu().numpy().copy()
             target = batch.y[head_name]
             for col_idx, (col_name, cm) in enumerate(col_dict.items()):
                 cm.update(preds[:, col_idx], target[:, col_idx])
