@@ -187,36 +187,39 @@ class PredictionSaver(pl.Callback):
 
         for k, v in batch.y:
             if isinstance(v, list):
-                try:
-                    av = np.array(v)
-                    v = list(av[keep_inds])
-                    # v = list(np.array(v)[do_keep])
-                except BaseException as e:
-                    print('logs.mod do_keep:     ', do_keep)
-                    print('logs.mod v:           ', v)
-                    print('logs.mod l(dk):       ', len(do_keep))
-                    print('logs.mod len(v):      ', len(v))
-                    print('logs.mod keep_inds:   ', keep_inds)
-                    print('logs.mod type(v):     ', type(v))
-                    print('logs.mod t(keep_inds):', type(keep_inds))
-                    print('logs.mod ki.shape:    ', keep_inds.shape)
-                    print('logs.mod ki.dtype:    ', keep_inds.dtype)
-                    print('logs.mod ki.dtype:    ', keep_inds.dtype)
-                    print('logs.mod av:          ', av)
-                    """
-                      TypeError: only integer scalar arrays can be converted to a scalar index
-                     
-                     
-                      logs.mod l(dk):        200
-                      logs.mod len(v):       200
-                      logs.mod keep_inds:    [  6  10  29  32  37  42  56  58  68  72  77  83  98 100 109 128 145 148
-                       164 168 171 190]
-                      logs.mod type(v):      <class 'list'>
-                      logs.mod t(keep_inds): <class 'numpy.ndarray'>
-                      logs.mod ki.shape:     (22,)
-                    """
-                    # print('logs.mod np.array(v):', np.array(v))
-                    raise e
+                v = [v[ki] for ki in keep_inds]
+                #
+                #
+                # try:
+                #     av = np.array(v)
+                #     v = list(av[keep_inds])
+                #     # v = list(np.array(v)[do_keep])
+                # except BaseException as e:
+                #     print('logs.mod do_keep:     ', do_keep)
+                #     print('logs.mod v:           ', v)
+                #     print('logs.mod l(dk):       ', len(do_keep))
+                #     print('logs.mod len(v):      ', len(v))
+                #     print('logs.mod keep_inds:   ', keep_inds)
+                #     print('logs.mod type(v):     ', type(v))
+                #     print('logs.mod t(keep_inds):', type(keep_inds))
+                #     print('logs.mod ki.shape:    ', keep_inds.shape)
+                #     print('logs.mod ki.dtype:    ', keep_inds.dtype)
+                #     print('logs.mod ki.dtype:    ', keep_inds.dtype)
+                #     print('logs.mod av:          ', av)
+                #     """
+                #       TypeError: only integer scalar arrays can be converted to a scalar index
+                #
+                #
+                #       logs.mod l(dk):        200
+                #       logs.mod len(v):       200
+                #       logs.mod keep_inds:    [  6  10  29  32  37  42  56  58  68  72  77  83  98 100 109 128 145 148
+                #        164 168 171 190]
+                #       logs.mod type(v):      <class 'list'>
+                #       logs.mod t(keep_inds): <class 'numpy.ndarray'>
+                #       logs.mod ki.shape:     (22,)
+                #     """
+                #     # print('logs.mod np.array(v):', np.array(v))
+                #     raise e
 
             elif isinstance(v, torch.Tensor):
                 v = list(v.cpu().numpy()[do_keep])
