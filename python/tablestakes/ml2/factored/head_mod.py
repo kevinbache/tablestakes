@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 import torch
+from pytorch_lightning.metrics.classification import confusion_matrix
 from torch import nn
 import pytorch_lightning as pl
 
@@ -17,39 +18,39 @@ from chillpill import params
 Loss = Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
 
 
-class SaveYhatsMetric(pl.metrics.Metric):
-    def __init__(self, p_save=0.01):
-        super().__init__()
-        self.p_save = p_save
-        self.preds = []
+# class SaveYhatsMetric(pl.metrics.Metric):
+#     def __init__(self, p_save=0.01):
+#         super().__init__()
+#         self.p_save = p_save
+#         self.preds = []
+#
+#     # noinspection PyMethodOverriding
+#     def update(self, y_hat: torch.Tensor, y: torch.Tensor) -> None:
+#         num_data = y.shape[0]
+#         do_save = torch.rand((num_data,)) < self.p_save
+#         self.preds.append(y_hat[do_save])
+#
+#     # noinspection PyMethodOverriding
+#     def compute(self, y_hat: torch.Tensor, y: torch.Tensor):
+#         return self.preds
 
-    # noinspection PyMethodOverriding
-    def update(self, y_hat: torch.Tensor, y: torch.Tensor) -> None:
-        num_data = y.shape[0]
-        do_save = torch.rand((num_data,)) < self.p_save
-        self.preds.append(y_hat[do_save])
 
-    # noinspection PyMethodOverriding
-    def compute(self, y_hat: torch.Tensor, y: torch.Tensor):
-        return self.preds
-
-
-class SaveLossesMetric(pl.metrics.Metric):
-    def __init__(self, loss_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor], p_save=1.0):
-        super().__init__()
-        self.p_save = p_save
-        self.losses = []
-        self.loss_fn = loss_fn
-
-    # noinspection PyMethodOverriding
-    def update(self, y_hat: torch.Tensor, y: torch.Tensor) -> None:
-        num_data = y.shape[0]
-        do_save = torch.rand((num_data,)) < self.p_save
-        self.losses.append(self.loss_fn(y_hat[do_save], y[do_save]))
-
-    # noinspection PyMethodOverriding
-    def compute(self, y: torch.Tensor, y_hat: torch.Tensor):
-        return torch.cat(self.losses, dim=0)
+# class SaveLossesMetric(pl.metrics.Metric):
+#     def __init__(self, loss_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor], p_save=1.0):
+#         super().__init__()
+#         self.p_save = p_save
+#         self.losses = []
+#         self.loss_fn = loss_fn
+#
+#     # noinspection PyMethodOverriding
+#     def update(self, y_hat: torch.Tensor, y: torch.Tensor) -> None:
+#         num_data = y.shape[0]
+#         do_save = torch.rand((num_data,)) < self.p_save
+#         self.losses.append(self.loss_fn(y_hat[do_save], y[do_save]))
+#
+#     # noinspection PyMethodOverriding
+#     def compute(self, y: torch.Tensor, y_hat: torch.Tensor):
+#         return torch.cat(self.losses, dim=0)
 
 
 class MetaMetric(abc.ABC):
@@ -244,7 +245,6 @@ class SigmoidHead(Head):
         if metrics_dict is None:
             metrics_dict = {
                 'sacc': logs_mod.SigmoidBetterAccuracy(),
-                # 'scm': logs_mod.SigmoidConfusionMatrix(hp.num_classes, hp.class_names),
             }
 
         num_classes = hp.num_classes
@@ -386,6 +386,15 @@ class WeightedHeadParams(params.ParameterSet):
         return obj
 
 
+class MyConfusionMatrix(pl.metrics.ConfusionMatrix):
+    """Just like the normal one but with device transfer"""
+
+    def update(self, preds: torch.Tensor, target: torch.Tensor):
+        confmat = confusion_matrix._confusion_matrix_update(preds, target, self.num_classes, self.threshold)
+        confmat = confmat.to(self.confmat.device)
+        self.confmat += confmat
+
+
 class SigmoidConfusionMatrixCallback(pl.Callback):
     """Maintain confusion matrices for each SigmoidHead"""
     DEFAULT_HEAD_NAME = 'DEFAULT'
@@ -401,7 +410,7 @@ class SigmoidConfusionMatrixCallback(pl.Callback):
         col_name_to_cm = {}
         if sub_hp.type == HeadMakerFactory.SIGMOID_TYPE_NAME:
             col_name_to_cm = {
-                col_name: pl.metrics.ConfusionMatrix(
+                col_name: MyConfusionMatrix(
                     num_classes=2,
                     normalize=None,
                     compute_on_step=False,
@@ -563,36 +572,6 @@ class WeightedHead(Head):
             )
 
         return head_maker
-
-
-# class ConfusionMatrixCallback(pl.Callback):
-#     def __init__(self, hp: Union[WeightedHeadParams, HeadParams]):
-#         super().__init__()
-#         self.hp = hp
-#
-#         self.cm = torch.zeros(num_classes, num_classes)
-#
-#     def on_validation_batch_end(
-#             self,
-#             trainer,
-#             pl_module,
-#             outputs,
-#             batch: datapoints.XYMetaDatapoint,
-#             batch_idx,
-#             dataloader_idx,
-#     ):
-#         _, y_hats_for_pred = pl_module(batch.x)
-#         ys = batch.y
-#
-#         for head_name, y_hats in y_hats_for_pred.items():
-#             y = ys[head_name]
-#             confmat = confusion_matrix._confusion_matrix_update(y_hat, y, self.num_classes, self.threshold)
-#         self.confmat += confmat
-#
-#
-#     def on_validation_epoch_end(self, trainer, pl_module):
-#         pass
-
 
 
 class HeadMakerFactory:
