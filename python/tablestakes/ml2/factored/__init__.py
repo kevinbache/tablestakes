@@ -2,6 +2,8 @@ import copy
 from dataclasses import dataclass
 from typing import *
 
+import pandas as pd
+
 import pytorch_lightning as pl
 
 from tablestakes import constants, utils
