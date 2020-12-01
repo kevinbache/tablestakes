@@ -62,6 +62,7 @@ setup(
         'transformers',
         's3fs',
         'neptune-client',
+        'neptune-contrib',
         'boto3',
         'dataclasses',
     ],

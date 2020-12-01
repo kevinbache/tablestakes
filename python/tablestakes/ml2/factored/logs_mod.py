@@ -201,7 +201,7 @@ class PredictionSaver(pl.Callback):
                 self.dir_to_head_outputs[meta_kept][head_name]['y'] = y
                 self.dir_to_head_outputs[meta_kept][head_name]['y_hats'].append(y_hat)
 
-    def get_df_dict(self, as_csvs=False):
+    def get_df_dict(self):
         d = {}
         for datapoint_dir, heads in self.dir_to_head_outputs.items():
             dd = {}
@@ -217,7 +217,7 @@ class PredictionSaver(pl.Callback):
         return d
 
     def on_validation_epoch_end(self, trainer, pl_module):
-        d = self.get_df_dict(as_csvs=True)
+        d = self.get_df_dict()
         # pl_module.log_dict(d, prog_bar=False, reduce_fx='sum', tbptt_reduce_fx='sum')
         pl_module.log_lossmetrics_dict(phase=utils.Phase.valid, d=d)
 

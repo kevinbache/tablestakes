@@ -76,6 +76,10 @@ class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
         do_log_to_progbar = phase == utils.Phase.train
         self.log_dict(d, prog_bar=do_log_to_progbar)
 
+    def log_df(self, name: str, df: pd.DataFrame):
+        from neptunecontrib.api.table import log_table
+        log_table(name, df)
+
     #######
     # OPT #
     #######
