@@ -409,6 +409,8 @@ class SigmoidConfusionMatrixCallback(pl.Callback):
     @classmethod
     def _get_col_name_to_cm_for_sub_head(cls, sub_hp: HeadParams):
         col_name_to_cm = {}
+        print(f'SigmoidConfusionMatrixCallback._get_col_name_to_cm_for_sub_head.sub_hp:    ', sub_hp)
+        print(f'SigmoidConfusionMatrixCallback._get_col_name_to_cm_for_sub_head.t(sub_hp): ', type(sub_hp))
         if sub_hp.type == HeadMakerFactory.SIGMOID_TYPE_NAME:
             col_name_to_cm = {
                 col_name: MyConfusionMatrix(
