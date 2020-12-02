@@ -65,7 +65,8 @@ setup(
         'neptune-contrib',
         'boto3',
         'dataclasses',
-        'pytorch_memlab',
+        # 'pytorch_memlab',
+        'git+https://github.com/stonesjtu/pytorch_memlab',
     ],
 
     classifiers=[

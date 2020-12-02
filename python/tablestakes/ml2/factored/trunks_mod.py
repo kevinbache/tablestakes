@@ -392,15 +392,15 @@ class Appender(nn.Module):
     """Append an array of zeros """
     def __init__(self, num_extra_dims: int, append_dim=-1, dtype=torch.float):
         super().__init__()
-        self.num_extra_dims = num_extra_dims
-        self.append_dim = append_dim
-        self.dtype = dtype
+        self._num_extra_dims = num_extra_dims
+        self._append_dim = append_dim
+        self._dtype = dtype
 
     def forward(self, x):
         shape = [e for e in x.shape]
-        shape[self.append_dim] = self.num_extra_dims
-        extra = torch.zeros(*shape, requires_grad=False, dtype=self.dtype, device=x.device)
-        return torch.cat(tensors=[x, extra], dim=self.append_dim)
+        shape[self._append_dim] = self._num_extra_dims
+        extra = torch.zeros(*shape, requires_grad=False, dtype=self._dtype, device=x.device)
+        return torch.cat(tensors=[x, extra], dim=self._append_dim)
 
 
 def build_performer_trans_block(
