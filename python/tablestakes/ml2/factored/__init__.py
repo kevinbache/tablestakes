@@ -60,7 +60,7 @@ class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
         from pytorch_memlab import LineProfiler
         with LineProfiler(self.__call__) as prof:
             y_hats_for_loss, y_hats_for_pred = self(batch.x)
-        prof.display()
+        print(prof.display())
         return self.head.loss_metrics(y_hats_for_loss, y_hats_for_pred, batch.y, batch.meta)
 
     def training_step(self, batch, batch_idx):
