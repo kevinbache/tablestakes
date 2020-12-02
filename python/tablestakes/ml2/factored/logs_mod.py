@@ -364,6 +364,23 @@ class MyLightningNeptuneLogger(pl_loggers.NeptuneLogger):
         self.append_tags(hp.experiment_tags)
 
     @pl.utilities.rank_zero_only
+    def log_metrics(
+            self,
+            metrics: Dict[str, Union[torch.Tensor, float, pd.DataFrame]],
+            step: Optional[int] = None
+    ) -> None:
+        assert pl.utilities.rank_zero_only.rank == 0, 'experiment tried to log from global_rank != 0'
+        for key, val in metrics.items():
+            if isinstance(val, pd.DataFrame):
+                self.log_df(key, val)
+            else:
+                self.log_metric(key, val, step=step)
+
+    def log_df(self, name: str, df: pd.DataFrame):
+        from neptunecontrib.api.table import log_table
+        log_table(name, df, self.experiment)
+
+    @pl.utilities.rank_zero_only
     def log_hyperparams(self, params: Union[Dict[str, Any], Namespace]) -> None:
         params = self._convert_params(params)
         params = self._flatten_dict(params)
