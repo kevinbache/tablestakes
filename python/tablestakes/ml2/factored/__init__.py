@@ -85,7 +85,7 @@ class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
 
     def log_df(self, name: str, df: pd.DataFrame):
         from neptunecontrib.api.table import log_table
-        log_table(name, df, experiment=self.logger.experiment)
+        log_table(name, df)
 
     #######
     # OPT #
