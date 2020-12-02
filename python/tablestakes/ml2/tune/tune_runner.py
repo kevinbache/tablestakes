@@ -149,7 +149,7 @@ class TuneRunner:
             weights_summary='full',
             fast_dev_run=fast_dev_run,
             accumulate_grad_batches=1,
-            profiler='advanced',
+            profiler='simple',
             deterministic=True,
             log_every_n_steps=hp.logs.num_steps_per_metric_log,
         )
