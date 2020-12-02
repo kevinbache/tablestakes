@@ -201,9 +201,11 @@ class PredictionSaver(pl.Callback):
                 self.dir_to_head_outputs[meta_kept][head_name]['y'] = y
                 self.dir_to_head_outputs[meta_kept][head_name]['y_hats'].append(y_hat)
 
-    def get_df_dict(self):
+    def get_df_dict(self, do_sanitize_filenames=True):
         d = {}
         for datapoint_dir, heads in self.dir_to_head_outputs.items():
+            if do_sanitize_filenames:
+                datapoint_dir = '-'.join(datapoint_dir.split(os.path.sep)[-2:])
             dd = {}
             for head_name, head_outs in heads.items():
                 df = pd.DataFrame(
@@ -215,7 +217,7 @@ class PredictionSaver(pl.Callback):
         return d
 
     def on_validation_epoch_end(self, trainer, pl_module):
-        d = self.get_df_dict()
+        d = self.get_df_dict(do_sanitize_filenames=True)
         # pl_module.log_dict(d, prog_bar=False, reduce_fx='sum', tbptt_reduce_fx='sum')
         pl_module.log_lossmetrics_dict(phase=utils.Phase.valid, d=d)
 
