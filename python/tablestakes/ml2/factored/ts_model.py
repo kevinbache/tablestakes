@@ -93,7 +93,6 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
         # END MODEL
         ###############################################################
 
-
         hpd = self.hp.to_dict()
         self.hparams = hpd
         self.save_hyperparameters(hpd)
@@ -105,54 +104,53 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
         assert isinstance(base, torch.Tensor)
         assert isinstance(vocab, torch.Tensor)
 
-        with torch.autograd.profiler.profile(use_cuda=True, record_shapes=True, profile_memory=True) as prof:
+        # with torch.autograd.profiler.profile(use_cuda=True, record_shapes=True, profile_memory=True) as prof:
+        if self.verbose:
+            print(f'base.shape: {base.shape}')
+            print(f'vocab.shape: {vocab.shape}')
 
-            if self.verbose:
-                print(f'base.shape: {base.shape}')
-                print(f'vocab.shape: {vocab.shape}')
+        with utils.Timer('ts_model forward embed', do_print_outputs=self.hp.verbose):
+            x = self.embed(vocab)
 
-            with utils.Timer('ts_model forward embed', do_print_outputs=self.hp.verbose):
-                x = self.embed(vocab)
+        if self.verbose:
+            print(f'x.shape after embed: {x.last_hidden_state.shape}')
 
-            if self.verbose:
-                print(f'x.shape after embed: {x.last_hidden_state.shape}')
+        x = torch.cat([base, x.last_hidden_state], dim=-1)
 
-            x = torch.cat([base, x.last_hidden_state], dim=-1)
+        num_batch, num_seq, _ = base.shape
 
-            num_batch, num_seq, _ = base.shape
+        if self.verbose:
+            print(f'x.shape after base_cat: {x.shape}')
 
-            if self.verbose:
-                print(f'x.shape after base_cat: {x.shape}')
+        with utils.Timer('ts_model forward trans', do_print_outputs=self.hp.verbose):
+            x_trans = self.trans(x) if self.trans \
+                else torch.zeros(num_batch, num_seq, 0, requires_grad=False, device=self.device)
 
-            with utils.Timer('ts_model forward trans', do_print_outputs=self.hp.verbose):
-                x_trans = self.trans(x) if self.trans \
-                    else torch.zeros(num_batch, num_seq, 0, requires_grad=False, device=self.device)
+        with utils.Timer('ts_model forward conv', do_print_outputs=self.hp.verbose):
+            x_conv = self.conv(x) if self.conv \
+                else torch.zeros(num_batch, num_seq, 0, requires_grad=False, device=self.device)
 
-            with utils.Timer('ts_model forward conv', do_print_outputs=self.hp.verbose):
-                x_conv = self.conv(x) if self.conv \
-                    else torch.zeros(num_batch, num_seq, 0, requires_grad=False, device=self.device)
+        if self.verbose:
+            print(f'x_trans.shape: {x_trans.shape}')
+            print(f'x_conv.shape: {x_conv.shape}')
 
-            if self.verbose:
-                print(f'x_trans.shape: {x_trans.shape}')
-                print(f'x_conv.shape: {x_conv.shape}')
+        # concatenate for sharpness
+        x = torch.cat([base, x_trans, x_conv], dim=-1)
 
-            # concatenate for sharpness
-            x = torch.cat([base, x_trans, x_conv], dim=-1)
+        if self.verbose:
+            print('x shape after cat before fc: ', x.shape)
 
-            if self.verbose:
-                print('x shape after cat before fc: ', x.shape)
+        with utils.Timer('ts_model forward fc', do_print_outputs=self.hp.verbose):
+            x = self.fc(x)
 
-            with utils.Timer('ts_model forward fc', do_print_outputs=self.hp.verbose):
-                x = self.fc(x)
+        if self.verbose:
+            print('x shape after fc before head: ', x.shape)
 
-            if self.verbose:
-                print('x shape after fc before head: ', x.shape)
+        with utils.Timer('ts_model forward head', do_print_outputs=self.hp.verbose):
+            x_for_loss, x_for_pred = self.head.forward_for_loss_and_pred(x)
 
-            with utils.Timer('ts_model forward head', do_print_outputs=self.hp.verbose):
-                x_for_loss, x_for_pred = self.head.forward_for_loss_and_pred(x)
-
-        utils.hprint('MODEL FORWARD PROFILER REPORT:')
-        print(prof.key_averages().table(sort_by="cuda_memory_usage"))
+        # utils.hprint('MODEL FORWARD PROFILER REPORT:')
+        # print(prof.key_averages().table(sort_by="cuda_memory_usage"))
 
         return x_for_loss, x_for_pred
 
