@@ -19,17 +19,28 @@ idle_timeout_minutes: 20
 # look here for ami info
 # https://aws.amazon.com/marketplace/server/configuration?productId=039d985d-abfb-4433-b75e-a302b018c668&ref_=psb_cfg_continue
 
+#head_node:
+#    InstanceType: m4.large
+#    ImageId: ami-0bc87a16c757a7f07   # dlami v36 us-west-2
+#    BlockDeviceMappings:
+#        - DeviceName: /dev/sda1
+#          Ebs:
+#              VolumeSize: 200
 head_node:
-    InstanceType: m4.large
-    ImageId: ami-0bc87a16c757a7f07   # dlami v36 us-west-2
+    InstanceType: g4dn.xlarge
+    ImageId: ami-030de16ccb223b3e0   # dlami v37 us-west-2
+#    ImageId: ami-0bc87a16c757a7f07   # dlami v36 us-west-2
+#    ImageId: ami-029d965a2ea7774a3   # dlami v37 us-east-1
     BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
-              VolumeSize: 200
+              VolumeSize: 300
 
 worker_nodes:
     InstanceType: g4dn.xlarge
-    ImageId: ami-0bc87a16c757a7f07   # dlami v36 us-west-2
+    ImageId: ami-030de16ccb223b3e0   # dlami v37 us-west-2
+#    ImageId: ami-0bc87a16c757a7f07   # dlami v36 us-west-2
+#    ImageId: ami-029d965a2ea7774a3   # dlami v37 us-east-1
     InstanceMarketOptions:
         MarketType: spot
         SpotOptions:
@@ -46,8 +57,11 @@ file_mounts: {
 
 
 setup_commands:
-    # my stuff
     - mkdir -p ~/projects
+
+    # CUDA 11
+    - sudo rm /usr/local/cuda
+    - sudo ln -s /usr/local/cuda-11.0 /usr/local/cuda
 
     # ray
     - source /home/ubuntu/.dlamirc && pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-1.1.0.dev0-cp37-cp37m-manylinux1_x86_64.whl
@@ -84,6 +98,7 @@ head_setup_commands:
     - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/chillpill/
 
     #  tablestakes
+    - pip install git+https://github.com/stonesjtu/pytorch_memlab
     - test -e ~/projects/tablestakes/python || git clone https://github.com/kevinbache/tablestakes.git ~/projects/tablestakes
     - cd ~/projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
     - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/tablestakes/python/
@@ -117,6 +132,7 @@ worker_setup_commands:
     - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/chillpill/
 
     #  tablestakes
+    - pip install git+https://github.com/stonesjtu/pytorch_memlab
     - test -e ~/projects/tablestakes/python || git clone https://github.com/kevinbache/tablestakes.git ~/projects/tablestakes
     - cd ~/projects/tablestakes && git fetch && git checkout `cat /tmp/tablestakes_current_branch_sha`
     - source /home/ubuntu/.dlamirc && pip install --editable ~/projects/tablestakes/python/
