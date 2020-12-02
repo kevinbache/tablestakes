@@ -131,7 +131,10 @@ class TuneRunner:
             raise NotImplementedError(f"Got checkpoint_dir in trian_fn: {checkpoint_dir}")
 
         utils.hprint("About to create net in TuneRunner")
-        net = self._factored_lightning_module_class.from_hp(hp=hp)
+        import torch.autograd.profiler as profiler
+        with profiler.profile(record_shapes=True, use_cuda=True, profile_memory=True) as prof:
+            net = self._factored_lightning_module_class.from_hp(hp=hp)
+        print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=1000))
 
         utils.set_seeds(hp.data.seed)
 
