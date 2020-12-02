@@ -172,10 +172,10 @@ class PredictionSaver(pl.Callback):
         self._inner(batch, pl_module)
 
     def _inner(self, batch, pl_module):
-        # yes, yes, terribly slow
         do_keep = []
         datapoint_dirs = batch.meta.datapoint_dir
 
+        # yes, yes, terribly slow
         for dd in datapoint_dirs:
             do_keep.append(any([dd.endswith(mv) for mv in self.meta_vals_to_keep]))
 
@@ -218,7 +218,7 @@ class PredictionSaver(pl.Callback):
 
     def on_validation_epoch_end(self, trainer, pl_module):
         d = self.get_df_dict(do_sanitize_filenames=True)
-        # pl_module.log_dict(d, prog_bar=False, reduce_fx='sum', tbptt_reduce_fx='sum')
+        d = {'preds': d}
         pl_module.log_lossmetrics_dict(phase=utils.Phase.valid, d=d)
 
     def print_preds(self):
