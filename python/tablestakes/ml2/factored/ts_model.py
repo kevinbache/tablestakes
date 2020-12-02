@@ -91,7 +91,7 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
                 hp=self.hp.fc,
             )
             self.head = head_maker(self.fc.get_num_outputs())
-        print(prof)
+        print(prof.key_averages().table(sort_by="cuda_memory_usage"))
         # END MODEL
         ###############################################################
 
