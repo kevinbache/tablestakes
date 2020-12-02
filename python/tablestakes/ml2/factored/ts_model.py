@@ -62,36 +62,39 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
 
         ###############################################################
         # MODEL
-        self.embed = trunks_mod.BertEmbedder(self.hp.embed)
+        with torch.autograd.profiler.profile(use_cuda=True, record_shapes=True, profile_memory=True) as prof:
+            self.embed = trunks_mod.BertEmbedder(self.hp.embed)
 
-        # cat here
-        num_embedcat_features = self.hp.embed.dim + num_x_base_features
+            # cat here
+            num_embedcat_features = self.hp.embed.dim + num_x_base_features
 
-        if self.hp.conv.num_layers == 0:
-            self.conv = None
-            num_conv_features = 0
-        else:
-            self.conv = trunks_mod.ConvBlock(
-                num_input_features=num_embedcat_features,
-                hp=self.hp.conv,
+            if self.hp.conv.num_layers == 0:
+                self.conv = None
+                num_conv_features = 0
+            else:
+                self.conv = trunks_mod.ConvBlock(
+                    num_input_features=num_embedcat_features,
+                    hp=self.hp.conv,
+                )
+                num_conv_features = self.conv.get_num_output_features()
+
+            if self.hp.trans.num_layers == 0:
+                self.trans = None
+                num_trans_features = 0
+            else:
+                self.trans = trunks_mod.TransBlockBuilder.build(hp=hp.trans, num_input_features=num_embedcat_features)
+                num_trans_features = self.trans.get_num_output_features()
+
+            num_fc_features = num_x_base_features + num_trans_features + num_conv_features
+            self.fc = trunks_mod.SlabNet(
+                num_input_features=num_fc_features,
+                hp=self.hp.fc,
             )
-            num_conv_features = self.conv.get_num_output_features()
-
-        if self.hp.trans.num_layers == 0:
-            self.trans = None
-            num_trans_features = 0
-        else:
-            self.trans = trunks_mod.TransBlockBuilder.build(hp=hp.trans, num_input_features=num_embedcat_features)
-            num_trans_features = self.trans.get_num_output_features()
-
-        num_fc_features = num_x_base_features + num_trans_features + num_conv_features
-        self.fc = trunks_mod.SlabNet(
-            num_input_features=num_fc_features,
-            hp=self.hp.fc,
-        )
-        self.head = head_maker(self.fc.get_num_outputs())
+            self.head = head_maker(self.fc.get_num_outputs())
+        print(prof)
         # END MODEL
         ###############################################################
+
 
         hpd = self.hp.to_dict()
         self.hparams = hpd

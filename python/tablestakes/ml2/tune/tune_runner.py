@@ -152,7 +152,7 @@ class TuneRunner:
             profiler='simple',
             deterministic=True,
             log_every_n_steps=hp.logs.num_steps_per_metric_log,
-            log_gpu_memory='all',
+            log_gpu_memory=hp.logs.log_gpu_memory,
         )
         utils.hprint('About to start tune_runner\'s trainer.fit...')
         fit_out = trainer.fit(net, datamodule=net.dm)
@@ -314,6 +314,7 @@ if __name__ == '__main__':
     hp.logs.num_steps_per_histogram_log = 20
     hp.logs.num_steps_per_metric_log = 5
     hp.logs.output_dir = constants.OUTPUT_DIR
+    hp.logs.log_gpu_memory = 'all'
 
     hp.exp.project_name = 'tablestakes'
     hp.exp.experiment_name = 'korv_which'

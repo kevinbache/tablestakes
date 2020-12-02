@@ -33,6 +33,8 @@ class LoggingParams(params.ParameterSet):
     num_steps_per_histogram_log: int = 10
     num_steps_per_metric_log: int = 10
     output_dir: str = 'output'
+    # Nona, 'all', or 'min_max'
+    log_gpu_memory: Optional[str] = None
 
 
 class TuneLogCopierCallback(pl.Callback):
