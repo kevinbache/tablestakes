@@ -61,11 +61,10 @@ def resnet_conv1_block(
 class BertEmbedder(pl.LightningModule):
     class ModelParams(params.ParameterSet):
         dim: int = 64
-        max_seq_len: int = 1024
         requires_grad: bool = True
         position_embedding_requires_grad: bool = False
 
-    def __init__(self, hp: Optional[ModelParams] = ModelParams()):
+    def __init__(self, hp: Optional[ModelParams] = ModelParams(), max_seq_len=1024):
         super().__init__()
         self.hp = hp
 
@@ -74,7 +73,7 @@ class BertEmbedder(pl.LightningModule):
             num_hidden_layers=0,
             num_attention_heads=1,
             intermediate_size=0,
-            max_position_embeddings=self.hp.max_seq_len,
+            max_position_embeddings=max_seq_len,
             output_attentions=False,
             output_hidden_states=False,
             return_dict=True,

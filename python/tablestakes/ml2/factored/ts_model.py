@@ -33,11 +33,8 @@ class TotalParams(params.ParameterSet):
             data = data_module.DataParams()
             data.data_name = 'DUMMY_DATASET'
         self.data = data
-
-        self.embed.max_seq_len = max_seq_len
         self.data.max_seq_length = max_seq_len
         self.data.batch_size = batch_size
-        self.opt.batch_size = batch_size
 
 
 class ModelBertConvTransTClass2(factored.FactoredLightningModule):
@@ -62,7 +59,7 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
 
         ###############################################################
         # MODEL
-        self.embed = trunks_mod.BertEmbedder(self.hp.embed)
+        self.embed = trunks_mod.BertEmbedder(self.hp.embed, max_seq_len=self.hp.data.max_seq_length)
 
         # cat here
         num_embedcat_features = self.hp.embed.dim + num_x_base_features

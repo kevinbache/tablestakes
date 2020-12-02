@@ -8,7 +8,6 @@ from chillpill import params
 
 class OptParams(params.ParameterSet):
     num_epochs: int = 10
-    batch_size: int = 32
     lr: float = 0.001
     min_lr: float = 1e-6
     patience: int = 10
