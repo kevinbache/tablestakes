@@ -27,16 +27,6 @@ setup(
 
     packages=find_packages(exclude=('tests',)),
 
-    # When you install this package, this console_scripts option ensures that another executable python script named
-    # `tablestakes_docker_entrypoint` is added to your path which will call the function called
-    # `main_funk` in the file imported in
-    # `tablestakes.tablestakes_docker_entrypoint`
-    entry_points={
-        # 'console_scripts': [
-        #     'tablestakes_docker_entrypoint=tablestakes.tablestakes_docker_entrypoint:main_funk',
-        # ],
-    },
-
     install_requires=[
         'tqdm',
         'numpy',
@@ -66,15 +56,13 @@ setup(
         'boto3',
         'dataclasses',
         # 'pytorch_memlab',
-        'git+https://github.com/stonesjtu/pytorch_memlab',
+        'git+git://github.com/stonesjtu/pytorch_memlab',
     ],
 
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
     ],
 )
