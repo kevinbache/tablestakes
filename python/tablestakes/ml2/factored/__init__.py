@@ -55,7 +55,7 @@ class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
         import torch.autograd.profiler as profiler
         with profiler.profile(record_shapes=True, use_cuda=True, profile_memory=True) as prof:
             y_hats_for_loss, y_hats_for_pred = self(batch.x)
-        print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=1000))
+        print(prof.key_averages().table(sort_by="cuda_mem", row_limit=1000))
         # y_hats_for_loss, y_hats_for_pred = self(batch.x)
         return self.head.loss_metrics(y_hats_for_loss, y_hats_for_pred, batch.y, batch.meta)
 
