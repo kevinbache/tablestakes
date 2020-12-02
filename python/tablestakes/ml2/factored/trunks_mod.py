@@ -388,7 +388,7 @@ def build_fast_trans_block(
     return builder.get()
 
 
-class Appender(pl.LightningModule):
+class Appender(nn.Module):
     """Append an array of zeros """
     def __init__(self, num_extra_dims: int, append_dim=-1, dtype=torch.float):
         super().__init__()
