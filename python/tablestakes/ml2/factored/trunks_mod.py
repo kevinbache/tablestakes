@@ -388,7 +388,7 @@ def build_fast_trans_block(
     return builder.get()
 
 
-class Appender(nn.Module):
+class Appender(pl.LightningModule):
     """Append an array of zeros """
     def __init__(self, num_extra_dims: int, append_dim=-1, dtype=torch.float):
         super().__init__()
@@ -399,7 +399,7 @@ class Appender(nn.Module):
     def forward(self, x):
         shape = [e for e in x.shape]
         shape[self.append_dim] = self.num_extra_dims
-        extra = torch.zeros(*shape, requires_grad=False, dtype=self.dtype)
+        extra = torch.zeros(*shape, requires_grad=False, dtype=self.dtype, device=x.device)
         return torch.cat(tensors=[x, extra], dim=self.append_dim)
 
 
