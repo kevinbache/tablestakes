@@ -461,7 +461,7 @@ class SigmoidConfusionMatrixCallback(pl.Callback):
                 df = pd.DataFrame(vals, columns=['pred=0', 'pred=1'], index=['true=0', 'true=1'])
                 self.head_name_to_col_dicts[head_name][col_name] = df
 
-        d = {'cms', copy.deepcopy(self.head_name_to_col_dicts)}
+        d = {'cms': copy.deepcopy(self.head_name_to_col_dicts)}
         pl_module.log_lossmetrics_dict(phase=utils.Phase.valid, d=d)
 
         self.cmdict_per_epoch.append(self.head_name_to_col_dicts)
