@@ -2,15 +2,16 @@ import copy
 from dataclasses import dataclass
 from typing import *
 
-import pandas as pd
-
 import pytorch_lightning as pl
+
+from pytorch_memlab import profile
+
+from chillpill import params
 
 from tablestakes import constants, utils
 from tablestakes.ml2.data import datapoints, data_module
 from tablestakes.ml2.factored import opt_mod, head_mod, logs_mod, trunks_mod
 
-from chillpill import params
 
 Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
 
@@ -47,6 +48,7 @@ class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
     ############
     # TRAINING #
     ############
+    @profile
     def forward_plus_lossmetrics(
             self,
             batch: datapoints.XYMetaDatapoint,

@@ -6,7 +6,6 @@ from typing import *
 import boto3
 
 import pytorch_lightning as pl
-from pytorch_memlab import profile
 
 import ray
 from ray import tune
@@ -235,7 +234,6 @@ class TuneRunner:
             reduction_factor=tune_hp.asha_reduction_factor,
         )
 
-    @profile
     def run(self, fast_dev_run=False, use_gpus=False):
         utils.set_seeds(self.search_params.data.seed)
 
