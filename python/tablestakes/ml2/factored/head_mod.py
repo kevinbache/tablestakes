@@ -93,6 +93,8 @@ class LossMetrics:
                 pass
             elif isinstance(v, pl.metrics.Metric):
                 self.metrics_dict[k] = MetaMetric(v)
+            else:
+                raise NotImplementedError(f'type(v): {type(v)}')
 
     def loss(self, y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         return self.loss_fn(y_hat, y)
@@ -180,7 +182,7 @@ class Head(LossMetrics, pl.LightningModule, abc.ABC):
         return loss
 
     def postproc_head_out_for_loss_fn(self, head_out):
-        return self.postproc_head_out_for_pred(head_out)
+        return head_out
 
     def postproc_head_out_for_pred(self, head_out):
         return head_out
@@ -275,6 +277,9 @@ class SigmoidHead(Head):
     def postproc_head_out_for_pred(self, head_out):
         return self.s(head_out)
 
+    def postproc_head_out_for_loss_fn(self, head_out):
+        return head_out
+
 
 class _SoftmaxHead(Head):
     def __init__(
@@ -358,6 +363,9 @@ class LinearSoftmaxHead(_SoftmaxHead):
             return self.lsm(head_output.permute(0, 2, 1))
         else:
             return self.lsm(head_output)
+
+    def postproc_head_out_for_pred(self, head_output):
+        return self.postproc_head_out_for_loss_fn(head_output)
 
 
 YDP = TypeVar('YDP', bound=datapoints.YDatapoint)
