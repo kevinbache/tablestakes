@@ -56,7 +56,6 @@ setup(
         'boto3',
         'dataclasses',
         # 'pytorch_memlab',
-        'git+git://github.com/stonesjtu/pytorch_memlab',
     ],
 
     classifiers=[
