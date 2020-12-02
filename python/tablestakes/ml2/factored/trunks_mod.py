@@ -82,7 +82,8 @@ class BertEmbedder(pl.LightningModule):
 
         self.e = transformers.BertModel(config, add_pooling_layer=False)
         for name, param in self.e.named_parameters():
-            if name == 'position_embeddings':
+            print(f'BertEmbedder param name: {name}')
+            if 'position_embeddings' in name:
                 requires_grad = self.hp.position_embedding_requires_grad
             else:
                 requires_grad = self.hp.requires_grad

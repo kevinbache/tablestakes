@@ -180,7 +180,7 @@ def run(
         weights_summary='full',
         fast_dev_run=fast_dev_run,
         accumulate_grad_batches=1,
-        profiler=True,
+        profiler='simple',
         deterministic=True,
         auto_lr_find=do_find_lr,
         log_every_n_steps=hp.logs.num_steps_per_metric_log,
