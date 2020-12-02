@@ -152,6 +152,7 @@ class TuneRunner:
             profiler='simple',
             deterministic=True,
             log_every_n_steps=hp.logs.num_steps_per_metric_log,
+            log_gpu_memory='all',
         )
         utils.hprint('About to start tune_runner\'s trainer.fit...')
         fit_out = trainer.fit(net, datamodule=net.dm)

@@ -4,8 +4,6 @@ from typing import *
 
 import pytorch_lightning as pl
 
-from pytorch_memlab import profile
-
 from chillpill import params
 
 from tablestakes import constants, utils
@@ -57,10 +55,12 @@ class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
         # with profiler.profile(record_shapes=True, use_cuda=True, profile_memory=True) as prof:
         #     y_hats_for_loss, y_hats_for_pred = self(batch.x)
         # print(prof.key_averages().table(sort_by="cuda_memory_usage", row_limit=1000))
-        from pytorch_memlab import LineProfiler
-        with LineProfiler(self.__call__) as prof:
-            y_hats_for_loss, y_hats_for_pred = self(batch.x)
-        print(prof.display())
+
+        # from pytorch_memlab import LineProfiler
+        # with LineProfiler(self.__call__) as prof:
+        #     y_hats_for_loss, y_hats_for_pred = self(batch.x)
+        # print(prof.display())
+        y_hats_for_loss, y_hats_for_pred = self(batch.x)
         return self.head.loss_metrics(y_hats_for_loss, y_hats_for_pred, batch.y, batch.meta)
 
     def training_step(self, batch, batch_idx):
