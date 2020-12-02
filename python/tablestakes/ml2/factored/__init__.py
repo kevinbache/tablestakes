@@ -48,7 +48,6 @@ class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
     ############
     # TRAINING #
     ############
-    @profile
     def forward_plus_lossmetrics(
             self,
             batch: datapoints.XYMetaDatapoint,
@@ -58,7 +57,10 @@ class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
         # with profiler.profile(record_shapes=True, use_cuda=True, profile_memory=True) as prof:
         #     y_hats_for_loss, y_hats_for_pred = self(batch.x)
         # print(prof.key_averages().table(sort_by="cuda_memory_usage", row_limit=1000))
-        y_hats_for_loss, y_hats_for_pred = self(batch.x)
+        from pytorch_memlab import LineProfiler
+        with LineProfiler(self.__call__) as prof:
+            y_hats_for_loss, y_hats_for_pred = self(batch.x)
+        prof.display()
         return self.head.loss_metrics(y_hats_for_loss, y_hats_for_pred, batch.y, batch.meta)
 
     def training_step(self, batch, batch_idx):
