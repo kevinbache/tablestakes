@@ -12,7 +12,7 @@ from chillpill import params
 
 
 class TotalParams(params.ParameterSet):
-    data: data_module.DataParams
+    data: data_module.DataParams = data_module.DataParams()
     opt: opt_mod.OptParams = opt_mod.OptParams()
     exp: logs_mod.ExperimentParams = logs_mod.ExperimentParams()
     logs: logs_mod.LoggingParams = logs_mod.LoggingParams()
@@ -25,16 +25,6 @@ class TotalParams(params.ParameterSet):
     head: head_mod.WeightedHeadParams = head_mod.WeightedHeadParams(weights={}, head_mod={})
 
     verbose: bool = False
-
-    def __init__(self, data: data_module.DataParams = None, max_seq_len=1024, batch_size=32):
-        super().__init__()
-        # TODO: hack.
-        if data is None:
-            data = data_module.DataParams()
-            data.data_name = 'DUMMY_DATASET'
-        self.data = data
-        self.data.max_seq_length = max_seq_len
-        self.data.batch_size = batch_size
 
 
 class ModelBertConvTransTClass2(factored.FactoredLightningModule):
@@ -59,7 +49,7 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
 
         ###############################################################
         # MODEL
-        self.embed = trunks_mod.BertEmbedder(self.hp.embed, max_seq_len=self.hp.data.max_seq_length)
+        self.embed = trunks_mod.BertEmbedder(self.hp.embed, max_seq_len=self.hp.data.max_seq_len)
 
         # cat here
         num_embedcat_features = self.hp.embed.dim + num_x_base_features
@@ -160,6 +150,7 @@ def run(
         callbacks=None,
 ):
     utils.set_seeds(hp.data.seed)
+    utils.set_pandas_disp()
 
     if callbacks is None:
         callbacks = [
@@ -219,12 +210,10 @@ if __name__ == '__main__':
         # dataset_name='num=100_057b',
         dataset_name='num=1000_2cfc',
     )
-    hp = TotalParams(
-        data=dp,
-        max_seq_len=8192,
-        batch_size=32,
-    )
+    hp = TotalParams(data=dp)
 
+    hp.data.max_seq_len = 8192
+    hp.data.batch_size = 32
     hp.data.do_ignore_cached_dataset = False
     hp.data.seed = 42
     hp.data.num_workers = 4
@@ -340,4 +329,11 @@ if __name__ == '__main__':
     utils.hprint('About to start model run:')
     utils.print_dict(hp.to_dict())
 
-    run(net, hp, fast_dev_run, do_find_lr=False)
+    callbacks = [
+        logs_mod.ClassCounterCallback(head_names=['doc_class']),
+        logs_mod.CounterTimerLrCallback(),
+        logs_mod.VocabLengthCallback(),
+        logs_mod.PredictionSaver(p_keep=1.0),
+    ]
+
+    run(net, hp, fast_dev_run, do_find_lr=False, callbacks=callbacks)

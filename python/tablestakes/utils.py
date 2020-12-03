@@ -38,9 +38,10 @@ class Phase(enum.Enum):
 
 
 # # too slow for contants
-import transformers
-VOCAB_PAD_VALUE = transformers.BertTokenizer.from_pretrained(constants.BERT_MODEL_NAME).mask_token_id
-# VOCAB_PAD_VALUE = 103
+# import transformers
+# VOCAB_PAD_VALUE = transformers.BertTokenizer.from_pretrained(constants.BERT_MODEL_NAME).mask_token_id
+assert constants.BERT_MODEL_NAME == 'bert-base-uncased'
+VOCAB_PAD_VALUE = 103
 
 
 def to_list(v: Any):

@@ -118,11 +118,14 @@ class HeadParams(params.ParameterSet):
     type: str = 'DEFAULT_TYPE'
     num_classes: int = -1
     class_names: Tuple[str] = ()
-    """See get_reducer() for x_ and loss_ reducer options"""
+    # See get_reducer() for x_ and loss_ reducer options
     x_reducer_name: str = ''
     loss_reducer_name: str = 'mean-0'
     do_permute_head_out: bool = True
-    class_weights: Optional[torch.Tensor] = None
+    # normalize between classes
+    class_weights: Optional[np.array] = None
+    # normalize within a class
+    pos_class_weights: Optional[np.array] = None
 
 
 class EmptyHeadParams(HeadParams):
@@ -251,13 +254,16 @@ class SigmoidHead(Head):
             metrics_dict=metrics_dict,
         )
         self.head = nn.Linear(num_input_features, num_classes)
-        self.loss_fn = nn.BCEWithLogitsLoss(reduction='none')
 
         self.num_classes = num_classes
 
         class_weights = hp.class_weights or np.ones(num_classes)
         self.register_buffer('class_weights', torch.tensor(class_weights, dtype=torch.float))
         self.class_weights /= self.class_weights.sum()
+
+        pos_class_weights = hp.pos_class_weights or np.ones(num_classes)
+        self.register_buffer('pos_class_weights', torch.tensor(pos_class_weights, dtype=torch.float))
+        self.loss_fn = nn.BCEWithLogitsLoss(reduction='none', pos_weight=self.pos_class_weights)
 
         self.x_reducer_fn = x_reducer
         self.loss_reducer_fn = loss_reducer

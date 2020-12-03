@@ -77,20 +77,14 @@ class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
         d = self.forward_plus_lossmetrics(batch, batch_idx)
         self.log_lossmetrics_dict(utils.Phase.test, d)
 
-    def log_lossmetrics_dict(self, phase: utils.Phase, d: Dict[str, Any]) -> None:
-        # if phase == utils.Phase.train:
-        #     self.log(name=self.LOSS_NAME, value=d[self.LOSS_NAME], prog_bar=True)
+    def log_lossmetrics_dict(self, phase: utils.Phase, d: Dict[str, Any], do_log_to_progbar=None) -> None:
         d = {phase.name: d}
         d = utils.detach_tensors(d)
         d = utils.flatten_dict(d, delimiter='/')
-        do_log_to_progbar = phase == utils.Phase.train
+        if do_log_to_progbar is None:
+            do_log_to_progbar = phase == utils.Phase.train
 
         self.log_dict(d, prog_bar=do_log_to_progbar)
-        # for name, val in d.items():
-        #     if isinstance(val, pd.DataFrame):
-        #         self.log_df(name, val)
-        #     else:
-        #         self.log(name, val, prog_bar=do_log_to_progbar)
 
     #######
     # OPT #

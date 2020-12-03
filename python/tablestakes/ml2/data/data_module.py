@@ -1,5 +1,4 @@
 import abc
-from dataclasses import dataclass
 from pathlib import Path
 from typing import *
 
@@ -20,6 +19,9 @@ class DataParams(params.ParameterSet):
     dataset_root_dir: utils.DirtyPath = constants.DATASETS_DIR
     do_ignore_cached_dataset: bool = False
 
+    max_seq_len = 4096
+    batch_size = 32
+
     p_valid = 0.1
     p_test = 0.1
     num_workers = 4
@@ -28,9 +30,6 @@ class DataParams(params.ParameterSet):
     num_cpus = 4
 
     seed = 42
-
-    max_seq_length = 4096
-    batch_size = 32
 
     def __init__(self, dataset_name='DUMMY_DATASET_NAME', **kwargs):
         self.dataset_name = dataset_name
@@ -93,7 +92,7 @@ class XYMetaHandlerDatasetModule(pl.LightningDataModule):
                   f'{len(self.train_dataset)}, {len(self.valid_dataset)}, {len(self.test_dataset)}')
 
     def _collate_fn(self, batch: List[datapoints.XYMetaDatapoint]) -> datapoints.XYMetaDatapoint:
-        return datapoints.XYMetaDatapoint.collate(batch, max_seq_len=self.hp.max_seq_length)
+        return datapoints.XYMetaDatapoint.collate(batch, max_seq_len=self.hp.max_seq_len)
 
     def train_dataloader(self):
         return DataLoader(

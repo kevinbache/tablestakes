@@ -18,9 +18,8 @@ from ray import tune
 from chillpill import params
 
 from tablestakes import constants, utils
-from tablestakes.ml2 import factored
-from tablestakes.ml2.data import datapoints, data_module
-
+from tablestakes.ml2.data import datapoints
+from torch.utils.data import DataLoader
 
 CURRENT_EPOCH_NAME = 'current_epoch'
 PARAM_COUNT_NAME = 'param_count'
@@ -290,10 +289,92 @@ class CounterTimerLrCallback(pl.Callback):
         trainer.logger.log_metrics(d, step=trainer.global_step)
 
 
-class BetterAccuracy(pl.metrics.Accuracy):
-    Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
+class ClassCounterCallback(pl.Callback):
+    """Count the number of datapoints belonging to each class.
 
-    """PyTorch Lightning's += lines cause warnings about transferring lots of scalars between cpu / gpu"""
+    Right now, designed for binary multi-feild problems (i.e.: `SigmoidHead`s)
+    """
+    PORTIONS = 'portions'
+    CLASS_COUNTS = 'class_counts'
+
+    def __init__(
+            self,
+            head_names: List[str],
+            total_hp: Optional[params.ParameterSet] = None,
+            do_update_pos_class_weights=True,
+            verbose=True,
+    ):
+        super().__init__()
+        self.head_names = head_names
+        self.verbose = verbose
+        self.hp = total_hp
+        self.do_update_pos_class_weights = do_update_pos_class_weights
+
+    def y_list_to_df(self, head_name: str, y: List[torch.Tensor]) -> pd.DataFrame:
+        y = torch.cat(y, dim=0)
+        num_datapoints = len(y)
+        counts = y.sum(dim=0).detach().numpy()
+        if head_name in self.hp.head.head_params:
+            cols = self.hp.head.head_params[head_name].class_names or None
+            assert len(cols) == len(counts)
+        else:
+            cols = None
+        return pd.DataFrame(data=[counts, counts / num_datapoints], columns=cols, index=['counts', self.PORTIONS])
+
+    def _inner(self, dataloader: DataLoader):
+        field_to_y_lists = defaultdict(list)
+        for batch in dataloader:
+            for field in self.head_names:
+                field_to_y_lists[field].extend([batch.y[field]])
+
+        field_to_class_counts = {
+            field_name: self.y_list_to_df(field_name, y_list)
+            for field_name, y_list in field_to_y_lists.items()
+        }
+        return field_to_class_counts
+
+    def on_train_start(self, trainer, pl_module):
+        field_to_class_counts = self._inner(dataloader=pl_module.train_dataloader())
+        if self.verbose:
+            utils.hprint('ClassCounterCallback Class Counts:')
+            utils.print_dict(field_to_class_counts)
+            print()
+
+        if self.hp is None:
+            if self.verbose:
+                print(f'  Not setting head_params.pos_class_weights because you did not pass hp to my init')
+        else:
+            if self.hp.head.type != 'weighted':
+                raise NotImplementedError(
+                    f'hp.head == {self.hp.head} but this is only implemented for WeightedHeadParams'
+                )
+            for field_name, class_counts_df in field_to_class_counts.items():
+                head_params = self.hp.head.head_params[field_name]
+
+                pos_class_weights = class_counts_df.loc[self.PORTIONS].values
+                zero_inds = np.where(pos_class_weights == 0)[0]
+                pos_class_weights[zero_inds] = 1.0
+                pos_class_weights = 1. / pos_class_weights
+
+                head_params.pos_class_weights = pos_class_weights
+                if self.verbose:
+                    weights_str = ', '.join([f'{e:.2f}' for e in pos_class_weights])
+                    print(f'  Setting head_params["{field_name}"].pos_class_weights = [{weights_str}]')
+                    print()
+
+        pl_module.log_lossmetrics_dict(
+            phase=utils.Phase.train,
+            d={self.CLASS_COUNTS: field_to_class_counts},
+            do_log_to_progbar=False,
+        )
+
+
+class BetterAccuracy(pl.metrics.Accuracy):
+    """Like Accuracy, but better.
+        - PyTorch Lightning's += lines cause warnings about transferring lots of scalars between cpu / gpu.
+        - Respect Y_VALUE_TO_IGNORE
+    """
+    Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
 
     def update(self, preds: torch.Tensor, target: torch.Tensor):
         preds, target = _input_format_classification(preds, target, self.threshold)
@@ -409,4 +490,5 @@ def get_pl_logger(hp: ExperimentParams, tune=None):
     logger = MyLightningNeptuneLogger(hp=hp, version=version, offline_mode=hp.offline_mode),
 
     return logger
+
 
