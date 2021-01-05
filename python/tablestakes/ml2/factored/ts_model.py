@@ -88,8 +88,8 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
     def forward(self, x: datapoints.BaseVocabDatapoint):
         base = x.base
         vocab = x.vocab
-        assert isinstance(base, torch.Tensor)
-        assert isinstance(vocab, torch.Tensor)
+        assert isinstance(base, torch.Tensor), f'base: {base}, type(base): {type(base)}'
+        assert isinstance(vocab, torch.Tensor), f'vocab: {vocab}, type(vocab): {type(vocab)}'
 
         # with torch.autograd.profiler.profile(use_cuda=True, record_shapes=True, profile_memory=True) as prof:
         if self.verbose:

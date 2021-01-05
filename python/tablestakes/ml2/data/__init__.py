@@ -1,4 +1,5 @@
 import abc
+from collections import defaultdict
 from pathlib import Path
 import re
 from typing import *
@@ -50,7 +51,7 @@ class SubtypeCsvHandler(Generic[DP], abc.ABC):
         self.glob_recursive = glob_recursive
         self.patterns = patterns
 
-        # eg.: filename = '/blah/blah/x_base.csv'
+        # eg.: filename = '/blah/blah/My Document.x_base.csv'
         #      sub_name = 'base'
         if filename_to_sub_name is None:
             filename_to_sub_name = lambda filename: self._match_between_prefix_and_ext(filename, prefix=prefix)
@@ -76,15 +77,78 @@ class SubtypeCsvHandler(Generic[DP], abc.ABC):
 
 class BaseVocabXHandler(SubtypeCsvHandler[datapoints.BaseVocabDatapoint]):
     def __init__(self):
-        super().__init__(subtype_name='x', patterns=['**/x_*.csv'], glob_recursive=True)
+        super().__init__(subtype_name='x', patterns=['**/*.x_*.csv'], glob_recursive=True)
 
     def _files_to_subtype(self, subname_to_file: Dict[str, Path]) -> datapoints.BaseVocabDatapoint:
         # print(f'BaseVocabXHandler subname_to_file:')
         # utils.print_dict(subname_to_file)
+        print('BaseVocabXHandler._files_to_subtype.subname_to_file')
+        utils.print_dict(subname_to_file)
+        print(' Done with print dict')
         return datapoints.BaseVocabDatapoint(
             base=utils.load_csv(subname_to_file[constants.X_BASE_BASE_NAME]),
             vocab=utils.load_csv(subname_to_file[constants.X_VOCAB_BASE_NAME]),
         )
+
+
+class BaseVocabMultiXHandler(SubtypeCsvHandler[datapoints.BaseVocabMultiDatapoint]):
+    """Converts a directory into a datapoint.  Multiple docs per datapoint."""
+    def __init__(self):
+        super().__init__(subtype_name='x', patterns=['**/*x_*.csv'], glob_recursive=True)
+
+    def _files_to_subtype(self, subname_to_file: Dict[str, Path]) -> DP:
+        pass
+
+    def handle(self, datapoint_dir: Path) -> DP:
+        # subbame is e.g. 'base' or 'vocab'
+        subname_to_docind_to_filename = defaultdict(dict)
+        # print("BaseVocabMultiXHandler.handle:")
+
+        # print(f'datapoint_dir: {datapoint_dir}')
+        # print(f'self.patterns: {self.patterns}')
+
+        x_files = utils.glob_multiple(datapoint_dir, self.patterns, self.glob_recursive)
+        # print(f'x_files: {x_files}')
+        for x_file in x_files:
+            subname = self.filename_to_subtype_name(x_file)
+            doc_ind = self._get_attachment_doc_ind(x_file)
+            # print(f'x_file: {x_file}')
+            # print(f'subname: {subname}')
+            # print(f'doc_ind: {doc_ind}')
+            subname_to_docind_to_filename[subname][doc_ind] = x_file
+
+        sorter = lambda tup: tup[0]
+
+        base_dfs = []
+        filenames = []
+        for doc_ind, f in sorted(subname_to_docind_to_filename[constants.X_BASE_BASE_NAME].items(), key=sorter):
+            base_dfs.append(utils.load_csv(f, index_col=0))
+            filenames.append(self._get_attachment_filename(f))
+
+        # print(f'base_dfs: {base_dfs}')
+        # print(f'filenames: {filenames}')
+
+        vocab_dfs = []
+        for doc_ind, f in sorted(subname_to_docind_to_filename[constants.X_VOCAB_BASE_NAME].items(), key=sorter):
+            vocab_dfs.append(utils.load_csv(f, index_col=0))
+
+        dp_inds = [None] * len(filenames)
+        sources = list(zip(dp_inds, filenames))
+
+        return datapoints.BaseVocabMultiDatapoint(
+            base=base_dfs,
+            vocab=vocab_dfs,
+            sources=sources,
+        )
+
+    def _get_attachment_doc_ind(self, p: utils.DirtyPath):
+        return int(Path(p).parent.name.replace('doc_', ''))
+
+    def _get_attachment_filename(self, p: utils.DirtyPath):
+        name = Path(p).name
+        for suffix in (constants.X_BASE_NAME, constants.X_VOCAB_NAME):
+            name = utils.replace_endswith(name, f'.{suffix}.csv', '')
+        return name
 
 
 class KorvWhichYHandler(SubtypeCsvHandler[datapoints.KorvWhichDatapoint]):

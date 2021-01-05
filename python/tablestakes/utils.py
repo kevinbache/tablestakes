@@ -222,6 +222,11 @@ class Timer:
             print(f'Timer{self.name_str} took {time.time() - self.t:2.3g} secs.')
 
 
+def allsame(lengths: int):
+    l0 = lengths[0]
+    return all([l == l0 for l in lengths])
+
+
 def levenshtein(a: str, b: str):
     na = len(a)
     nb = len(b)
@@ -244,7 +249,7 @@ def levenshtein(a: str, b: str):
     return d[na, nb]
 
 
-def mkdir_if_not_exist(d: str, make_parents=True):
+def mkdir_if_not_exist(d: Union[str, Path], make_parents=True):
     p = Path(d)
     if p.exists():
         if p.is_dir():
@@ -258,14 +263,33 @@ def mkdir_if_not_exist(d: str, make_parents=True):
 
 def prepend_before_extension(f: str, to_append: str, new_ext: Optional[str] = None):
     p = Path(f)
-    ext = new_ext if new_ext is not None else p.suffix
-    return p.parent / f'{p.stem}{to_append}{ext}'
+
+    suffix = ''.join(p.suffixes)
+    stem = p.name[:-len(suffix)]
+    ext = new_ext if new_ext is not None else suffix
+
+    return p.parent / f'{stem}{to_append}{ext}'
 
 
-def set_pandas_disp(width=200, max_rows=200):
-    pd.set_option('display.max_columns', width)
-    pd.set_option('display.max_rows', max_rows)
+def replace_suffixes(p: Path, new_suffix: str) -> Path:
+    suffix = ''.join(p.suffixes)
+    stem = p.name[:-len(suffix)]
+
+    return p.parent / f'{stem}{new_suffix}'
+
+
+def replace_endswith(s: str, old_end: str, new_end: str):
+    if not s.endswith(old_end):
+        return s
+    base = s[:-len(old_end)]
+    return f'{base}{new_end}'
+
+
+def set_pandas_disp(width=200, max_col_width=50, max_rows=200, max_columns=100):
     pd.set_option('display.width', width)
+    pd.set_option('display.max_colwidth', max_col_width)
+    pd.set_option('display.max_rows', max_rows)
+    pd.set_option('display.max_columns', max_columns)
 
 
 class PdfHandler:

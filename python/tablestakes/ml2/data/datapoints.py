@@ -1,5 +1,6 @@
 import abc
 from dataclasses import dataclass
+import itertools
 from typing import *
 
 import numpy as np
@@ -35,11 +36,19 @@ def _pad_arrays(arrays: List[np.array], dtype, max_seq_len, pad_val=0):
     )
 
 
-def _get_df_or_tensor_num_features(e: Union[pd.DataFrame, torch.Tensor]):
+def _get_df_or_tensor_num_features(e: Union[pd.DataFrame, torch.Tensor, list, tuple, dict]):
     if hasattr(e, 'get_num_features'):
         return e.get_num_features()
     elif isinstance(e, (pd.DataFrame, torch.Tensor)):
         return e.shape[-1]
+    elif isinstance(e, (list, tuple)):
+        sizes = [_get_df_or_tensor_num_features(ee) for ee in e]
+        assert utils.allsame(sizes)
+        return sizes[0]
+    elif isinstance(e, MutableMapping):
+        sizes = [_get_df_or_tensor_num_features(ee) for ee in e.values()]
+        assert utils.allsame(sizes)
+        return sizes[0]
     else:
         raise NotImplementedError(f'type: {type(e)}, e: {e}')
 
@@ -86,11 +95,12 @@ class Datapoint(utils.DataclassPlus, abc.ABC):
     def from_dict(cls, d: Dict):
         return cls(**d)
 
+DFT = Union[pd.DataFrame, torch.Tensor]
 
 @dataclass
 class BaseVocabDatapoint(Datapoint):
-    base: Union[pd.DataFrame, torch.Tensor]
-    vocab: Union[pd.DataFrame, torch.Tensor]
+    base: DFT
+    vocab: DFT
 
     def __len__(self):
         return len(self.base)
@@ -98,7 +108,6 @@ class BaseVocabDatapoint(Datapoint):
     # noinspection PyMethodOverriding
     @classmethod
     def collate(cls, dps: List['BaseVocabDatapoint'], max_seq_len: int) -> 'BaseVocabDatapoint':
-        # noinspection PyTypeChecker
         base = _pad_arrays(
             arrays=[dp.base.values for dp in dps],
             dtype=torch.float,
@@ -112,13 +121,71 @@ class BaseVocabDatapoint(Datapoint):
             pad_val=utils.VOCAB_PAD_VALUE,
         ).squeeze(2)
 
+        filenames = [dp.filenames for dp in dps]
+
         return cls(
             base=base,
             vocab=vocab,
+            filenames=filenames,
         )
 
     def get_batch_lens(self):
         return np.where(self.vocab == utils.VOCAB_PAD_VALUE)[0]
+
+
+@dataclass
+class BaseVocabMultiDatapoint(BaseVocabDatapoint):
+    """Like a BaseVocabDatapoint but mulitple docs per datapoint.
+    base and vocab each map doc name to data for that doc.
+    """
+    # one df/tensor per document when it's a single datapoint; sources is (None, filename_str)
+    # one df/tensor per document when it's a batch  datapoint; sources is (doc_id_int, filename)
+    base: Union[List[DFT], DFT]
+    vocab: Union[List[DFT], DFT]
+    sources: List[Tuple[Optional[int], str]]
+
+    def get_num_features(self):
+        # noinspection PyArgumentList
+        return self.__class__(
+            base=_get_df_or_tensor_num_features(self.base),
+            vocab=_get_df_or_tensor_num_features(self.vocab),
+            sources=len(self.sources),
+        )
+
+    def __len__(self):
+        return len(self.base)
+
+    # noinspection PyMethodOverriding
+    @classmethod
+    def collate(cls, dps: List['BaseVocabMultiDatapoint'], max_seq_len: int) -> 'BaseVocabMultiDatapoint':
+        sources = []
+        base_arrays = []
+        vocab_arrays = []
+        for dp_ind, dp in enumerate(dps):
+            for base_array, vocab_array, (_, filename) in zip(dp.base, dp.vocab, dp.sources):
+                sources.append((dp_ind, filename))
+                base_arrays.append(base_array.values)
+                vocab_arrays.append(vocab_array.values)
+
+        base = _pad_arrays(
+            arrays=base_arrays,
+            dtype=torch.float,
+            max_seq_len=max_seq_len,
+            pad_val=0,
+        )
+
+        vocab = _pad_arrays(
+            arrays=vocab_arrays,
+            dtype=torch.long,
+            max_seq_len=max_seq_len,
+            pad_val=utils.VOCAB_PAD_VALUE,
+        ).squeeze(2)
+
+        return cls(
+            base=base,
+            vocab=vocab,
+            sources=sources,
+        )
 
 
 @dataclass

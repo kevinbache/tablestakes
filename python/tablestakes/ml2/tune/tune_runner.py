@@ -81,6 +81,12 @@ class TuneRunner:
         if tune_hp.ray_local_mode:
             args['num_cpus'] = model_hp.data.num_cpus
         print("About to init ray...")
+        import warnings
+        warnings.warn(
+            'tune_runner.py hard coding node ip address to 127.0.0.1 as workaround to vpn issue.'
+            'https://github.com/ray-project/ray/issues/6573'
+        )
+        ray.services.get_node_ip_address = lambda: '127.0.0.1'
         ray.init(**args)
         print("Done with ray init")
 

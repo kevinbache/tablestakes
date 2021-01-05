@@ -101,8 +101,9 @@ class CrawledDirectory:
 
     def crawl_this_dir(self, file_handlers: List[FileHandler], do_ignore_cache=True):
         outs = {}
-        if do_ignore_cache:
-            self.update_file_refs()
+        self.update_file_refs()
+        # if do_ignore_cache:
+        #     self.update_file_refs()
         for f in self.file_refs:
             for file_handler in file_handlers:
                 if file_handler.should_handle(f):
