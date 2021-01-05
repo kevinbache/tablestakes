@@ -41,7 +41,7 @@ class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
         self.opt.set_pl_module(pl_module=self)
 
         # set me in subclasses
-        self.head = None
+        self.neckhead = None
 
     ############
     # TRAINING #
@@ -61,7 +61,7 @@ class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
         #     y_hats_for_loss, y_hats_for_pred = self(batch.x)
         # print(prof.display())
         y_hats_for_loss, y_hats_for_pred = self(batch.x)
-        return self.head.loss_metrics(y_hats_for_loss, y_hats_for_pred, batch.y, batch.meta)
+        return self.neckhead.loss_metrics(y_hats_for_loss, y_hats_for_pred, batch.y, batch.meta)
 
     def training_step(self, batch, batch_idx):
         d = self.forward_plus_lossmetrics(batch, batch_idx)

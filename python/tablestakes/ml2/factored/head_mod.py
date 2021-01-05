@@ -588,6 +588,7 @@ class HeadMakerFactory:
             cls,
             neck_hp: trunks_mod.SlabNet.ModelParams,
             head_hp: Union[WeightedHeadParams, HeadParams],
+            # neck_trans_hp: Optional[trunks_mod.TransBlockBuilder.ModelParams] = None,
     ) -> HeadMaker:
 
         num_head_inputs = max(neck_hp.num_features, neck_hp.num_groups)
@@ -602,11 +603,6 @@ class HeadMakerFactory:
                     head_makers=subhead_makers,
                     head_weights=head_hp.weights,
                 )
-                # return HeadedSlabNet(
-                #     num_input_features=num_input_features,
-                #     head=head_maker(neck_hp.num_features),
-                #     neck_hp=neck_hp,
-                # )
                 return head_maker(num_input_features)
             return fn
         elif head_hp.type == 'linear':
@@ -692,30 +688,26 @@ class HeadedSlabNet(trunks_mod.SlabNet, LossMetrics):
     ) -> Dict[str, torch.Tensor]:
         return self.head.loss_metrics(y_hat_for_loss, y_hat_for_pred, y, metas)
 
-# class StartEndHead(Head):
-#     """Predict the start and end location within a sequence.  Prediction must be positive."""
-#     def __init__(
-#             self,
-#             num_input_features: int,
-#             num_classes: int,
-#     ):
-#         nn.Module.__init__(self)
-#
-#         self.start = nn.Linear(
-#             in_features=num_input_features,
-#             out_features=num_classes,
-#             bias=True,
-#         )
-#
-#         self.end = nn.Linear(
-#             in_features=num_input_features,
-#             out_features=num_classes,
-#             bias=True,
-#         )
-#
-#     def forward(self, x):
-#         relu = nn.ReLU()
-#         return {
-#             'start_logits': relu(self.start(x)).permute(0, 2, 1),
-#             'end_logits': relu(self.end(x)).permute(0, 2, 1),
-#         }
+
+class MultiAggHead(Head):
+    def __init__(self):
+        super().__init__()
+
+        # neck spits out embeddings for each doc
+        # we have doc ids in sources.  group by doc ids
+        # agg appropriately
+        #   sum
+        #   mean
+        #   max
+        #   min
+        #   transformer
+        #   lstm
+        #   include 'is_msgpart' field
+
+    @staticmethod
+    def groupby(data_tensor: torch.Tensor, doc_inds: List[int]):
+        # https://twitter.com/jeremyphoward/status/1185062637341593600
+        idxs, vals = torch.unique(doc_inds, return_counts=True)
+        split_arrays = torch.split_with_sizes(data_tensor, tuple(vals))
+        doc_ind_to_array = {idx.item(): split_array for idx, split_array in zip(idxs, split_arrays)}
+        return doc_ind_to_array

@@ -414,7 +414,12 @@ class SigmoidBetterAccuracy(pl.metrics.Accuracy):
         preds = preds > self.THRESHOLD
         # preds, target = _input_format_classification(preds, target, self.threshold)
         # assert preds.shape == target.shape, f"preds.shape: {preds.shape}, target.shape: {target.shape}"
-        self.correct = self.correct + torch.sum(preds.eq(target))
+        try:
+            self.correct = self.correct + torch.sum(preds.eq(target))
+        except BaseException as e:
+            print('preds:  ', preds, preds.shape)
+            print('target: ', target, target.shape)
+            raise e
         self.total = self.total + target.numel() - target.eq(self.Y_VALUE_TO_IGNORE).sum()
 
 

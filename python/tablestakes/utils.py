@@ -172,11 +172,12 @@ def save_csv(filename: DirtyPath, obj: pd.DataFrame, index=False, *args, **kwarg
     return obj.to_csv(filename, index=index, *args, **kwargs)
 
 
-def set_seeds(seed: int):
+def set_seeds(seed: int, set_deterministic=False):
     from pytorch_lightning import seed_everything
     from faker import Faker
     seed_everything(seed)
     Faker.seed(seed)
+    torch.set_deterministic(set_deterministic)
 
 
 def hprint(s: str, sep_char='=', do_include_pre_break_line=True):

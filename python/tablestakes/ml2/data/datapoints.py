@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 import torch
+from torch.nn import functional as F
 
 from tablestakes import utils, constants
 from transformers import BertTokenizer
@@ -136,36 +137,37 @@ class BaseVocabDatapoint(Datapoint):
 @dataclass
 class BaseVocabMultiDatapoint(BaseVocabDatapoint):
     """Like a BaseVocabDatapoint but mulitple docs per datapoint.
+
     base and vocab each map doc name to data for that doc.
     """
-    # one df/tensor per document when it's a single datapoint; sources is (None, filename_str)
-    # one df/tensor per document when it's a batch  datapoint; sources is (doc_id_int, filename)
     base: Union[List[DFT], DFT]
     vocab: Union[List[DFT], DFT]
-    sources: List[Tuple[Optional[int], str]]
+    filenames: List[str]
+    datapoint_indices: Optional[List[int]] = None
+    # sources: List[Tuple[Optional[int], str]]
 
     def get_num_features(self):
         # noinspection PyArgumentList
         return self.__class__(
             base=_get_df_or_tensor_num_features(self.base),
             vocab=_get_df_or_tensor_num_features(self.vocab),
-            sources=len(self.sources),
+            filenames=len(self.filenames),
+            datapoint_indices=None if self.datapoint_indices is None else len(self.datapoint_indices),
         )
-
-    def __len__(self):
-        return len(self.base)
 
     # noinspection PyMethodOverriding
     @classmethod
     def collate(cls, dps: List['BaseVocabMultiDatapoint'], max_seq_len: int) -> 'BaseVocabMultiDatapoint':
-        sources = []
         base_arrays = []
         vocab_arrays = []
+        filenames = []
+        datapoint_indices = []
         for dp_ind, dp in enumerate(dps):
-            for base_array, vocab_array, (_, filename) in zip(dp.base, dp.vocab, dp.sources):
-                sources.append((dp_ind, filename))
+            for base_array, vocab_array, filename in zip(dp.base, dp.vocab, dp.filenames):
                 base_arrays.append(base_array.values)
                 vocab_arrays.append(vocab_array.values)
+                filenames.append(filename)
+                datapoint_indices.append(dp_ind)
 
         base = _pad_arrays(
             arrays=base_arrays,
@@ -184,7 +186,8 @@ class BaseVocabMultiDatapoint(BaseVocabDatapoint):
         return cls(
             base=base,
             vocab=vocab,
-            sources=sources,
+            filenames=filenames,
+            datapoint_indices=datapoint_indices,
         )
 
 

@@ -22,6 +22,7 @@ class TotalParams(params.ParameterSet):
     trans: trunks_mod.TransBlockBuilder.ModelParams = trunks_mod.TransBlockBuilder.ModelParams()
     fc: trunks_mod.SlabNet.ModelParams = trunks_mod.SlabNet.ModelParams()
     neck: head_mod.HeadedSlabNet.ModelParams = head_mod.HeadedSlabNet.ModelParams()
+    neck_trans: trunks_mod.TransBlockBuilder.ModelParams = trunks_mod.TransBlockBuilder.ModelParams()
     head: head_mod.WeightedHeadParams = head_mod.WeightedHeadParams(weights={}, head_mod={})
 
     verbose: bool = False
@@ -33,7 +34,7 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
             hp: TotalParams,
             dm: data_module.XYMetaHandlerDatasetModule,
             opt: opt_mod.OptimizersMaker,
-            head_maker: Callable[[int], head_mod.Head],
+            neckhead_maker: Callable[[int], head_mod.Head],
     ):
         super().__init__(hp, opt)
         # for autocomplete
@@ -76,14 +77,14 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
             num_input_features=num_fc_features,
             hp=self.hp.fc,
         )
-        self.head = head_maker(self.fc.get_num_outputs())
+
+        self.neckhead = neckhead_maker(self.fc.get_num_outputs())
         # END MODEL
         ###############################################################
 
-        hpd = self.hp.to_dict()
-        self.hparams = hpd
-        self.save_hyperparameters(hpd)
-        self.hparams.lr = self.hp.opt.lr
+        hp_dict = self.hp.to_dict()
+        hp_dict['lr'] = self.hp.opt.lr
+        self.save_hyperparameters(hp_dict)
 
     def forward(self, x: datapoints.BaseVocabDatapoint):
         base = x.base
@@ -97,49 +98,49 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
             print(f'vocab.shape: {vocab.shape}')
 
         with utils.Timer('ts_model forward embed', do_print_outputs=self.hp.verbose):
-            x = self.embed(vocab)
+            out = self.embed(vocab)
 
         if self.verbose:
-            print(f'x.shape after embed: {x.last_hidden_state.shape}')
+            print(f'out.shape after embed: {out.last_hidden_state.shape}')
 
-        x = torch.cat([base, x.last_hidden_state], dim=-1)
+        out = torch.cat([base, out.last_hidden_state], dim=-1)
 
         num_batch, num_seq, _ = base.shape
 
         if self.verbose:
-            print(f'x.shape after base_cat: {x.shape}')
+            print(f'out.shape after base_cat: {out.shape}')
 
         with utils.Timer('ts_model forward trans', do_print_outputs=self.hp.verbose):
-            x_trans = self.trans(x) if self.trans \
+            out_trans = self.trans(out) if self.trans \
                 else torch.zeros(num_batch, num_seq, 0, requires_grad=False, device=self.device)
 
         with utils.Timer('ts_model forward conv', do_print_outputs=self.hp.verbose):
-            x_conv = self.conv(x) if self.conv \
+            out_conv = self.conv(out) if self.conv \
                 else torch.zeros(num_batch, num_seq, 0, requires_grad=False, device=self.device)
 
         if self.verbose:
-            print(f'x_trans.shape: {x_trans.shape}')
-            print(f'x_conv.shape: {x_conv.shape}')
+            print(f'out_trans.shape: {out_trans.shape}')
+            print(f'out_conv.shape: {out_conv.shape}')
 
         # concatenate for sharpness
-        x = torch.cat([base, x_trans, x_conv], dim=-1)
+        out = torch.cat([base, out_trans, out_conv], dim=-1)
 
         if self.verbose:
-            print('x shape after cat before fc: ', x.shape)
+            print('out shape after cat before fc: ', out.shape)
 
         with utils.Timer('ts_model forward fc', do_print_outputs=self.hp.verbose):
-            x = self.fc(x)
+            out = self.fc(out)
 
         if self.verbose:
-            print('x shape after fc before head: ', x.shape)
+            print('out shape after fc before head: ', out.shape)
 
         with utils.Timer('ts_model forward head', do_print_outputs=self.hp.verbose):
-            x_for_loss, x_for_pred = self.head.forward_for_loss_and_pred(x)
+            out_for_loss, out_for_pred = self.neckhead.forward_for_loss_and_pred(out)
 
         # utils.hprint('MODEL FORWARD PROFILER REPORT:')
         # print(prof.key_averages().table(sort_by="cuda_memory_usage"))
 
-        return x_for_loss, x_for_pred
+        return out_for_loss, out_for_pred
 
 
 def run(

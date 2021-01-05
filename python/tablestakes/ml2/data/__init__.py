@@ -132,13 +132,10 @@ class BaseVocabMultiXHandler(SubtypeCsvHandler[datapoints.BaseVocabMultiDatapoin
         for doc_ind, f in sorted(subname_to_docind_to_filename[constants.X_VOCAB_BASE_NAME].items(), key=sorter):
             vocab_dfs.append(utils.load_csv(f, index_col=0))
 
-        dp_inds = [None] * len(filenames)
-        sources = list(zip(dp_inds, filenames))
-
         return datapoints.BaseVocabMultiDatapoint(
             base=base_dfs,
             vocab=vocab_dfs,
-            sources=sources,
+            filenames=filenames,
         )
 
     def _get_attachment_doc_ind(self, p: utils.DirtyPath):

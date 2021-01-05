@@ -493,6 +493,7 @@ class TransBlockBuilder(abc.ABC):
         'performer': build_performer_trans_block,
         'pytorch': build_pytorch_trans_block,
         'ablatable': build_ablatable_trans_block,
+        'none': lambda: nn.Identity(),
     }
 
     def __init__(self, name, hp: ModelParams):
