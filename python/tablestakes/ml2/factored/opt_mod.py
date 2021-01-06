@@ -3,10 +3,12 @@ from typing import *
 import pytorch_lightning as pl
 from torch import optim
 
+from tablestakes.ml2.factored import trunks_mod
+
 from chillpill import params
 
 
-class OptParams(params.ParameterSet):
+class OptParams(trunks_mod.BuilderParams):
     num_epochs: int = 10
     lr: float = 0.001
     min_lr: float = 1e-6
@@ -14,6 +16,9 @@ class OptParams(params.ParameterSet):
     search_metric: str = 'valid/loss'
     search_mode: str = 'min'
     lr_reduction_factor: float = 0.5
+
+    def build(self) -> 'OptimizersMaker':
+        return OptimizersMaker(hp=self)
 
 
 class OptimizersMaker:

@@ -113,3 +113,5 @@ class ColNames:
         HAS_LEADING_ZERO,
     ]
 
+SIGMOID_TYPE_NAME = 'sigmoid'
+

@@ -513,3 +513,31 @@ def flatten_dict(dt, delimiter="/", prevent_delimiter=False):
         for k in remove:
             del dt[k]
     return dt
+
+
+ReducerFn = Callable[[torch.Tensor], torch.Tensor]
+
+
+def get_reducer(num_input_features: int, reducer_str: str) -> Tuple[ReducerFn, int]:
+    if reducer_str == 'smash':
+        reducer_fn = trunks_mod.artless_smash
+        num_input_features *= 8
+    elif reducer_str in ('first', 'first-dim1'):
+        def reducer_fn(x):
+            if len(x.shape) == 3:
+                return x[:, 0, :].squeeze(dim=1)
+            elif len(x.shape) == 2:
+                return x[:, 0].squeeze()
+            else:
+                raise ValueError()
+    elif reducer_str == 'first-dim2':
+        reducer_fn = lambda x: x[:, :, 0].squeeze(dim=2)
+    elif reducer_str == 'mean-0':
+        reducer_fn = lambda x: x.mean(dim=0).squeeze()
+    elif reducer_str == 'sum':
+        reducer_fn = lambda x: torch.sum(x)
+    else:
+        reducer_fn = nn.Identity()
+    return reducer_fn, num_input_features
+
+

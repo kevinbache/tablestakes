@@ -6,9 +6,10 @@ import numpy as np
 import pandas as pd
 
 import torch
-from pytorch_lightning.metrics.classification import confusion_matrix
 from torch import nn
+
 import pytorch_lightning as pl
+from pytorch_lightning.metrics.classification import confusion_matrix
 
 from tablestakes import constants, utils
 from tablestakes.ml2.factored import trunks_mod, logs_mod
@@ -114,7 +115,7 @@ class LossMetrics:
         return d
 
 
-class HeadParams(params.ParameterSet):
+class HeadParams(trunks_mod.BuilderParams):
     type: str = 'DEFAULT_TYPE'
     num_classes: int = -1
     class_names: Tuple[str] = ()
@@ -127,15 +128,41 @@ class HeadParams(params.ParameterSet):
     # normalize within a class
     pos_class_weights: Optional[np.array] = None
 
+    def build(self, num_input_features: int, neck_hp: trunks_mod.SlabNet.ModelParams) -> Any:
+        num_head_inputs = max(neck_hp.num_features, neck_hp.num_groups)
+
+        type_str = self.type.lower()
+
+        if type_str == 'linear':
+            return HeadedSlabNet(
+                num_input_features=num_input_features,
+                head=LinearSoftmaxHead(num_head_inputs, self),
+                neck_hp=neck_hp,
+            )
+        elif type_str == 'softmax':
+            return HeadedSlabNet(
+                num_input_features=num_input_features,
+                head=AdaptiveSoftmaxHead(num_head_inputs, self),
+                neck_hp=neck_hp,
+            )
+        elif type_str == constants.SIGMOID_TYPE_NAME:
+            return HeadedSlabNet(
+                num_input_features=num_input_features,
+                head=SigmoidHead(num_head_inputs, self),
+                neck_hp=neck_hp,
+            )
+        elif head_hp.type is None or head_hp.type.lower() == 'none':
+            return lambda _: EmptyHead()
+        else:
+            raise ValueError(f'Got unknown type: {head_hp.type}')
+
+
 
 class EmptyHeadParams(HeadParams):
     type: str = 'none'
     num_classes: int = -1
     x_reducer_name: str = 'none'
     do_permute_head_out: bool = False
-
-
-ReducerFn = Callable[[torch.Tensor], torch.Tensor]
 
 
 class Head(LossMetrics, pl.LightningModule, abc.ABC):
@@ -191,15 +218,12 @@ class Head(LossMetrics, pl.LightningModule, abc.ABC):
         return head_out
 
     # noinspection PyMethodMayBeStatic
-    def _get_reducers(self, num_input_features: int, hp: HeadParams) -> Tuple[ReducerFn, ReducerFn, int]:
+    def _get_reducers(self, num_input_features: int, hp: HeadParams) -> Tuple[utils.ReducerFn, utils.ReducerFn, int]:
         x_reducer, num_input_features = \
-            get_reducer(num_input_features=num_input_features, reducer_str=hp.x_reducer_name)
+            utils.get_reducer(num_input_features=num_input_features, reducer_str=hp.x_reducer_name)
         loss_reducer, num_input_features = \
-            get_reducer(num_input_features=num_input_features, reducer_str=hp.loss_reducer_name)
+            utils.get_reducer(num_input_features=num_input_features, reducer_str=hp.loss_reducer_name)
         return x_reducer, loss_reducer, num_input_features
-
-
-HeadMaker = Callable[[int], Head]
 
 
 class EmptyHead(Head):
@@ -208,29 +232,6 @@ class EmptyHead(Head):
         self.loss_fn = lambda y_hat, y: -1
         self.head = nn.Identity()
         self.x_reducer_fn = lambda x: x
-
-
-def get_reducer(num_input_features: int, reducer_str: str) -> Tuple[ReducerFn, int]:
-    if reducer_str == 'smash':
-        reducer_fn = trunks_mod.artless_smash
-        num_input_features *= 8
-    elif reducer_str in ('first', 'first-dim1'):
-        def reducer_fn(x):
-            if len(x.shape) == 3:
-                return x[:, 0, :].squeeze(dim=1)
-            elif len(x.shape) == 2:
-                return x[:, 0].squeeze()
-            else:
-                raise ValueError()
-    elif reducer_str == 'first-dim2':
-        reducer_fn = lambda x: x[:, :, 0].squeeze(dim=2)
-    elif reducer_str == 'mean-0':
-        reducer_fn = lambda x: x.mean(dim=0).squeeze()
-    elif reducer_str == 'sum':
-        reducer_fn = lambda x: torch.sum(x)
-    else:
-        reducer_fn = nn.Identity()
-    return reducer_fn, num_input_features
 
 
 class SigmoidHead(Head):
@@ -293,8 +294,8 @@ class _SoftmaxHead(Head):
             num_input_features: int,
             num_classes: int,
             head: nn.Module,
-            x_reducer: Optional[ReducerFn] = None,
-            loss_reducer: Optional[ReducerFn] = torch.mean,
+            x_reducer: Optional[utils.ReducerFn] = None,
+            loss_reducer: Optional[utils.ReducerFn] = torch.mean,
     ):
         super().__init__(
             num_input_features,
@@ -377,7 +378,7 @@ class LinearSoftmaxHead(_SoftmaxHead):
 YDP = TypeVar('YDP', bound=datapoints.YDatapoint)
 
 
-class WeightedHeadParams(params.ParameterSet):
+class WeightedHeadParams(trunks_mod.BuilderParams):
     weights: Dict[str, float] = {}
     head_params: Dict[str, HeadParams] = {}
     type: str = 'weighted'
@@ -393,6 +394,10 @@ class WeightedHeadParams(params.ParameterSet):
         assert 'type' in d
         obj.type = d['type']
         return obj
+
+    def build(self, num_input_features: int, neck_hp: trunks_mod.SlabNet.ModelParams):
+        heads = {name: head_params.build(num_input_features, neck_hp=neck_hp) for name, head_params in self.head_params.items()}
+        return WeightedHead(num_input_features=num_input_features, heads=heads, weights=self.weights)
 
 
 class MyConfusionMatrix(pl.metrics.ConfusionMatrix):
@@ -417,7 +422,7 @@ class SigmoidConfusionMatrixCallback(pl.Callback):
     @classmethod
     def _get_col_name_to_cm_for_sub_head(cls, sub_hp: HeadParams):
         col_name_to_cm = {}
-        if sub_hp.type == HeadMakerFactory.SIGMOID_TYPE_NAME:
+        if sub_hp.type == constants.SIGMOID_TYPE_NAME:
             col_name_to_cm = {
                 col_name: MyConfusionMatrix(
                     num_classes=2,
@@ -474,6 +479,9 @@ class SigmoidConfusionMatrixCallback(pl.Callback):
         self.head_name_to_col_dicts = self._get_head_name_to_col_dicts(self.hp)
 
 
+HeadMaker = Callable[[int], Head]
+
+
 class WeightedHead(Head):
     LOSS_NAME = constants.LOSS_NAME
     """Multiheaded head with weights for loss."""
@@ -483,7 +491,10 @@ class WeightedHead(Head):
 
         assert heads.keys() == weights.keys()
 
-        self.heads = nn.ModuleDict(modules=heads)
+        self.heads = nn.ModuleDict(modules={
+            head_name: head
+            for head_name, head in heads.items()
+        })
 
         weight_vals = [weights[head_name] for head_name in self.heads.keys()]
         self.register_buffer('head_weights', torch.tensor(weight_vals, dtype=torch.float))
@@ -578,61 +589,61 @@ class WeightedHead(Head):
         return head_maker
 
 
-class HeadMakerFactory:
-    SIGMOID_TYPE_NAME = 'sigmoid'
-
-    """Heads need to be manufactured from neck_hp dict so it's got
-    to be things that are easily serializable like strs."""
-    @classmethod
-    def create(
-            cls,
-            neck_hp: trunks_mod.SlabNet.ModelParams,
-            head_hp: Union[WeightedHeadParams, HeadParams],
-            # neck_trans_hp: Optional[trunks_mod.TransBlockBuilder.ModelParams] = None,
-    ) -> HeadMaker:
-
-        num_head_inputs = max(neck_hp.num_features, neck_hp.num_groups)
-
-        if head_hp.type == 'weighted':
-            subhead_makers = {
-                head_name: cls.create(neck_hp, subhead_hp)
-                for head_name, subhead_hp in head_hp.head_params.items()
-            }
-            def fn(num_input_features: int):
-                head_maker = WeightedHead.maker_from_makers(
-                    head_makers=subhead_makers,
-                    head_weights=head_hp.weights,
-                )
-                return head_maker(num_input_features)
-            return fn
-        elif head_hp.type == 'linear':
-            def fn(num_input_features: int):
-                return HeadedSlabNet(
-                    num_input_features=num_input_features,
-                    head=LinearSoftmaxHead(num_head_inputs, head_hp),
-                    neck_hp=neck_hp,
-                )
-            return fn
-        elif head_hp.type == 'softmax':
-            def fn(num_input_features: int):
-                return HeadedSlabNet(
-                    num_input_features=num_input_features,
-                    head=AdaptiveSoftmaxHead(num_head_inputs, head_hp),
-                    neck_hp=neck_hp,
-                )
-            return fn
-        elif head_hp.type == cls.SIGMOID_TYPE_NAME:
-            def fn(num_input_features: int):
-                return HeadedSlabNet(
-                    num_input_features=num_input_features,
-                    head=SigmoidHead(num_head_inputs, head_hp),
-                    neck_hp=neck_hp,
-                )
-            return fn
-        elif head_hp.type is None or head_hp.type == 'none':
-            return lambda _: EmptyHead()
-        else:
-            raise ValueError(f'Got unknown type: {head_hp.type}')
+# class HeadMakerFactory:
+#     SIGMOID_TYPE_NAME = 'sigmoid'
+#
+#     """Heads need to be manufactured from neck_hp dict so it's got
+#     to be things that are easily serializable like strs."""
+#     @classmethod
+#     def create(
+#             cls,
+#             neck_hp: trunks_mod.SlabNet.ModelParams,
+#             head_hp: Union[WeightedHeadParams, HeadParams],
+#             # neck_trans_hp: Optional[trunks_mod.TransBlockBuilder.ModelParams] = None,
+#     ) -> HeadMaker:
+#
+#         num_head_inputs = max(neck_hp.num_features, neck_hp.num_groups)
+#
+#         if head_hp.type == 'weighted':
+#             subhead_makers = {
+#                 head_name: cls.create(neck_hp, subhead_hp)
+#                 for head_name, subhead_hp in head_hp.head_params.items()
+#             }
+#             def fn(num_input_features: int):
+#                 head_maker = WeightedHead.maker_from_makers(
+#                     head_makers=subhead_makers,
+#                     head_weights=head_hp.weights,
+#                 )
+#                 return head_maker(num_input_features)
+#             return fn
+#         elif head_hp.type == 'linear':
+#             def fn(num_input_features: int):
+#                 return HeadedSlabNet(
+#                     num_input_features=num_input_features,
+#                     head=LinearSoftmaxHead(num_head_inputs, head_hp),
+#                     neck_hp=neck_hp,
+#                 )
+#             return fn
+#         elif head_hp.type == 'softmax':
+#             def fn(num_input_features: int):
+#                 return HeadedSlabNet(
+#                     num_input_features=num_input_features,
+#                     head=AdaptiveSoftmaxHead(num_head_inputs, head_hp),
+#                     neck_hp=neck_hp,
+#                 )
+#             return fn
+#         elif head_hp.type == cls.SIGMOID_TYPE_NAME:
+#             def fn(num_input_features: int):
+#                 return HeadedSlabNet(
+#                     num_input_features=num_input_features,
+#                     head=SigmoidHead(num_head_inputs, head_hp),
+#                     neck_hp=neck_hp,
+#                 )
+#             return fn
+#         elif head_hp.type is None or head_hp.type == 'none':
+#             return lambda _: EmptyHead()
+#         else:
+#             raise ValueError(f'Got unknown type: {head_hp.type}')
 
 
 class HeadedSlabNet(trunks_mod.SlabNet, LossMetrics):
@@ -687,27 +698,3 @@ class HeadedSlabNet(trunks_mod.SlabNet, LossMetrics):
             metas: List[Any],
     ) -> Dict[str, torch.Tensor]:
         return self.head.loss_metrics(y_hat_for_loss, y_hat_for_pred, y, metas)
-
-
-class MultiAggHead(Head):
-    def __init__(self):
-        super().__init__()
-
-        # neck spits out embeddings for each doc
-        # we have doc ids in sources.  group by doc ids
-        # agg appropriately
-        #   sum
-        #   mean
-        #   max
-        #   min
-        #   transformer
-        #   lstm
-        #   include 'is_msgpart' field
-
-    @staticmethod
-    def groupby(data_tensor: torch.Tensor, doc_inds: List[int]):
-        # https://twitter.com/jeremyphoward/status/1185062637341593600
-        idxs, vals = torch.unique(doc_inds, return_counts=True)
-        split_arrays = torch.split_with_sizes(data_tensor, tuple(vals))
-        doc_ind_to_array = {idx.item(): split_array for idx, split_array in zip(idxs, split_arrays)}
-        return doc_ind_to_array

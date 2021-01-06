@@ -11,7 +11,7 @@ from tablestakes.ml2.factored import data_module, logs_mod, opt_mod, trunks_mod,
 from chillpill import params
 
 
-class TotalParams(params.ParameterSet):
+class TotalParams(trunks_mod.BuilderParams):
     data: data_module.DataParams = data_module.DataParams()
     opt: opt_mod.OptParams = opt_mod.OptParams()
     exp: logs_mod.ExperimentParams = logs_mod.ExperimentParams()
@@ -22,10 +22,12 @@ class TotalParams(params.ParameterSet):
     trans: trunks_mod.TransBlockBuilder.ModelParams = trunks_mod.TransBlockBuilder.ModelParams()
     fc: trunks_mod.SlabNet.ModelParams = trunks_mod.SlabNet.ModelParams()
     neck: head_mod.HeadedSlabNet.ModelParams = head_mod.HeadedSlabNet.ModelParams()
-    neck_trans: trunks_mod.TransBlockBuilder.ModelParams = trunks_mod.TransBlockBuilder.ModelParams()
     head: head_mod.WeightedHeadParams = head_mod.WeightedHeadParams(weights={}, head_mod={})
 
     verbose: bool = False
+
+    def build(self, dm: Optional[pl.LightningDataModule] = None) -> Any:
+        return ModelBertConvTransTClass2(hp=self, dm=dm)
 
 
 class ModelBertConvTransTClass2(factored.FactoredLightningModule):
@@ -33,10 +35,8 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
             self,
             hp: TotalParams,
             dm: data_module.XYMetaHandlerDatasetModule,
-            opt: opt_mod.OptimizersMaker,
-            neckhead_maker: Callable[[int], head_mod.Head],
     ):
-        super().__init__(hp, opt)
+        super().__init__(hp)
         # for autocomplete
         assert isinstance(self.hp, TotalParams)
 
@@ -50,35 +50,33 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
 
         ###############################################################
         # MODEL
-        self.embed = trunks_mod.BertEmbedder(self.hp.embed, max_seq_len=self.hp.data.max_seq_len)
-
-        # cat here
+        #  embed
+        self.embed = self.hp.embed.build(max_seq_len=self.hp.data.max_seq_len)
         num_embedcat_features = self.hp.embed.dim + num_x_base_features
 
+        #  conv
         if self.hp.conv.num_layers == 0:
             self.conv = None
             num_conv_features = 0
         else:
-            self.conv = trunks_mod.ConvBlock(
-                num_input_features=num_embedcat_features,
-                hp=self.hp.conv,
-            )
+            self.conv = self.hp.conv.build(num_input_features=num_embedcat_features)
             num_conv_features = self.conv.get_num_output_features()
 
+        #  trans
         if self.hp.trans.num_layers == 0:
             self.trans = None
             num_trans_features = 0
         else:
-            self.trans = trunks_mod.TransBlockBuilder.build(hp=hp.trans, num_input_features=num_embedcat_features)
+            self.trans = hp.trans.build(num_input_features=num_embedcat_features)
             num_trans_features = self.trans.get_num_output_features()
 
+        #  fc
         num_fc_features = num_x_base_features + num_trans_features + num_conv_features
-        self.fc = trunks_mod.SlabNet(
-            num_input_features=num_fc_features,
-            hp=self.hp.fc,
-        )
+        self.fc = self.hp.fc.build(num_input_features=num_fc_features)
 
-        self.neckhead = neckhead_maker(self.fc.get_num_outputs())
+        #  neckhead
+        self.neckhead = self.hp.head.build(num_input_features=self.fc.get_num_outputs(), neck_hp=self.hp.neck)
+
         # END MODEL
         ###############################################################
 
@@ -191,17 +189,14 @@ def run(
 class TablestakesBertConvTransTClassModel(ModelBertConvTransTClass2):
     @classmethod
     def from_hp(cls, hp: TotalParams):
-        dm = tablestakes_data.TablestakesHandlerDataModule(hp.data)
-        net = cls(
+        return cls(
             hp=hp,
-            dm=dm,
-            opt=opt_mod.OptimizersMaker(hp.opt),
+            dm=tablestakes_data.TablestakesHandlerDataModule(hp.data),
             head_maker=head_mod.HeadMakerFactory.create(
                 neck_hp=hp.neck,
                 head_hp=hp.head,
             ),
         )
-        return net
 
 
 if __name__ == '__main__':

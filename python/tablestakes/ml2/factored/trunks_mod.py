@@ -15,7 +15,18 @@ from tablestakes.ml import ablation
 from chillpill import params
 
 
-class SizedSequential(nn.Sequential):
+class BuilderParams(params.ParameterSet, abc.ABC):
+    @abc.abstractmethod
+    def build(self, *args, **kwargs) -> Any:
+        pass
+
+
+class Sized(abc.ABC):
+    @abc.abstractmethod
+    def get_num_output_features(self):
+        pass
+
+class SizedSequential(Sized, nn.Sequential):
     def __init__(self, args: Union[OrderedDict, List, Tuple], num_output_features):
         if isinstance(args, OrderedDict):
             super().__init__(args)
@@ -59,10 +70,13 @@ def resnet_conv1_block(
 
 
 class BertEmbedder(pl.LightningModule):
-    class ModelParams(params.ParameterSet):
+    class ModelParams(BuilderParams):
         dim: int = 64
         requires_grad: bool = True
         position_embedding_requires_grad: bool = False
+
+        def build(self, max_seq_len: int):
+            return BertEmbedder(self, max_seq_len=max_seq_len)
 
     def __init__(self, hp: Optional[ModelParams] = ModelParams(), max_seq_len=1024):
         super().__init__()
@@ -107,13 +121,21 @@ class FullyConv1Resnet(pl.LightningModule):
     DROP_SUFFIX = '_drop'
     BLOCK_SUFFIX = ''
 
-    class ModelParams(params.ParameterSet):
+    class ModelParams(BuilderParams):
         num_groups: int = 32
         num_blocks_per_residual: int = 2
         num_blocks_per_dropout: int = 2
         dropout_p: float = 0.5
         activation: nn.Module = nn.LeakyReLU
         do_include_first_norm: bool = True
+
+        def build(self, num_input_features: int, neuron_counts: List[int], do_error_if_group_div_off=False):
+            return FullyConv1Resnet(
+                num_input_features=num_input_features,
+                neuron_counts=neuron_counts,
+                do_error_if_group_div_off=do_error_if_group_div_off,
+                hp=self,
+            )
 
     def __init__(
             self,
@@ -199,7 +221,7 @@ class FullyConv1Resnet(pl.LightningModule):
 class ConvBlock(pl.LightningModule):
     SKIP_SUFFIX = '_skip'
 
-    class ModelParams(params.ParameterSet):
+    class ModelParams(BuilderParams):
         num_layers: int = 8
         num_features: int = 32
         kernel_size: int = 3
@@ -211,6 +233,14 @@ class ConvBlock(pl.LightningModule):
         activation: nn.Module = nn.LeakyReLU
         do_include_first_norm: bool = True
         requires_grad: bool = True
+
+        def build(self, num_input_features: int, do_error_if_group_div_off=False):
+            return ConvBlock(
+                num_input_features=num_input_features,
+                hp=self,
+                do_error_if_group_div_off=do_error_if_group_div_off,
+            )
+
 
     def __init__(
             self,
@@ -289,7 +319,7 @@ class ConvBlock(pl.LightningModule):
 class SlabNet(FullyConv1Resnet):
     """A fully convolutional resnet with constant number of features across layers."""
 
-    class ModelParams(params.ParameterSet):
+    class ModelParams(BuilderParams):
         num_features: int = 32
         num_layers: int = 4
         num_groups: int = 32
@@ -299,6 +329,12 @@ class SlabNet(FullyConv1Resnet):
         activation: nn.Module = nn.LeakyReLU
         do_include_first_norm: bool = True
         requires_grad: bool = True
+
+        def build(self, num_input_features: int):
+            return SlabNet(
+                num_input_features=num_input_features,
+                hp=self,
+            )
 
     def __init__(
             self,
@@ -350,7 +386,7 @@ def build_fast_trans_block(
         get_decoder=False,
 ) -> nn.Module:
     from fast_transformers import builders, feature_maps
-    s = TransBlockBuilder.split(hp.impl)
+    s = TransBlockBuilder.split_impl_name(hp.impl)
     feature_map_name = None if len(s) == 1 else s[1]
 
     num_query_features = hp.num_query_features or num_input_features
@@ -475,8 +511,8 @@ def build_ablatable_trans_block(
     )
 
 
-class TransBlockBuilder(abc.ABC):
-    class ModelParams(params.ParameterSet):
+class TransBlockBuilder:
+    class ModelParams(BuilderParams):
         impl: str = 'fast-favor'
         num_layers: int = 2
         num_heads: int = 8
@@ -484,6 +520,9 @@ class TransBlockBuilder(abc.ABC):
         fc_dim_mult: int = 2
         p_dropout: int = 0.1
         p_attention_dropout: int = 0.1
+
+        def build(self, num_input_features: int, get_decoder: bool=False) -> Any:
+            return TransBlockBuilder.build(hp=self, num_input_features=num_input_features, get_decoder=get_decoder)
 
     IMPL_NAME_SPLIT_STR = '-'
     name = None
@@ -496,18 +535,17 @@ class TransBlockBuilder(abc.ABC):
         'none': lambda: nn.Identity(),
     }
 
-    def __init__(self, name, hp: ModelParams):
+    def __init__(self, name: str):
         super().__init__()
-        self.hp = hp
         self.name = name
 
     @classmethod
-    def split(cls, enc_name):
+    def split_impl_name(cls, enc_name):
         return enc_name.split(cls.IMPL_NAME_SPLIT_STR)
 
     @classmethod
     def build(cls, hp: ModelParams, num_input_features: int, get_decoder=False) -> SizedSequential:
-        base_name = TransBlockBuilder.split(hp.impl)[0]
+        base_name = cls.split_impl_name(hp.impl)[0]
 
         if base_name not in cls.KNOWN_ENCODER_BUILDERS:
             raise ValueError(f"Couldn't find an encoder called {base_name}, "
@@ -524,3 +562,76 @@ class TransBlockBuilder(abc.ABC):
         d['trans'] = builder_fn(hp=hp, num_input_features=num_total_features, get_decoder=get_decoder)
 
         return SizedSequential(d, num_output_features=num_total_features)
+
+
+class Combiner(pl.LightningModule):
+    def forward(self, xs: List[torch.Tensor]):
+        pass
+
+
+class AggCatCombiner(Combiner):
+    def __init__(self, ):
+        super().__init__()
+
+
+
+class GroupTransAggCat(pl.LightningModule):
+    """Group input array by grouping vector, run each group through a model, and aggregate each group at the end
+        and concatenate the resulting post-aggregated vectors.
+
+    It's basically a map reduce with a neural net in the middle.
+
+    Inputs are sized:
+        (num_docs, seq_len, num_input_features)
+    Outputs are sized:
+        (num_batch_size, seq_len, num_output_features)
+
+    Where num_docs is the sum of the number of docs for each datapoint in the batch.
+    It's basically batch size but the collate fn expands multiple docs within each datapoint and cats all of the
+        resulting docs across datapoints within the batch into the batch size dimension.
+    """
+    class ModelParams(BuilderParams):
+        inner_model_params: BuilderParams
+        agg_fn_name: str = 'mean-0'
+        split_cat_dim: int = 0
+
+        def build(self, num_input_features: int):
+            return GroupTransAggCat(self, num_input_features=num_input_features)
+
+    def __init__(self, hp: ModelParams, num_input_features: int):
+        super().__init__()
+        self.hp = hp
+        self.num_input_features = num_input_features
+
+        self.model = self.hp.inner_model_params.build(num_input_features=num_input_features)
+        self.agg = utils.get_reducer(num_input_features, reducer_str=self.hp.agg_fn_name)
+
+        ###############################
+        ################################
+        #################################
+        # u r here
+        # self.
+        # .here
+        # .here
+        # .this is the spot
+
+    def forward(self, x: torch.Tensor, groups: torch.Tensor):
+        xs = self.groupby(data_tensor=x, doc_inds=groups, split_dim=self.hp.split_cat_dim)
+        xs = [self.model(x) for x in xs]
+        xs = [self.agg(x) for x in xs]
+        x = torch.cat(xs, dim=self.hp.split_cat_dim)
+        return x
+
+    @staticmethod
+    def groupby(data_tensor: torch.Tensor, doc_inds: torch.Tensor, split_dim=0) -> List[torch.Tensor]:
+        # https://twitter.com/jeremyphoward/status/1185062637341593600
+        idxs, vals = torch.unique(doc_inds, return_counts=True)
+        split_arrays = torch.split_with_sizes(data_tensor, tuple(vals), dim=split_dim)
+
+        doc_arrays = [None] * max(idxs)
+        for idx, split_array in zip(idxs, split_arrays):
+            doc_arrays[idx.item()] = split_array
+
+        doc_arrays = [e for e in doc_arrays if e is not None]
+        return doc_arrays
+[]

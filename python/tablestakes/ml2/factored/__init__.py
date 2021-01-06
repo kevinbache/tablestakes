@@ -15,7 +15,7 @@ Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
 
 
 @dataclass
-class FactoredParams(params.ParameterSet):
+class FactoredParams(trunks_mod.BuilderParams):
     opt: opt_mod.OptParams
     logs: logs_mod.LoggingParams
     exp: logs_mod.ExperimentParams
@@ -24,6 +24,10 @@ class FactoredParams(params.ParameterSet):
 
     data: data_module.DataParams
 
+    def build(self, *args, **kwargs):
+        raise NotImplementedError("You shouldn't use this directly; instantiate one of its subclasses instead.")
+
+
 
 class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
     """A Lightning Module which has been factored into distinct parts."""
@@ -31,13 +35,12 @@ class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
     def __init__(
             self,
             hp: FactoredParams,
-            opt: opt_mod.OptimizersMaker,
             *args,
             **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.hp = copy.deepcopy(hp)
-        self.opt = opt
+        self.opt = hp.opt.build()
         self.opt.set_pl_module(pl_module=self)
 
         # set me in subclasses
