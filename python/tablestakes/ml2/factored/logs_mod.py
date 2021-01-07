@@ -206,7 +206,7 @@ class PredictionSaver(pl.Callback):
         d = {}
         for datapoint_dir, heads in self.dir_to_head_outputs.items():
             if do_sanitize_filenames:
-                datapoint_dir = '-'.join(datapoint_dir.split_impl_name(os.path.sep)[-2:])
+                datapoint_dir = '-'.join(datapoint_dir.split(os.path.sep)[-2:])
             dd = {}
             for head_name, head_outs in heads.items():
                 df = pd.DataFrame(

@@ -141,7 +141,7 @@ class RectTransformerModule(pl.LightningModule):
 
         self.heads = nn.ModuleList([
             metrics_mod.HeadedSlabNet(
-                num_input_features=self.fc_module.get_num_outputs(),
+                num_input_features=self.fc_module.get_num_output_features(),
                 num_output_features=num_classes,
                 num_neurons=utils.pow2int(self.hp.log2num_head_neurons),
                 num_layers=self.hp.num_head_blocks,

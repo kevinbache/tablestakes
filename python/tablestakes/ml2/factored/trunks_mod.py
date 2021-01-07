@@ -16,6 +16,9 @@ from chillpill import params
 
 
 class BuilderParams(params.ParameterSet, abc.ABC):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
     @abc.abstractmethod
     def build(self, *args, **kwargs) -> Any:
         pass
@@ -25,6 +28,14 @@ class Sized(abc.ABC):
     @abc.abstractmethod
     def get_num_output_features(self):
         pass
+
+class SizedBuilderParams(Sized, BuilderParams, abc.ABC):
+    pass
+
+
+
+class SizedPlModule(pl.LightningModule, Sized):
+    pass
 
 class SizedSequential(Sized, nn.Sequential):
     def __init__(self, args: Union[OrderedDict, List, Tuple], num_output_features):
@@ -75,7 +86,7 @@ class BertEmbedder(pl.LightningModule):
         requires_grad: bool = True
         position_embedding_requires_grad: bool = False
 
-        def build(self, max_seq_len: int):
+        def build(self, max_seq_len: int) -> 'BertEmbedder':
             return BertEmbedder(self, max_seq_len=max_seq_len)
 
     def __init__(self, hp: Optional[ModelParams] = ModelParams(), max_seq_len=1024):
@@ -214,7 +225,7 @@ class FullyConv1Resnet(pl.LightningModule):
         x = x.permute(0, 2, 1)
         return x
 
-    def get_num_outputs(self):
+    def get_num_output_features(self):
         return self._num_output_features
 
 
@@ -241,7 +252,6 @@ class ConvBlock(pl.LightningModule):
                 do_error_if_group_div_off=do_error_if_group_div_off,
             )
 
-
     def __init__(
             self,
             num_input_features: int,
@@ -261,6 +271,9 @@ class ConvBlock(pl.LightningModule):
 
         # neurons which are added to each layer to ensure that layer sizes are divisible by num_groups
         self._extra_counts = [self.hp.num_groups - r if r else 0 for r in remainders]
+        print('ConvBlock all_counts:  ', all_counts)
+        print('ConvBlock remainders:  ', remainders)
+        print('ConvBlock extra counts:', self._extra_counts)
         all_counts = [c + e for c, e in zip(all_counts, self._extra_counts)]
 
         blocks = OrderedDict()
@@ -316,7 +329,7 @@ class ConvBlock(pl.LightningModule):
         return self._num_output_features
 
 
-class SlabNet(FullyConv1Resnet):
+class SlabNet(FullyConv1Resnet, Sized):
     """A fully convolutional resnet with constant number of features across layers."""
 
     class ModelParams(BuilderParams):
@@ -564,62 +577,79 @@ class TransBlockBuilder:
         return SizedSequential(d, num_output_features=num_total_features)
 
 
-class Combiner(pl.LightningModule):
+class Combiner(pl.LightningModule, Sized, abc.ABC):
     def forward(self, xs: List[torch.Tensor]):
         pass
 
-
 class AggCatCombiner(Combiner):
-    def __init__(self, ):
+    """Aggregate groups then cat results."""
+    def __init__(self, num_input_features: int, aggregator_name: str, cat_dim: int=0):
         super().__init__()
+        self.agg, self.num_output_features = utils.get_reducer(
+            num_input_features=num_input_features,
+            aggregator_str=aggregator_name,
+        )
+        self.cat_dim = cat_dim
+
+    def forward(self, xs: List[torch.Tensor]):
+        return torch.cat([self.agg(x) for x in xs], dim=self.cat_dim)
+
+    def get_num_output_features(self):
+        return self.num_output_features
 
 
-
-class GroupTransAggCat(pl.LightningModule):
+class SplitModelCombineData(pl.LightningModule, Sized):
     """Group input array by grouping vector, run each group through a model, and aggregate each group at the end
         and concatenate the resulting post-aggregated vectors.
 
-    It's basically a map reduce with a neural net in the middle.
+    It's basically a map reduce along the data dimension (or any other really) with a neural net in the middle.
 
     Inputs are sized:
         (num_docs, seq_len, num_input_features)
     Outputs are sized:
-        (num_batch_size, seq_len, num_output_features)
+        (num_datapoints_per_batch, seq_len, num_output_features)
 
     Where num_docs is the sum of the number of docs for each datapoint in the batch.
     It's basically batch size but the collate fn expands multiple docs within each datapoint and cats all of the
         resulting docs across datapoints within the batch into the batch size dimension.
     """
     class ModelParams(BuilderParams):
-        inner_model_params: BuilderParams
-        agg_fn_name: str = 'mean-0'
         split_cat_dim: int = 0
+        model: BuilderParams
+        agg_fn_name: str = 'mean-0-keep'
 
-        def build(self, num_input_features: int):
-            return GroupTransAggCat(self, num_input_features=num_input_features)
+        def build(self, num_input_features: int, num_features_to_cat: int) -> 'SplitModelCombineData':
+            return SplitModelCombineData(
+                self,
+                num_input_features=num_input_features,
+                num_features_to_cat=num_features_to_cat,
+            )
 
-    def __init__(self, hp: ModelParams, num_input_features: int):
+    def __init__(self, hp: ModelParams, num_input_features: int, num_features_to_cat: int, *args, **kwargs):
         super().__init__()
         self.hp = hp
         self.num_input_features = num_input_features
+        self.num_base_features = num_features_to_cat
 
-        self.model = self.hp.inner_model_params.build(num_input_features=num_input_features)
-        self.agg = utils.get_reducer(num_input_features, reducer_str=self.hp.agg_fn_name)
+        self.splitter = Splitter(num_input_features=num_input_features, split_dim=self.hp.split_cat_dim)
+        self.model = self.hp.model.build(
+            num_input_features=self.num_input_features,
+            num_base_features=self.num_base_features,
+            *args, **kwargs
+        )
+        self.agg = AggCatCombiner(
+            num_input_features=self.model.get_num_output_features(),
+            aggregator_name=self.hp.agg_fn_name,
+            cat_dim=self.hp.split_cat_dim,
+        )
+        self._num_output_features = self.agg.get_num_output_features()
 
-        ###############################
-        ################################
-        #################################
-        # u r here
-        # self.
-        # .here
-        # .here
-        # .this is the spot
-
-    def forward(self, x: torch.Tensor, groups: torch.Tensor):
-        xs = self.groupby(data_tensor=x, doc_inds=groups, split_dim=self.hp.split_cat_dim)
-        xs = [self.model(x) for x in xs]
-        xs = [self.agg(x) for x in xs]
-        x = torch.cat(xs, dim=self.hp.split_cat_dim)
+    def forward(self, x: torch.Tensor, to_cat: torch.Tensor, group_indices: torch.Tensor):
+        xs = self.splitter(x=x, group_indices=group_indices)
+        to_cats = self.splitter(x=to_cat, group_indices=group_indices)
+        # TODO: passing base into a general model like this is odd.  Maybe just pass in whole datapoint.
+        xs = [self.model(x, base=to_cat) for x, to_cat in zip(xs, to_cats)]
+        x = self.agg(xs)
         return x
 
     @staticmethod
@@ -634,4 +664,141 @@ class GroupTransAggCat(pl.LightningModule):
 
         doc_arrays = [e for e in doc_arrays if e is not None]
         return doc_arrays
-[]
+
+    def get_num_output_features(self):
+        return self._num_output_features
+
+
+class Splitter(SizedPlModule):
+    def __init__(self, num_input_features: int, split_dim=0):
+        super().__init__()
+        self.num_input_features = num_input_features
+        self.split_dim = split_dim
+
+    def forward(self, x: torch.Tensor, group_indices: torch.Tensor):
+        """group indices is a vector of group indices in [0, n)"""
+        return self.splitby(data_tensor=x, split_indices=group_indices, split_dim=self.split_dim)
+
+    @staticmethod
+    def splitby(data_tensor: torch.Tensor, split_indices: torch.Tensor, split_dim=0) -> List[torch.Tensor]:
+        # https://twitter.com/jeremyphoward/status/1185062637341593600
+        idxs, vals = torch.unique(split_indices, return_counts=True)
+        split_arrays = torch.split_with_sizes(data_tensor, tuple(vals), dim=split_dim)
+
+        doc_tensors = []
+        for idx, split_array in sorted(zip(idxs, split_arrays), key=lambda t: t[0]):
+            doc_tensors.append(split_array)
+
+        return doc_tensors
+
+    def get_num_output_features(self):
+        return self.num_input_features
+
+
+class DupeModelCombineFeats(SizedPlModule):
+    """Duplicate an input into each of several models then recombine them by catting along some dimension."""
+    def __init__(
+            self,
+            num_input_features: int,
+            model_name_to_params: Dict[str, SizedBuilderParams],
+            cat_dim: int=constants.FEATURE_DIM,
+    ):
+        super().__init__()
+        self.num_input_features = num_input_features
+        self.cat_dim = cat_dim
+
+        self.name_to_model = {}
+        self.name_to_num_output_features = {}
+        for model_name, model_params in model_name_to_params.items():
+            model = model_params.build(num_input_features=num_input_features)
+            self.name_to_model[model_name] = model
+            self.name_to_num_output_features[model_name] = model.get_num_output_features()
+
+        self.models = nn.ModuleDict(self.name_to_model)
+
+        self._num_output_features = sum(self.name_to_num_output_features.values())
+
+    def forward(self, x: torch.Tensor):
+        xs = [model(x) for _, model in self.name_to_model.items()]
+        return torch.cat(xs, dim=self.cat_dim)
+
+    def _get_model_and_num_output_features(self, model_name: str, model_params: BuilderParams):
+        if model_params.num_layers == 0:
+            model = None
+            num_features = 0
+        else:
+            model = self.hp.conv.build(num_input_features=num_embedcat_features)
+            num_features = self.conv.get_num_output_features()
+
+        return model, num_features
+
+    def get_num_output_features(self):
+        return self._num_output_features
+
+
+class TransConvCatFc(SizedPlModule):
+    class ModelParams(BuilderParams):
+        conv: ConvBlock.ModelParams = ConvBlock.ModelParams()
+        trans: TransBlockBuilder.ModelParams = TransBlockBuilder.ModelParams()
+        fc: SlabNet.ModelParams = SlabNet.ModelParams()
+
+        cat_dim: int = -1
+
+        def build(
+                self,
+                num_input_features: int,
+                num_base_features: int,
+        ) -> 'TransConvCatFc':
+            return TransConvCatFc(num_input_features, num_base_features, self)
+
+    def __init__(self, num_input_features: int, num_base_features, hp: ModelParams):
+        super().__init__()
+        self.hp = hp
+
+        self.tc = DupeModelCombineFeats(
+            num_input_features=num_input_features,
+            model_name_to_params={'conv': self.hp.conv, 'trans': self.hp.trans},
+            cat_dim=self.hp.cat_dim,
+        )
+        self.fc = SlabNet(self.tc.get_num_output_features() + num_base_features, self.hp.fc)
+
+    def forward(self, x: torch.Tensor, base: torch.Tensor):
+        x = self.tc(x)
+        x = torch.cat([x, base], dim=self.hp.cat_dim)
+        x = self.fc(x)
+        return x
+
+    def get_num_output_features(self):
+        return self.fc.get_num_output_features()
+
+
+class EmbedCat(SizedPlModule):
+    """Embed a vocab vector, then concatenate a feature vector."""
+    class ModelParams(BuilderParams):
+        embed: BertEmbedder.ModelParams = BertEmbedder.ModelParams()
+        cat_dim: int = -1
+
+        def build(self, num_features_to_cat: int, max_seq_len: int) -> 'EmbedCat':
+            return EmbedCat(self, num_features_to_cat, max_seq_len=max_seq_len)
+
+    def __init__(
+            self,
+            hp: ModelParams,
+            num_features_to_cat: int,
+            max_seq_len: int,
+    ):
+        super().__init__()
+        self.hp = hp
+        self.num_features_to_cat = num_features_to_cat
+        self.cat_dim = self.hp.cat_dim
+
+        self.embed: BertEmbedder = self.hp.embed.build(max_seq_len=max_seq_len)
+
+    def forward(self, vocab: torch.Tensor, to_cat: torch.Tensor):
+        assert to_cat.shape[self.cat_dim] == self.num_features_to_cat
+        x = self.embed(vocab).last_hidden_state
+        assert x.shape[self.cat_dim] == self.hp.embed.dim, f'x.shape: {x.shape}, hp.dim: {self.hp.dim}'
+        return torch.cat([x, to_cat], dim=self.cat_dim)
+
+    def get_num_output_features(self):
+        return self.hp.embed.dim + self.num_features_to_cat

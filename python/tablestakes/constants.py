@@ -115,3 +115,5 @@ class ColNames:
 
 SIGMOID_TYPE_NAME = 'sigmoid'
 
+FEATURE_DIM = -1
+

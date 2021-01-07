@@ -518,11 +518,11 @@ def flatten_dict(dt, delimiter="/", prevent_delimiter=False):
 ReducerFn = Callable[[torch.Tensor], torch.Tensor]
 
 
-def get_reducer(num_input_features: int, reducer_str: str) -> Tuple[ReducerFn, int]:
-    if reducer_str == 'smash':
+def get_reducer(num_input_features: int, aggregator_str: str) -> Tuple[ReducerFn, int]:
+    if aggregator_str == 'smash':
         reducer_fn = trunks_mod.artless_smash
         num_input_features *= 8
-    elif reducer_str in ('first', 'first-dim1'):
+    elif aggregator_str in ('first', 'first-dim1'):
         def reducer_fn(x):
             if len(x.shape) == 3:
                 return x[:, 0, :].squeeze(dim=1)
@@ -530,11 +530,13 @@ def get_reducer(num_input_features: int, reducer_str: str) -> Tuple[ReducerFn, i
                 return x[:, 0].squeeze()
             else:
                 raise ValueError()
-    elif reducer_str == 'first-dim2':
+    elif aggregator_str == 'first-dim2':
         reducer_fn = lambda x: x[:, :, 0].squeeze(dim=2)
-    elif reducer_str == 'mean-0':
+    elif aggregator_str == 'mean-0':
         reducer_fn = lambda x: x.mean(dim=0).squeeze()
-    elif reducer_str == 'sum':
+    elif aggregator_str == 'mean-0-keep':
+        reducer_fn = lambda x: x.mean(dim=0, keepdim=True)
+    elif aggregator_str == 'sum':
         reducer_fn = lambda x: torch.sum(x)
     else:
         reducer_fn = nn.Identity()

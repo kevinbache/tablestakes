@@ -21,8 +21,8 @@ class TotalParams(trunks_mod.BuilderParams):
     conv: trunks_mod.ConvBlock.ModelParams = trunks_mod.ConvBlock.ModelParams()
     trans: trunks_mod.TransBlockBuilder.ModelParams = trunks_mod.TransBlockBuilder.ModelParams()
     fc: trunks_mod.SlabNet.ModelParams = trunks_mod.SlabNet.ModelParams()
-    neck: head_mod.HeadedSlabNet.ModelParams = head_mod.HeadedSlabNet.ModelParams()
-    head: head_mod.WeightedHeadParams = head_mod.WeightedHeadParams(weights={}, head_mod={})
+    neck: trunks_mod.SlabNet.ModelParams = trunks_mod.SlabNet.ModelParams()
+    head: head_mod.WeightedHeadParams = head_mod.WeightedHeadParams()
 
     verbose: bool = False
 
@@ -75,7 +75,7 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
         self.fc = self.hp.fc.build(num_input_features=num_fc_features)
 
         #  neckhead
-        self.neckhead = self.hp.head.build(num_input_features=self.fc.get_num_outputs(), neck_hp=self.hp.neck)
+        self.neckhead = self.hp.head.build(num_input_features=self.fc.get_num_output_features(), neck_hp=self.hp.neck)
 
         # END MODEL
         ###############################################################
@@ -120,7 +120,7 @@ class ModelBertConvTransTClass2(factored.FactoredLightningModule):
             print(f'out_trans.shape: {out_trans.shape}')
             print(f'out_conv.shape: {out_conv.shape}')
 
-        # concatenate for sharpness
+        # concatenate for sharpness before fc
         out = torch.cat([base, out_trans, out_conv], dim=-1)
 
         if self.verbose:

@@ -14,7 +14,6 @@ from tablestakes.ml2.factored import opt_mod, head_mod, logs_mod, trunks_mod
 Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
 
 
-@dataclass
 class FactoredParams(trunks_mod.BuilderParams):
     opt: opt_mod.OptParams
     logs: logs_mod.LoggingParams
@@ -40,11 +39,12 @@ class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
     ):
         super().__init__(*args, **kwargs)
         self.hp = copy.deepcopy(hp)
+
         self.opt = hp.opt.build()
-        self.opt.set_pl_module(pl_module=self)
+        self.opt.set_pl_module(self)
 
         # set me in subclasses
-        self.neckhead = None
+        self.head = None
 
     ############
     # TRAINING #
@@ -64,7 +64,7 @@ class FactoredLightningModule(pl.LightningModule, head_mod.LossMetrics):
         #     y_hats_for_loss, y_hats_for_pred = self(batch.x)
         # print(prof.display())
         y_hats_for_loss, y_hats_for_pred = self(batch.x)
-        return self.neckhead.loss_metrics(y_hats_for_loss, y_hats_for_pred, batch.y, batch.meta)
+        return self.head.loss_metrics(y_hats_for_loss, y_hats_for_pred, batch.y, batch.meta)
 
     def training_step(self, batch, batch_idx):
         d = self.forward_plus_lossmetrics(batch, batch_idx)

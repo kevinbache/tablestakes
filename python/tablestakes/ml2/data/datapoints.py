@@ -143,7 +143,7 @@ class BaseVocabMultiDatapoint(BaseVocabDatapoint):
     base: Union[List[DFT], DFT]
     vocab: Union[List[DFT], DFT]
     filenames: List[str]
-    datapoint_indices: Optional[List[int]] = None
+    datapoint_indices: Optional[Union[List[int], torch.Tensor]] = None
     # sources: List[Tuple[Optional[int], str]]
 
     def get_num_features(self):
@@ -168,6 +168,8 @@ class BaseVocabMultiDatapoint(BaseVocabDatapoint):
                 vocab_arrays.append(vocab_array.values)
                 filenames.append(filename)
                 datapoint_indices.append(dp_ind)
+
+        datapoint_indices = torch.tensor(datapoint_indices, dtype=torch.long)
 
         base = _pad_arrays(
             arrays=base_arrays,

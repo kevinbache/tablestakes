@@ -128,34 +128,29 @@ class HeadParams(trunks_mod.BuilderParams):
     # normalize within a class
     pos_class_weights: Optional[np.array] = None
 
-    def build(self, num_input_features: int, neck_hp: trunks_mod.SlabNet.ModelParams) -> Any:
-        num_head_inputs = max(neck_hp.num_features, neck_hp.num_groups)
+    neck: Optional[trunks_mod.SlabNet.ModelParams] = None
+
+    def build(self, num_input_features: int) -> Any:
+        if self.neck is not None:
+            num_head_inputs = max(self.neck.num_features, self.neck.num_groups)
+        else:
+            num_input_features
 
         type_str = self.type.lower()
 
         if type_str == 'linear':
-            return HeadedSlabNet(
-                num_input_features=num_input_features,
-                head=LinearSoftmaxHead(num_head_inputs, self),
-                neck_hp=neck_hp,
-            )
+            head = LinearSoftmaxHead(num_head_inputs, self)
         elif type_str == 'softmax':
-            return HeadedSlabNet(
-                num_input_features=num_input_features,
-                head=AdaptiveSoftmaxHead(num_head_inputs, self),
-                neck_hp=neck_hp,
-            )
+            head = AdaptiveSoftmaxHead(num_head_inputs, self)
         elif type_str == constants.SIGMOID_TYPE_NAME:
-            return HeadedSlabNet(
-                num_input_features=num_input_features,
-                head=SigmoidHead(num_head_inputs, self),
-                neck_hp=neck_hp,
-            )
+            head = SigmoidHead(num_head_inputs, self)
         elif head_hp.type is None or head_hp.type.lower() == 'none':
-            return lambda _: EmptyHead()
+            head = EmptyHead()
         else:
             raise ValueError(f'Got unknown type: {head_hp.type}')
 
+        if self.neck is not None:
+            return NeckHead(self.neck.build(num_input_features), head)
 
 
 class EmptyHeadParams(HeadParams):
@@ -177,23 +172,31 @@ class Head(LossMetrics, pl.LightningModule, abc.ABC):
         self.num_classes = num_classes
         self.metrics_dict = metrics_dict or {}
 
-        self.loss_fn = lambda y_hat, y: -1
         self.head = nn.Identity()
+
+        self.loss_fn = lambda y_hat, y: -1
         self.x_reducer_fn = lambda x: x
         self.loss_reducer_fn = lambda x: x
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.x_reducer_fn(x.squeeze(1))
-        x = self.postproc_head_out_for_pred(self.head(x))
-        return x
+        return self.forward_for_pred(x)
 
     def forward_for_loss(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.x_reducer_fn(x.squeeze(1))
+        # x = x.squeeze(1)
+        x = self.x_reducer_fn(x)
         x = self.postproc_head_out_for_loss_fn(self.head(x))
         return x
 
+    def forward_for_pred(self, x: torch.Tensor) -> torch.Tensor:
+        # x = x.squeeze(1)
+        x = self.x_reducer_fn(x)
+        x = self.postproc_head_out_for_pred(self.head(x))
+        return x
+
     def forward_for_loss_and_pred(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        x = self.x_reducer_fn(x.squeeze(1))
+        # TODO: disabled for lawplus model2
+        # x = x.squeeze(1)
+        x = self.x_reducer_fn(x)
         x = self.head(x)
         x_for_loss = self.postproc_head_out_for_loss_fn(x)
         x_for_pred = self.postproc_head_out_for_pred(x)
@@ -220,9 +223,11 @@ class Head(LossMetrics, pl.LightningModule, abc.ABC):
     # noinspection PyMethodMayBeStatic
     def _get_reducers(self, num_input_features: int, hp: HeadParams) -> Tuple[utils.ReducerFn, utils.ReducerFn, int]:
         x_reducer, num_input_features = \
-            utils.get_reducer(num_input_features=num_input_features, reducer_str=hp.x_reducer_name)
-        loss_reducer, num_input_features = \
-            utils.get_reducer(num_input_features=num_input_features, reducer_str=hp.loss_reducer_name)
+            utils.get_reducer(num_input_features=num_input_features, aggregator_str=hp.x_reducer_name)
+        loss_reducer, num_input_features_loss_red = \
+            utils.get_reducer(num_input_features=num_input_features, aggregator_str=hp.loss_reducer_name)
+        assert num_input_features_loss_red == num_input_features
+
         return x_reducer, loss_reducer, num_input_features
 
 
@@ -395,8 +400,11 @@ class WeightedHeadParams(trunks_mod.BuilderParams):
         obj.type = d['type']
         return obj
 
-    def build(self, num_input_features: int, neck_hp: trunks_mod.SlabNet.ModelParams):
-        heads = {name: head_params.build(num_input_features, neck_hp=neck_hp) for name, head_params in self.head_params.items()}
+    def build(self, num_input_features: int) ->  'WeightedHead':
+        heads = {
+            name: head_params.build(num_input_features)
+            for name, head_params in self.head_params.items()
+        }
         return WeightedHead(num_input_features=num_input_features, heads=heads, weights=self.weights)
 
 
@@ -479,7 +487,7 @@ class SigmoidConfusionMatrixCallback(pl.Callback):
         self.head_name_to_col_dicts = self._get_head_name_to_col_dicts(self.hp)
 
 
-HeadMaker = Callable[[int], Head]
+# HeadMaker = Callable[[int], Head]
 
 
 class WeightedHead(Head):
@@ -566,27 +574,27 @@ class WeightedHead(Head):
 
         return head_name_to_loss_metrics
 
-    @classmethod
-    def maker_from_makers(
-            cls,
-            head_makers: Dict[str, HeadMaker],
-            head_weights: Dict[str, float],
-    ) -> HeadMaker:
-
-        def head_maker(num_input_features):
-            heads = {}
-            head_weights_out = {}
-            for head_name, hm in head_makers.items():
-                if head_weights[head_name] != 0.0:
-                    heads[head_name] = hm(num_input_features)
-                    head_weights_out[head_name] = head_weights[head_name]
-            return WeightedHead(
-                num_input_features=num_input_features,
-                heads=heads,
-                weights=head_weights_out,
-            )
-
-        return head_maker
+    # @classmethod
+    # def maker_from_makers(
+    #         cls,
+    #         head_makers: Dict[str, HeadMaker],
+    #         head_weights: Dict[str, float],
+    # ) -> HeadMaker:
+    #
+    #     def head_maker(num_input_features):
+    #         heads = {}
+    #         head_weights_out = {}
+    #         for head_name, hm in head_makers.items():
+    #             if head_weights[head_name] != 0.0:
+    #                 heads[head_name] = hm(num_input_features)
+    #                 head_weights_out[head_name] = head_weights[head_name]
+    #         return WeightedHead(
+    #             num_input_features=num_input_features,
+    #             heads=heads,
+    #             weights=head_weights_out,
+    #         )
+    #
+    #     return head_maker
 
 
 # class HeadMakerFactory:
@@ -646,41 +654,28 @@ class WeightedHead(Head):
 #             raise ValueError(f'Got unknown type: {head_hp.type}')
 
 
-class HeadedSlabNet(trunks_mod.SlabNet, LossMetrics):
-    """A slabnet with a head containing num_output_features."""
-
+class NeckHead(pl.LightningModule, LossMetrics):
     def __init__(
             self,
-            num_input_features: int,
-            head: Optional[Head],
-            head_maker: Optional[HeadMaker] = None,
-            neck_hp: Optional[trunks_mod.SlabNet.ModelParams] = trunks_mod.SlabNet.ModelParams(),
+            neck: Sized,
+            head: Head,
     ):
-        # TODO: omg, this is terrible
-        trunks_mod.SlabNet.__init__(
-            self,
-            num_input_features=num_input_features,
-            hp=neck_hp,
-        )
-        LossMetrics.__init__(self)
-        if head_maker is None:
-            assert isinstance(head, Head)
-            self.head = head
-        else:
-            self.head = head_maker(num_input_features)
+        super().__init__()
+        self.neck = neck
+        self.head = head
 
     def forward(self, x):
-        x = super().forward(x)
+        x = self.neck(x)
         x = self.head(x)
         return x
 
     def forward_for_loss(self, x: torch.Tensor) -> torch.Tensor:
-        x = super().forward(x)
+        x = self.neck(x)
         x = self.head.forward_for_loss(x)
         return x
 
     def forward_for_loss_and_pred(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        x = super().forward(x)
+        x = self.neck(x)
         x_for_loss, x_for_pred = self.head.forward_for_loss_and_pred(x)
         return x_for_loss, x_for_pred
 
