@@ -333,8 +333,8 @@ class ClassCounterCallback(pl.Callback):
         }
         return field_to_class_counts
 
-    def on_train_start(self, trainer, pl_module):
-        field_to_class_counts = self._inner(dataloader=pl_module.train_dataloader())
+    def on_init_start(self, trainer: pl.Trainer):
+        field_to_class_counts = self._inner(dataloader=trainer.train_dataloader())
         if self.verbose:
             utils.hprint('ClassCounterCallback Class Counts:')
             utils.print_dict(field_to_class_counts)

@@ -123,9 +123,9 @@ class HeadParams(trunks_mod.BuilderParams):
     x_reducer_name: str = ''
     loss_reducer_name: str = 'mean-0'
     do_permute_head_out: bool = True
-    # normalize between classes
+    # apply weight between classes
     class_weights: Optional[np.array] = None
-    # normalize within a class
+    # equalize pos/neg within a class
     pos_class_weights: Optional[np.array] = None
 
     neck: Optional[trunks_mod.SlabNet.ModelParams] = None
@@ -272,12 +272,15 @@ class SigmoidHead(Head):
 
         self.num_classes = num_classes
 
+        # these are for balancing pos/neg within classes
         class_weights = hp.class_weights or np.ones(num_classes)
         self.register_buffer('class_weights', torch.tensor(class_weights, dtype=torch.float))
         self.class_weights /= self.class_weights.sum()
 
+        # these are for balancing between classes
         pos_class_weights = hp.pos_class_weights or np.ones(num_classes)
         self.register_buffer('pos_class_weights', torch.tensor(pos_class_weights, dtype=torch.float))
+        warnings.warn(f'Final pos_class_weights: {self.pos_class_weights}')
         self.loss_fn = nn.BCEWithLogitsLoss(reduction='none', pos_weight=self.pos_class_weights)
 
         self.x_reducer_fn = x_reducer
