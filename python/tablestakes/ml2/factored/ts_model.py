@@ -326,7 +326,7 @@ if __name__ == '__main__':
     utils.print_dict(hp.to_dict())
 
     callbacks = [
-        logs_mod.PosClassWeightSetterCallback(
+        logs_mod.ClassCounter(
             head_names=['doc_class'],
             total_hp=hp,
         ),

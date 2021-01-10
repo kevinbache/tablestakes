@@ -290,7 +290,7 @@ class CounterTimerLrCallback(pl.Callback):
         trainer.logger.log_metrics(d, step=trainer.global_step)
 
 
-class PosClassWeightSetterCallback(pl.Callback):
+class ClassCounter(pl.Callback):
     """Count the number of datapoints belonging to each class.
 
     Right now, designed for binary multi-feild problems (i.e.: `SigmoidHead`s)
@@ -303,6 +303,7 @@ class PosClassWeightSetterCallback(pl.Callback):
             head_names: List[str],
             total_hp: Optional[params.ParameterSet] = None,
             do_update_pos_class_weights=True,
+            max_pos_class_weight=10.0,
             verbose=True,
     ):
         super().__init__()
@@ -310,6 +311,7 @@ class PosClassWeightSetterCallback(pl.Callback):
         self.verbose = verbose
         self.hp = total_hp
         self.do_update_pos_class_weights = do_update_pos_class_weights
+        self.max_pos_class_weight = max_pos_class_weight
 
     def _y_list_to_df(self, head_name: str, y: List[torch.Tensor]) -> pd.DataFrame:
         y = torch.cat(y, dim=0)
@@ -352,9 +354,14 @@ class PosClassWeightSetterCallback(pl.Callback):
             assert hasattr(pl_module, 'head')
             for field_name, class_counts_df in field_to_class_counts.items():
                 pos_class_weights = class_counts_df.loc[self.PORTIONS].values
+
                 zero_inds = np.where(pos_class_weights == 0)[0]
                 pos_class_weights[zero_inds] = 1.0
+
                 pos_class_weights = 1. / pos_class_weights
+
+                max_inds = np.where(pos_class_weights > self.max_pos_class_weight)[0]
+                pos_class_weights[max_inds] = self.max_pos_class_weight
 
                 head = pl_module.head.heads[field_name]
                 head.set_pos_class_weights(torch.tensor(pos_class_weights, dtype=torch.float, device=pl_module.device))
