@@ -41,6 +41,8 @@ class TuneRunner:
     ):
         self.include_gpus = None
 
+        utils.set_pandas_disp(width=300)
+
         # if you leave this at the default false, then every call to tune.report needs to have all
         # expected metrics in it
         os.environ['TUNE_DISABLE_STRICT_METRIC_CHECKING'] = "1"
@@ -127,6 +129,8 @@ class TuneRunner:
         utils.hprint('Starting train function with config:')
         utils.print_dict(config)
         print()
+
+        utils.set_pandas_disp(width=300)
 
         hp = self._model_param_class.from_dict(config)
         assert isinstance(hp, self._model_param_class)
