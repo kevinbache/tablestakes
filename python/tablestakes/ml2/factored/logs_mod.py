@@ -8,9 +8,10 @@ import numpy as np
 import pandas as pd
 
 import torch
+from torch.utils.data import DataLoader
 
-from pytorch_lightning.metrics.utils import _input_format_classification
 import pytorch_lightning as pl
+from pytorch_lightning.metrics.utils import _input_format_classification
 from pytorch_lightning import loggers as pl_loggers
 
 from ray import tune
@@ -19,7 +20,7 @@ from chillpill import params
 
 from tablestakes import constants, utils
 from tablestakes.ml2.data import datapoints
-from torch.utils.data import DataLoader
+from tablestakes.ml2.data import data_module
 
 CURRENT_EPOCH_NAME = 'current_epoch'
 PARAM_COUNT_NAME = 'param_count'
@@ -289,7 +290,7 @@ class CounterTimerLrCallback(pl.Callback):
         trainer.logger.log_metrics(d, step=trainer.global_step)
 
 
-class ClassCounterCallback(pl.Callback):
+class PosClassWeightSetterCallback(pl.Callback):
     """Count the number of datapoints belonging to each class.
 
     Right now, designed for binary multi-feild problems (i.e.: `SigmoidHead`s)
@@ -310,7 +311,7 @@ class ClassCounterCallback(pl.Callback):
         self.hp = total_hp
         self.do_update_pos_class_weights = do_update_pos_class_weights
 
-    def y_list_to_df(self, head_name: str, y: List[torch.Tensor]) -> pd.DataFrame:
+    def _y_list_to_df(self, head_name: str, y: List[torch.Tensor]) -> pd.DataFrame:
         y = torch.cat(y, dim=0)
         num_datapoints = len(y)
         counts = y.sum(dim=0).detach().numpy()
@@ -328,13 +329,13 @@ class ClassCounterCallback(pl.Callback):
                 field_to_y_lists[field].extend([batch.y[field]])
 
         field_to_class_counts = {
-            field_name: self.y_list_to_df(field_name, y_list)
+            field_name: self._y_list_to_df(field_name, y_list)
             for field_name, y_list in field_to_y_lists.items()
         }
         return field_to_class_counts
 
-    def on_init_start(self, trainer: pl.Trainer):
-        field_to_class_counts = self._inner(dataloader=trainer.train_dataloader())
+    def on_train_epoch_start(self, trainer: pl.Trainer, pl_module):
+        field_to_class_counts = self._inner(dataloader=pl_module.train_dataloader())
         if self.verbose:
             utils.hprint('ClassCounterCallback Class Counts:')
             utils.print_dict(field_to_class_counts)
@@ -348,15 +349,15 @@ class ClassCounterCallback(pl.Callback):
                 raise NotImplementedError(
                     f'hp.head == {self.hp.head} but this is only implemented for WeightedHeadParams'
                 )
+            assert hasattr(pl_module, 'head')
             for field_name, class_counts_df in field_to_class_counts.items():
-                head_params = self.hp.head.head_params[field_name]
-
                 pos_class_weights = class_counts_df.loc[self.PORTIONS].values
                 zero_inds = np.where(pos_class_weights == 0)[0]
                 pos_class_weights[zero_inds] = 1.0
                 pos_class_weights = 1. / pos_class_weights
 
-                head_params.pos_class_weights = pos_class_weights
+                head = pl_module.head.heads[field_name]
+                head.set_pos_class_weights(torch.tensor(pos_class_weights, dtype=torch.float))
                 if self.verbose:
                     weights_str = ', '.join([f'{e:.2f}' for e in pos_class_weights])
                     print(f'  Setting head_params["{field_name}"].pos_class_weights = [{weights_str}]')
@@ -370,8 +371,10 @@ class ClassCounterCallback(pl.Callback):
 
 
 class BetterAccuracy(pl.metrics.Accuracy):
+    # TODO: add class weights to init; report both
     """Like Accuracy, but better.
-        - PyTorch Lightning's += lines cause warnings about transferring lots of scalars between cpu / gpu.
+        - PyTorch Lightning's += lines cause warnings about transferring lots of scalars between cpu / gpu
+          but  = ... + lines are fine
         - Respect Y_VALUE_TO_IGNORE
     """
     Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE

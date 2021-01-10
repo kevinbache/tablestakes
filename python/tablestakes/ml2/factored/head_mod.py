@@ -280,7 +280,6 @@ class SigmoidHead(Head):
         # these are for balancing between classes
         pos_class_weights = hp.pos_class_weights or np.ones(num_classes)
         self.register_buffer('pos_class_weights', torch.tensor(pos_class_weights, dtype=torch.float))
-        warnings.warn(f'Final pos_class_weights: {self.pos_class_weights}')
         self.loss_fn = nn.BCEWithLogitsLoss(reduction='none', pos_weight=self.pos_class_weights)
 
         self.x_reducer_fn = x_reducer
@@ -289,6 +288,10 @@ class SigmoidHead(Head):
         self.do_permute_head_out = hp.do_permute_head_out
 
         self.s = nn.Sigmoid()
+
+    def set_pos_class_weights(self, pos_class_weights: torch.Tensor):
+        self.pos_class_weights = pos_class_weights
+        self.loss_fn = nn.BCEWithLogitsLoss(reduction='none', pos_weight=self.pos_class_weights)
 
     def loss(self, y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         loss = self.loss_fn(y_hat, y)
@@ -705,3 +708,6 @@ class NeckHead(pl.LightningModule, LossMetrics):
             metas: List[Any],
     ) -> Dict[str, torch.Tensor]:
         return self.head.loss_metrics(y_hat_for_loss, y_hat_for_pred, y, metas)
+
+    def set_pos_class_weights(self, pos_class_weights: torch.Tensor):
+        return self.head.set_pos_class_weights(pos_class_weights)

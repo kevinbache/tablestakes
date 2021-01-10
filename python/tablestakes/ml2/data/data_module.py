@@ -2,12 +2,12 @@ import abc
 from pathlib import Path
 from typing import *
 
-import pytorch_lightning as pl
 import torch
+from torch.utils.data import DataLoader
+import pytorch_lightning as pl
+
 from tablestakes import utils, constants
 from tablestakes.ml2.data import datapoints
-from torch.utils.data import DataLoader
-
 from tablestakes.ml2 import data
 
 from chillpill import params

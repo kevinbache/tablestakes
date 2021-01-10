@@ -113,7 +113,6 @@ class BertEmbedder(pl.LightningModule):
             #   embeddings.token_type_embeddings.weight
             #   embeddings.LayerNorm.weight
             #   embeddings.LayerNorm.bias
-            print(f'BertEmbedder param name: {name}')
             if 'position_embeddings' in name:
                 requires_grad = self.hp.position_embedding_requires_grad
             else:
@@ -604,7 +603,7 @@ class SplitAggCat(pl.LightningModule, Sized, abc.ABC):
         return self.num_output_features
 
 
-class SplitModelCombineData(pl.LightningModule, Sized):
+class ModelSplitAggCombineData(pl.LightningModule, Sized):
     """Group input array by grouping vector, run each group through a model, and aggregate each group at the end
         and concatenate the resulting post-aggregated vectors.
 
@@ -626,15 +625,15 @@ class SplitModelCombineData(pl.LightningModule, Sized):
         model: 'TransConvCatFc.ModelParams'
         agg_fn_name: str = 'mean-0-keep'
 
-        def build(self, num_input_features: int, num_features_to_cat: int) -> 'SplitModelCombineData':
-            return SplitModelCombineData(
+        def build(self, num_input_features: int, num_features_to_cat: int) -> 'ModelSplitAggCombineData':
+            return ModelSplitAggCombineData(
                 self,
                 num_input_features=num_input_features,
                 num_features_to_cat=num_features_to_cat,
             )
 
         @classmethod
-        def from_dict(cls, d: Dict) -> 'SplitModelCombineData.ModelParams':
+        def from_dict(cls, d: Dict) -> 'ModelSplitAggCombineData.ModelParams':
             out = copy.deepcopy(cls(**d))
             out.model = TransConvCatFc.ModelParams.from_dict(out.model)
             return out
