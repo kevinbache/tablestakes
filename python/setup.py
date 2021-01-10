@@ -56,6 +56,7 @@ setup(
         'boto3',
         'dataclasses',
         # 'pytorch_memlab',
+        'fast-transformers',
     ],
 
     classifiers=[

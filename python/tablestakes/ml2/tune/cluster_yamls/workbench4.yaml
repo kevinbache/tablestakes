@@ -20,8 +20,7 @@ idle_timeout_minutes: 20
 # todo: create AMI containing all needed packages for quick cluster startup
 head_node:
     InstanceType: g4dn.4xlarge
-   # AMI ID : ami-0c322afdce03ef272 dlami 35.0 ubuntu 18.04
-    ImageId: latest_dlami
+    ImageId: ami-098555c9b343eb09c   # dlami v38 us-west-2
     BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:

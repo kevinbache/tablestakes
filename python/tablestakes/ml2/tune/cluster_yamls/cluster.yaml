@@ -28,9 +28,7 @@ idle_timeout_minutes: 20
 #              VolumeSize: 200
 head_node:
     InstanceType: g4dn.xlarge
-    ImageId: ami-030de16ccb223b3e0   # dlami v37 us-west-2
-#    ImageId: ami-0bc87a16c757a7f07   # dlami v36 us-west-2
-#    ImageId: ami-029d965a2ea7774a3   # dlami v37 us-east-1
+    ImageId: ami-098555c9b343eb09c   # dlami v38 us-west-2
     BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
@@ -38,9 +36,7 @@ head_node:
 
 worker_nodes:
     InstanceType: g4dn.xlarge
-    ImageId: ami-030de16ccb223b3e0   # dlami v37 us-west-2
-#    ImageId: ami-0bc87a16c757a7f07   # dlami v36 us-west-2
-#    ImageId: ami-029d965a2ea7774a3   # dlami v37 us-east-1
+    ImageId: ami-098555c9b343eb09c   # dlami v38 us-west-2
     InstanceMarketOptions:
         MarketType: spot
         SpotOptions:
