@@ -36,7 +36,7 @@ class TuneRunner:
             self,
             model_hp: FactoredParams,
             tune_hp: TuneParams,
-            factored_lightning_module_class: type,
+            # factored_lightning_module_class: type,
             extra_pl_callbacks: Optional[List[pl.callbacks.Callback]] = None,
     ):
         self.include_gpus = None
@@ -53,8 +53,8 @@ class TuneRunner:
 
         self._model_param_class = model_hp.__class__
 
-        assert issubclass(factored_lightning_module_class, factored.FactoredLightningModule)
-        self._factored_lightning_module_class = factored_lightning_module_class
+        # assert issubclass(factored_lightning_module_class, factored.FactoredLightningModule)
+        # self._factored_lightning_module_class = factored_lightning_module_class
 
         # self._metrics_tracker_class = self._factored_lightning_module_class.get_metrics_tracker_class()
 
@@ -137,7 +137,7 @@ class TuneRunner:
             raise NotImplementedError(f"Got checkpoint_dir in trian_fn: {checkpoint_dir}")
 
         utils.hprint("About to create net in TuneRunner")
-        net = self._factored_lightning_module_class.from_hp(hp=hp)
+        net = hp.build()
         # import torch.autograd.profiler as profiler
         # with profiler.profile(record_shapes=True, use_cuda=True, profile_memory=True) as prof:
         #     net = self._factored_lightning_module_class.from_hp(hp=hp)
@@ -412,7 +412,7 @@ if __name__ == '__main__':
     tune_runner = TuneRunner(
         model_hp=hp,
         tune_hp=tune_hp,
-        factored_lightning_module_class=ts_model.TablestakesBertConvTransTClassModel,
+        # factored_lightning_module_class=ts_model.TablestakesBertConvTransTClassModel,
         extra_pl_callbacks=None,
     )
     tune_runner.run(

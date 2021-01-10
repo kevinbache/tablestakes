@@ -478,7 +478,7 @@ class MyLightningNeptuneLogger(pl_loggers.NeptuneLogger):
     def set_properties(self, new_properties: Dict):
         if self.offline_mode:
             import warnings
-            warnings.warn('log_mods.MyLightningNeptuneLogger skipping set_properties')
+            warnings.warn('log_mods.MyLightningNeptuneLogger is in offline mode and is skipping set_properties')
             return
         else:
             properties = self.experiment._backend.get_experiment(self.experiment.internal_id).properties

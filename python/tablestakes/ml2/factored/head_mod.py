@@ -152,6 +152,15 @@ class HeadParams(trunks_mod.BuilderParams):
         if self.neck is not None:
             return NeckHead(self.neck.build(num_input_features), head)
 
+    @classmethod
+    def from_dict(cls, d: Dict):
+        out = copy.deepcopy(cls(**d))
+        assert hasattr(out, 'neck')
+        if out.neck is not None:
+            out.neck = trunks_mod.SlabNet.ModelParams.from_dict(out.neck)
+        return out
+
+
 
 class EmptyHeadParams(HeadParams):
     type: str = 'none'

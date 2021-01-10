@@ -1,4 +1,5 @@
 import abc
+import copy
 from typing import *
 
 import torch
@@ -577,21 +578,20 @@ class TransBlockBuilder:
         return SizedSequential(d, num_output_features=num_total_features)
 
 
-class Combiner(pl.LightningModule, Sized, abc.ABC):
-    def forward(self, xs: List[torch.Tensor]):
-        pass
-
-class AggCatCombiner(Combiner):
+class SplitAggCat(pl.LightningModule, Sized, abc.ABC):
     """Aggregate groups then cat results."""
     def __init__(self, num_input_features: int, aggregator_name: str, cat_dim: int=0):
         super().__init__()
+        self.cat_dim = cat_dim
+
+        self.splitter = Splitter(num_input_features=num_input_features, split_dim=self.cat_dim)
         self.agg, self.num_output_features = utils.get_reducer(
             num_input_features=num_input_features,
             aggregator_str=aggregator_name,
         )
-        self.cat_dim = cat_dim
 
-    def forward(self, xs: List[torch.Tensor]):
+    def forward(self, x: torch.Tensor, group_indices: torch.Tensor):
+        xs = self.splitter(x, group_indices)
         return torch.cat([self.agg(x) for x in xs], dim=self.cat_dim)
 
     def get_num_output_features(self):
@@ -613,9 +613,11 @@ class SplitModelCombineData(pl.LightningModule, Sized):
     It's basically batch size but the collate fn expands multiple docs within each datapoint and cats all of the
         resulting docs across datapoints within the batch into the batch size dimension.
     """
+
     class ModelParams(BuilderParams):
         split_cat_dim: int = 0
-        model: BuilderParams
+        # TODO: re-generalize
+        model: 'TransConvCatFc.ModelParams'
         agg_fn_name: str = 'mean-0-keep'
 
         def build(self, num_input_features: int, num_features_to_cat: int) -> 'SplitModelCombineData':
@@ -625,31 +627,39 @@ class SplitModelCombineData(pl.LightningModule, Sized):
                 num_features_to_cat=num_features_to_cat,
             )
 
+        @classmethod
+        def from_dict(cls, d: Dict) -> 'SplitModelCombineData.ModelParams':
+            out = copy.deepcopy(cls(**d))
+            out.model = TransConvCatFc.ModelParams.from_dict(out.model)
+            return out
+
+
     def __init__(self, hp: ModelParams, num_input_features: int, num_features_to_cat: int, *args, **kwargs):
         super().__init__()
         self.hp = hp
         self.num_input_features = num_input_features
         self.num_base_features = num_features_to_cat
 
-        self.splitter = Splitter(num_input_features=num_input_features, split_dim=self.hp.split_cat_dim)
+        # self.splitter = Splitter(num_input_features=num_input_features, split_dim=self.hp.split_cat_dim)
         self.model = self.hp.model.build(
             num_input_features=self.num_input_features,
             num_base_features=self.num_base_features,
             *args, **kwargs
         )
-        self.agg = AggCatCombiner(
+        self.sac = SplitAggCat(
             num_input_features=self.model.get_num_output_features(),
             aggregator_name=self.hp.agg_fn_name,
             cat_dim=self.hp.split_cat_dim,
         )
-        self._num_output_features = self.agg.get_num_output_features()
+        self._num_output_features = self.sac.get_num_output_features()
 
     def forward(self, x: torch.Tensor, to_cat: torch.Tensor, group_indices: torch.Tensor):
-        xs = self.splitter(x=x, group_indices=group_indices)
-        to_cats = self.splitter(x=to_cat, group_indices=group_indices)
+        # xs = self.splitter(x=x, group_indices=group_indices)
+        # to_cats = self.splitter(x=to_cat, group_indices=group_indices)
         # TODO: passing base into a general model like this is odd.  Maybe just pass in whole datapoint.
-        xs = [self.model(x, base=to_cat) for x, to_cat in zip(xs, to_cats)]
-        x = self.agg(xs)
+        # xs = [self.model(x, base=to_cat) for x, to_cat in zip(xs, to_cats)]
+        x = self.model(x, base=to_cat)
+        x = self.sac(x, group_indices)
         return x
 
     @staticmethod
@@ -677,12 +687,12 @@ class Splitter(SizedPlModule):
 
     def forward(self, x: torch.Tensor, group_indices: torch.Tensor):
         """group indices is a vector of group indices in [0, n)"""
-        return self.splitby(data_tensor=x, split_indices=group_indices, split_dim=self.split_dim)
+        return self.splitby(data_tensor=x, group_indices=group_indices, split_dim=self.split_dim)
 
     @staticmethod
-    def splitby(data_tensor: torch.Tensor, split_indices: torch.Tensor, split_dim=0) -> List[torch.Tensor]:
+    def splitby(data_tensor: torch.Tensor, group_indices: torch.Tensor, split_dim=0) -> List[torch.Tensor]:
         # https://twitter.com/jeremyphoward/status/1185062637341593600
-        idxs, vals = torch.unique(split_indices, return_counts=True)
+        idxs, vals = torch.unique(group_indices, return_counts=True)
         split_arrays = torch.split_with_sizes(data_tensor, tuple(vals), dim=split_dim)
 
         doc_tensors = []
@@ -751,6 +761,15 @@ class TransConvCatFc(SizedPlModule):
         ) -> 'TransConvCatFc':
             return TransConvCatFc(num_input_features, num_base_features, self)
 
+        @classmethod
+        def from_dict(cls, d: Dict) -> 'TransConvCatFc.ModelParams':
+            out = copy.deepcopy(cls(**d))
+            out.conv = ConvBlock.ModelParams.from_dict(out.conv)
+            out.trans = TransBlockBuilder.ModelParams.from_dict(out.trans)
+            out.fc = SlabNet.ModelParams.from_dict(out.fc)
+            return out
+
+
     def __init__(self, num_input_features: int, num_base_features, hp: ModelParams):
         super().__init__()
         self.hp = hp
@@ -780,6 +799,12 @@ class EmbedCat(SizedPlModule):
 
         def build(self, num_features_to_cat: int, max_seq_len: int) -> 'EmbedCat':
             return EmbedCat(self, num_features_to_cat, max_seq_len=max_seq_len)
+
+        @classmethod
+        def from_dict(cls, d: Dict) -> 'EmbedCat.ModelParams':
+            out = copy.deepcopy(cls(**d))
+            out.embed = BertEmbedder.ModelParams.from_dict(out.embed)
+            return out
 
     def __init__(
             self,

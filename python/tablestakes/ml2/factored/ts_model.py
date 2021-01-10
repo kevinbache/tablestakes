@@ -326,7 +326,10 @@ if __name__ == '__main__':
     utils.print_dict(hp.to_dict())
 
     callbacks = [
-        logs_mod.ClassCounterCallback(head_names=['doc_class']),
+        logs_mod.ClassCounterCallback(
+            head_names=['doc_class'],
+            total_hp=hp,
+        ),
         logs_mod.CounterTimerLrCallback(),
         logs_mod.VocabLengthCallback(),
         logs_mod.PredictionSaver(p_keep=1.0),
