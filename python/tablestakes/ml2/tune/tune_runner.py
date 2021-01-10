@@ -41,7 +41,7 @@ class TuneRunner:
     ):
         self.include_gpus = None
 
-        utils.set_pandas_disp(width=300)
+        utils.set_pandas_disp(width=200)
 
         # if you leave this at the default false, then every call to tune.report needs to have all
         # expected metrics in it
