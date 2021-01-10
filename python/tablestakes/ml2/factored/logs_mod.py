@@ -334,7 +334,7 @@ class PosClassWeightSetterCallback(pl.Callback):
         }
         return field_to_class_counts
 
-    def on_train_start(self, trainer: pl.Trainer, pl_module):
+    def on_train_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule):
         field_to_class_counts = self._inner(dataloader=pl_module.train_dataloader())
         if self.verbose:
             utils.hprint('ClassCounterCallback Class Counts:')
@@ -357,7 +357,7 @@ class PosClassWeightSetterCallback(pl.Callback):
                 pos_class_weights = 1. / pos_class_weights
 
                 head = pl_module.head.heads[field_name]
-                head.set_pos_class_weights(torch.tensor(pos_class_weights, dtype=torch.float))
+                head.set_pos_class_weights(torch.tensor(pos_class_weights, dtype=torch.float, device=pl_module.device))
                 if self.verbose:
                     weights_str = ', '.join([f'{e:.2f}' for e in pos_class_weights])
                     print(f'  Setting head_params["{field_name}"].pos_class_weights = [{weights_str}]')
