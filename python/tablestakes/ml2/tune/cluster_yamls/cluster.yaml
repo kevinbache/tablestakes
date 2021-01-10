@@ -60,7 +60,7 @@ setup_commands:
     - sudo ln -s /usr/local/cuda-11.0 /usr/local/cuda
 
     # ray
-    - source /home/ubuntu/.dlamirc && pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-1.1.0.dev0-cp37-cp37m-manylinux1_x86_64.whl
+    - source /home/ubuntu/.dlamirc && pip install -U https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-1.2.0.dev0-cp37-cp37m-manylinux2014_x86_64.whl
     - source /home/ubuntu/.dlamirc && pip install ray[all]
     #  for https://docs.ray.io/en/stable/webui.html
     - source /home/ubuntu/.dlamirc && jupyter nbextension enable --py --sys-prefix widgetsnbextension
