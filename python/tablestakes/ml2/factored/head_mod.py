@@ -116,17 +116,17 @@ class LossMetrics:
 
 
 class HeadParams(trunks_mod.BuilderParams):
+    # weight between classes
+    class_name_to_weight: Dict[str, float]
+    # equalize pos/neg within a class
+    pos_class_weights: Optional[np.array] = None
+
     type: str = 'DEFAULT_TYPE'
     num_classes: int = -1
-    class_names: Tuple[str] = ()
     # See get_reducer() for x_ and loss_ reducer options
     x_reducer_name: str = ''
     loss_reducer_name: str = 'mean-0'
     do_permute_head_out: bool = True
-    # apply weight between classes
-    class_weights: Optional[np.array] = None
-    # equalize pos/neg within a class
-    pos_class_weights: Optional[np.array] = None
 
     neck: Optional[trunks_mod.SlabNet.ModelParams] = None
 
@@ -273,7 +273,7 @@ class SigmoidHead(Head):
         self.num_classes = num_classes
 
         # these are for balancing pos/neg within classes
-        class_weights = hp.class_weights or np.ones(num_classes)
+        class_weights = hp.class_name_to_weight.values() or np.ones(num_classes)
         self.register_buffer('class_weights', torch.tensor(class_weights, dtype=torch.float))
         self.class_weights /= self.class_weights.sum()
 
@@ -452,7 +452,7 @@ class SigmoidConfusionMatrixCallback(pl.Callback):
                     normalize=None,
                     compute_on_step=False,
                 )
-                for col_name in sub_hp.class_names
+                for col_name in sub_hp.class_name_to_weight.keys()
             }
         return col_name_to_cm
 

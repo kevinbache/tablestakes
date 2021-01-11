@@ -318,7 +318,7 @@ class ClassCounter(pl.Callback):
         num_datapoints = len(y)
         counts = y.sum(dim=0).detach().numpy()
         if head_name in self.hp.head.head_params:
-            cols = self.hp.head.head_params[head_name].class_names or None
+            cols = list(self.hp.head.head_params[head_name].class_name_to_weight.keys()) or None
             assert len(cols) == len(counts)
         else:
             cols = None
