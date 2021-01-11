@@ -138,9 +138,9 @@ class HeadParams(trunks_mod.BuilderParams):
 
         type_str = self.type.lower()
 
-        if type_str == 'linear':
+        if type_str == 'softmax':
             head = LinearSoftmaxHead(num_head_inputs, self)
-        elif type_str == 'softmax':
+        elif type_str == 'adaptivesoftmax':
             head = AdaptiveSoftmaxHead(num_head_inputs, self)
         elif type_str == constants.SIGMOID_TYPE_NAME:
             head = SigmoidHead(num_head_inputs, self)
@@ -273,7 +273,7 @@ class SigmoidHead(Head):
         self.num_classes = num_classes
 
         # these are for balancing pos/neg within classes
-        class_weights = hp.class_name_to_weight.values() or np.ones(num_classes)
+        class_weights = list(hp.class_name_to_weight.values()) or np.ones(num_classes)
         self.register_buffer('class_weights', torch.tensor(class_weights, dtype=torch.float))
         self.class_weights /= self.class_weights.sum()
 
