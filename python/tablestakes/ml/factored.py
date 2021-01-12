@@ -115,11 +115,11 @@ class FactoredLightningModule(pl.LightningModule, torch_mod.Parameterized[torch_
     def get_metrics_tracker_class():
         return metrics_mod.ClassificationMetricsTracker
 
-    @classmethod
-    def from_hp(cls, hp: FactoredParams):
-        return cls(
-            hp=hp,
-            data_module= data.TablestakesDataModule(hp.data),
-            metrics_tracker=cls.get_metrics_tracker_class()(hp.metrics),
-            opt=OptimizersMaker(hp.opt),
-        )
+    # @classmethod
+    # def from_hp(cls, hp: FactoredParams):
+    #     return cls(
+    #         hp=hp,
+    #         data_module= data.TablestakesDataModule(hp.data),
+    #         metrics_tracker=cls.get_metrics_tracker_class()(hp.metrics),
+    #         opt=OptimizersMaker(hp.opt),
+    #     )

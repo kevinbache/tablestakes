@@ -116,6 +116,7 @@ class LossMetrics:
 
 
 class HeadParams(trunks_mod.BuilderParams):
+    y_field_name: str
     # weight between classes
     class_name_to_weight: Dict[str, float]
     # equalize pos/neg within a class
@@ -130,11 +131,14 @@ class HeadParams(trunks_mod.BuilderParams):
 
     neck: Optional[trunks_mod.SlabNet.ModelParams] = None
 
+    def get_y_field_name(self):
+        return self.y_field_name
+
     def build(self, num_input_features: int) -> Any:
         if self.neck is not None:
             num_head_inputs = max(self.neck.num_features, self.neck.num_groups)
         else:
-            num_input_features
+            num_head_inputs = num_input_features
 
         type_str = self.type.lower()
 
@@ -174,6 +178,7 @@ class Head(LossMetrics, pl.LightningModule, abc.ABC):
             self,
             num_input_features: int,
             num_classes: int,
+            hp: HeadParams,
             metrics_dict: Optional[Dict[str, pl.metrics.Metric]] = None,
     ):
         pl.LightningModule.__init__(self)
@@ -181,11 +186,16 @@ class Head(LossMetrics, pl.LightningModule, abc.ABC):
         self.num_classes = num_classes
         self.metrics_dict = metrics_dict or {}
 
+        self.hp = hp
+
         self.head = nn.Identity()
 
         self.loss_fn = lambda y_hat, y: -1
         self.x_reducer_fn = lambda x: x
         self.loss_reducer_fn = lambda x: x
+
+    def get_y_field_name(self):
+        return self.hp.y_field_name
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.forward_for_pred(x)
@@ -242,7 +252,7 @@ class Head(LossMetrics, pl.LightningModule, abc.ABC):
 
 class EmptyHead(Head):
     def __init__(self):
-        super().__init__(-1, -1, {})
+        super().__init__(-1, -1, {}, None)
         self.loss_fn = lambda y_hat, y: -1
         self.head = nn.Identity()
         self.x_reducer_fn = lambda x: x
@@ -267,6 +277,7 @@ class SigmoidHead(Head):
             num_input_features=num_input_features,
             num_classes=num_classes,
             metrics_dict=metrics_dict,
+            hp=hp,
         )
         self.head = nn.Linear(num_input_features, num_classes)
 
@@ -314,6 +325,7 @@ class _SoftmaxHead(Head):
             num_input_features: int,
             num_classes: int,
             head: nn.Module,
+            hp: HeadParams,
             x_reducer: Optional[utils.ReducerFn] = None,
             loss_reducer: Optional[utils.ReducerFn] = torch.mean,
     ):
@@ -322,7 +334,8 @@ class _SoftmaxHead(Head):
             num_classes,
             metrics_dict={
                 'acc': logs_mod.BetterAccuracy(),
-            }
+            },
+            hp=hp,
         )
 
         self.x_reducer_fn = x_reducer
@@ -335,6 +348,7 @@ class _SoftmaxHead(Head):
         try:
             loss = self.loss_fn(y_hat, y)
         except BaseException as e:
+            print(f'_SoftmaxHead: y_hat: {y_hat}, y: {y}')
             raise e
         if self.loss_reducer_fn is not None:
             loss = self.loss_reducer_fn(loss)
@@ -381,7 +395,14 @@ class LinearSoftmaxHead(_SoftmaxHead):
 
         num_classes = hp.num_classes
         head = nn.Linear(num_input_features, num_classes)
-        super().__init__(num_input_features, num_classes, head, x_reducer, loss_reducer)
+        super().__init__(
+            num_input_features=num_input_features,
+            num_classes=num_classes,
+            head=head,
+            hp=hp,
+            x_reducer=x_reducer,
+            loss_reducer=loss_reducer,
+        )
         self.lsm = nn.LogSoftmax(dim=1)
         self.do_permute_head_out = hp.do_permute_head_out
 
@@ -399,15 +420,18 @@ YDP = TypeVar('YDP', bound=datapoints.YDatapoint)
 
 
 class WeightedHeadParams(trunks_mod.BuilderParams):
-    weights: Dict[str, float] = {}
+    head_weights: Dict[str, float] = {}
     head_params: Dict[str, HeadParams] = {}
     type: str = 'weighted'
+
+    def get_y_field_name_from_head_name(self, head_name: str):
+        return self.head_params[head_name].get_y_field_name()
 
     @classmethod
     def from_dict(cls, d: Dict):
         obj = copy.deepcopy(cls())
         assert 'weights' in d
-        obj.weights = d['weights']
+        obj.head_weights = d['head_weights']
         assert 'head_params' in d
         assert isinstance(d['head_params'], dict)
         obj.head_params = {k: HeadParams.from_dict(v) for k, v in d['head_params'].items()}
@@ -416,11 +440,11 @@ class WeightedHeadParams(trunks_mod.BuilderParams):
         return obj
 
     def build(self, num_input_features: int) ->  'WeightedHead':
-        heads = {
-            name: head_params.build(num_input_features)
-            for name, head_params in self.head_params.items()
-        }
-        return WeightedHead(num_input_features=num_input_features, heads=heads, weights=self.weights)
+        # heads = {
+        #     name: head_params.build(num_input_features)
+        #     for name, head_params in self.head_params.items()
+        # }
+        return WeightedHead(num_input_features=num_input_features, hp=self)
 
 
 class MyConfusionMatrix(pl.metrics.ConfusionMatrix):
@@ -446,14 +470,18 @@ class SigmoidConfusionMatrixCallback(pl.Callback):
     def _get_col_name_to_cm_for_sub_head(cls, sub_hp: HeadParams):
         col_name_to_cm = {}
         if sub_hp.type == constants.SIGMOID_TYPE_NAME:
-            col_name_to_cm = {
-                col_name: MyConfusionMatrix(
-                    num_classes=2,
-                    normalize=None,
-                    compute_on_step=False,
-                )
-                for col_name in sub_hp.class_name_to_weight.keys()
-            }
+            try:
+                col_name_to_cm = {
+                    col_name: MyConfusionMatrix(
+                        num_classes=2,
+                        normalize=None,
+                        compute_on_step=False,
+                    )
+                    for col_name in sub_hp.class_name_to_weight.keys()
+                }
+            except AttributeError as e:
+                print(f"sub_hp: {sub_hp}")
+                raise e
         return col_name_to_cm
 
     @classmethod
@@ -481,8 +509,9 @@ class SigmoidConfusionMatrixCallback(pl.Callback):
 
         _, head_to_y_hats = pl_module(batch.x)
         for head_name, col_dict in self.head_name_to_col_dicts.items():
+            y_field_name = self.hp.head_params[head_name].get_y_field_name()
             preds: torch.Tensor = head_to_y_hats[head_name]
-            target: torch.Tensor = batch.y[head_name]
+            target: torch.Tensor = batch.y[y_field_name]
 
             for col_idx, (col_name, cm) in enumerate(col_dict.items()):
                 cm.update(preds[:, col_idx], target[:, col_idx])
@@ -509,17 +538,24 @@ class WeightedHead(Head):
     LOSS_NAME = constants.LOSS_NAME
     """Multiheaded head with weights for loss."""
 
-    def __init__(self, num_input_features: int, heads: Dict[str, Head], weights: Dict[str, float]):
-        super().__init__(num_input_features=num_input_features, num_classes=-1, metrics_dict={})
+    def __init__(self, num_input_features: int, hp: WeightedHeadParams):
+        super().__init__(num_input_features=num_input_features, num_classes=-1, hp=hp, metrics_dict={})
 
-        assert heads.keys() == weights.keys()
+        heads = {
+            name: head_params.build(num_input_features)
+            for name, head_params in hp.head_params.items()
+        }
+        head_weights = hp.head_weights
+
+        assert heads.keys() == head_weights.keys(), \
+            f'heads.keys() = {heads.keys()} != head_weights.keys() = {head_weights.keys()}'
 
         self.heads = nn.ModuleDict(modules={
             head_name: head
             for head_name, head in heads.items()
         })
 
-        weight_vals = [weights[head_name] for head_name in self.heads.keys()]
+        weight_vals = [head_weights[head_name] for head_name in self.heads.keys()]
         self.register_buffer('head_weights', torch.tensor(weight_vals, dtype=torch.float))
 
     def forward(self, x: torch.Tensor) -> Dict[str, Any]:
@@ -574,7 +610,7 @@ class WeightedHead(Head):
 
         head_name_to_loss_metrics = {}
         for head_name, head in self.heads.items():
-            y_tensor = y[head_name]
+            y_tensor = y[head.get_y_field_name()]
             y_hat_for_loss_tensor = y_hats_for_loss[head_name]
             y_hat_for_pred_tensor = y_hats_for_pred[head_name]
             head_name_to_loss_metrics[head_name] = \
@@ -672,12 +708,15 @@ class WeightedHead(Head):
 class NeckHead(pl.LightningModule, LossMetrics):
     def __init__(
             self,
-            neck: Sized,
+            neck: trunks_mod.SlabNet,
             head: Head,
     ):
         super().__init__()
         self.neck = neck
         self.head = head
+
+    def get_y_field_name(self):
+        return self.head.get_y_field_name()
 
     def forward(self, x):
         x = self.neck(x)
@@ -711,3 +750,11 @@ class NeckHead(pl.LightningModule, LossMetrics):
 
     def set_pos_class_weights(self, pos_class_weights: torch.Tensor):
         return self.head.set_pos_class_weights(pos_class_weights)
+
+    # def __getattr__(self, item):
+    #     assert hasattr(self, 'head')
+    #     try:
+    #         return self.head.__getattribute__(item)
+    #     except RecursionError as e:
+    #         print(f'item: {item}, self: {self}, head: {self.head}')
+    #         raise e

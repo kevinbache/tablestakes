@@ -327,7 +327,7 @@ if __name__ == '__main__':
 
     callbacks = [
         logs_mod.ClassCounter(
-            head_names=['doc_class'],
+            field_names=[None],
             total_hp=hp,
         ),
         logs_mod.CounterTimerLrCallback(),

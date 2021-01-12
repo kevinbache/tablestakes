@@ -138,11 +138,12 @@ class VocabLengthCallback(pl.Callback):
 class PredictionSaver(pl.Callback):
     def __init__(
             self,
+            weighted_head_params,
             dir_suffixes_to_keep: Iterable[str] = (),
             p_keep: float = 0.05,
     ):
         super().__init__()
-
+        self.weighted_head_params = weighted_head_params
         self.meta_vals_to_keep = dir_suffixes_to_keep
         self.p_keep = p_keep
         self.dir_to_head_outputs = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
@@ -197,7 +198,12 @@ class PredictionSaver(pl.Callback):
 
         for meta_idx, meta_kept in enumerate(metas_kept):
             for head_name, y_hat_per_head in y_hats_for_pred.items():
-                y_per_head = ys[head_name]
+                y_field_name = self.weighted_head_params.head_params[head_name].get_y_field_name()
+                try:
+                    y_per_head = ys[y_field_name]
+                except KeyError as e:
+                    print(f'PredictionSaver._inner ys: {ys}')
+                    raise e
                 y = y_per_head[meta_idx].copy()
                 y_hat = y_hat_per_head[meta_idx].cpu().numpy().copy()
                 self.dir_to_head_outputs[meta_kept][head_name]['y'] = y
@@ -210,9 +216,10 @@ class PredictionSaver(pl.Callback):
                 datapoint_dir = '-'.join(datapoint_dir.split(os.path.sep)[-2:])
             dd = {}
             for head_name, head_outs in heads.items():
+                y_field_name = self.weighted_head_params.get_y_field_name_from_head_name(head_name)
                 df = pd.DataFrame(
                     [head_outs['y']] + head_outs['y_hats'],
-                    columns=self.head_name_to_y_cols[head_name]
+                    columns=self.head_name_to_y_cols[y_field_name]
                 )
                 dd[head_name] = df
             d[datapoint_dir] = dd
@@ -296,20 +303,27 @@ class ClassCounter(pl.Callback):
     Right now, designed for binary multi-feild problems (i.e.: `SigmoidHead`s)
     """
     PORTIONS = 'portions'
+    INV_PORTIONS = '1 / portions'
     CLASS_COUNTS = 'class_counts'
 
     def __init__(
             self,
-            head_names: List[str],
+            field_names: List[str],
             total_hp: Optional[params.ParameterSet] = None,
             do_update_pos_class_weights=True,
             max_pos_class_weight=10.0,
             verbose=True,
     ):
         super().__init__()
-        self.head_names = head_names
+        self.field_names = field_names
         self.verbose = verbose
         self.hp = total_hp
+        self.head_name_to_field_name = {
+            head_name: head.get_y_field_name()
+            for head_name, head in self.hp.head.head_params.items()
+        }
+        self.field_name_to_head_name = {v: k for k, v in self.head_name_to_field_name.items()}
+
         self.do_update_pos_class_weights = do_update_pos_class_weights
         self.max_pos_class_weight = max_pos_class_weight
 
@@ -317,22 +331,23 @@ class ClassCounter(pl.Callback):
         y = torch.cat(y, dim=0)
         num_datapoints = len(y)
         counts = y.sum(dim=0).detach().numpy()
-        if head_name in self.hp.head.head_params:
+        if head_name in self.hp.head.head_params.keys():
             cols = list(self.hp.head.head_params[head_name].class_name_to_weight.keys()) or None
             assert len(cols) == len(counts)
         else:
             cols = None
-        return pd.DataFrame(data=[counts, counts / num_datapoints], columns=cols, index=['counts', self.PORTIONS])
+        index = ['counts', self.PORTIONS, self.INV_PORTIONS]
+        return pd.DataFrame(data=[counts, counts / num_datapoints, num_datapoints / counts], columns=cols, index=index)
 
     def _inner(self, dataloader: DataLoader):
-        field_to_y_lists = defaultdict(list)
+        field_name_to_y_lists = defaultdict(list)
         for batch in dataloader:
-            for field in self.head_names:
-                field_to_y_lists[field].extend([batch.y[field]])
+            for field_name in self.field_names:
+                field_name_to_y_lists[field_name].extend([batch.y[field_name]])
 
         field_to_class_counts = {
             field_name: self._y_list_to_df(field_name, y_list)
-            for field_name, y_list in field_to_y_lists.items()
+            for field_name, y_list in field_name_to_y_lists.items()
         }
         return field_to_class_counts
 
@@ -363,7 +378,8 @@ class ClassCounter(pl.Callback):
                 max_inds = np.where(pos_class_weights > self.max_pos_class_weight)[0]
                 pos_class_weights[max_inds] = self.max_pos_class_weight
 
-                head = pl_module.head.heads[field_name]
+                head_name = self.field_name_to_head_name[field_name]
+                head = pl_module.head.heads[head_name]
                 head.set_pos_class_weights(torch.tensor(pos_class_weights, dtype=torch.float, device=pl_module.device))
                 if self.verbose:
                     weights_str = ', '.join([f'{e:.2f}' for e in pos_class_weights])
@@ -381,14 +397,14 @@ class BetterAccuracy(pl.metrics.Accuracy):
     # TODO: add class weights to init; report both
     """Like Accuracy, but better.
         - PyTorch Lightning's += lines cause warnings about transferring lots of scalars between cpu / gpu
-          but  = ... + lines are fine
+          but " = ... +" lines are fine
         - Respect Y_VALUE_TO_IGNORE
     """
     Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
 
     def update(self, preds: torch.Tensor, target: torch.Tensor):
         preds, target = _input_format_classification(preds, target, self.threshold)
-        assert preds.shape == target.shape
+        assert preds.shape == target.shape, f'preds.shape = {preds.shape} != target.shape = {target.shape}'
 
         self.correct = self.correct + torch.sum(preds.eq(target))
         self.total = self.total + target.numel() - target.eq(self.Y_VALUE_TO_IGNORE).sum()

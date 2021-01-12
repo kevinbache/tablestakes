@@ -2,6 +2,8 @@ import abc
 from pathlib import Path
 from typing import *
 
+import pandas as pd
+
 import torch
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
@@ -72,7 +74,14 @@ class XYMetaHandlerDatasetModule(pl.LightningDataModule):
         pass
 
     def get_y_col_names(self):
-        return {name: df.columns for name, df in self.ds.datapoints[0].y}
+        out = {}
+        for name, value in self.ds.datapoints[0].y:
+            if isinstance(value, pd.DataFrame):
+                cols = value.columns
+            else:
+                cols = [None]
+            out[name] = cols
+        return out
 
     def setup(self, stage: Optional[str] = None):
         # called on one gpu

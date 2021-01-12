@@ -182,25 +182,17 @@ class ClassificationMetricsTracker(torch_mod.Parameterized, abc.ABC):
         return out
 
     # @classmethod
-    # def get_valid_metric_name(cls, metric_name: str, output_name: Optional[str] = None):
-    #     return cls._get_phase_name(cls.VALID_PHASE_NAME, metric_name, output_name)
+    # def get_all_metric_names_for_phase(cls, phase_name: str):
+    #     metrics_names = [m for m in cls.METRICS.keys()] + [cls.LOSS_VAL_NAME]
+    #     output_names = constants.Y_BASE_NAMES
     #
-    # @classmethod
-    # def get_train_metric_name(cls, metric_name: str, output_name: Optional[str] = None):
-    #     return cls._get_phase_name(cls.TRAIN_PHASE_NAME, metric_name, output_name)
-
-    @classmethod
-    def get_all_metric_names_for_phase(cls, phase_name: str):
-        metrics_names = [m for m in cls.METRICS.keys()] + [cls.LOSS_VAL_NAME]
-        output_names = constants.Y_BASE_NAMES
-
-        out = []
-        for metric_name in metrics_names:
-            for output_name in output_names:
-                out.append(cls._get_phase_name(phase_name, metric_name, output_name))
-        out.append(cls._get_phase_name(phase_name, cls.LOSS_VAL_NAME, cls.TOTAL_NAME))
-
-        return out
+    #     out = []
+    #     for metric_name in metrics_names:
+    #         for output_name in output_names:
+    #             out.append(cls._get_phase_name(phase_name, metric_name, output_name))
+    #     out.append(cls._get_phase_name(phase_name, cls.LOSS_VAL_NAME, cls.TOTAL_NAME))
+    #
+    #     return out
 
     def log_losses_and_metrics(self, phase_name, loss, losses, y_hats_dict, ys_dict, prog_bar=False):
         output_names = ys_dict.keys()
@@ -247,7 +239,7 @@ class ClassificationMetricsTracker(torch_mod.Parameterized, abc.ABC):
     def on_pretrain_routine_start(self) -> None:
         if self.pl_module.logger is None:
             return
-        self.pl_module.logger.log_hyperparams(self.pl_module.hp.to_dict())
+        self.pl_module.logger.log_hyperparams(self.pl_module.weighted_head_params.to_dict())
 
     def on_after_backward(self):
         if self.pl_module.logger is None:
