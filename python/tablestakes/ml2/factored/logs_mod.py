@@ -336,8 +336,13 @@ class ClassCounter(pl.Callback):
             assert len(cols) == len(counts)
         else:
             cols = None
-        index = ['counts', self.PORTIONS, self.INV_PORTIONS]
-        return pd.DataFrame(data=[counts, counts / num_datapoints, num_datapoints / counts], columns=cols, index=index)
+
+        invs = [1.0 if not c else num_datapoints / c for c in counts]
+        return pd.DataFrame(
+            data=[counts, counts / num_datapoints, invs],
+            columns=cols,
+            index=['counts', self.PORTIONS, self.INV_PORTIONS],
+        )
 
     def _inner(self, dataloader: DataLoader):
         field_name_to_y_lists = defaultdict(list)

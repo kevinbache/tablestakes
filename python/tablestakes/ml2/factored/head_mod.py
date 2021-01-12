@@ -132,7 +132,11 @@ class HeadParams(trunks_mod.BuilderParams):
     neck: Optional[trunks_mod.SlabNet.ModelParams] = None
 
     def get_y_field_name(self):
-        return self.y_field_name
+        try:
+            return self.y_field_name
+        except AttributeError as e:
+            print(self)
+            raise e
 
     def build(self, num_input_features: int) -> Any:
         if self.neck is not None:
@@ -346,7 +350,7 @@ class _SoftmaxHead(Head):
 
     def loss(self, y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         try:
-            loss = self.loss_fn(y_hat, y)
+            loss = self.loss_fn(y_hat, y.argmax(dim=1))
         except BaseException as e:
             print(f'_SoftmaxHead: y_hat: {y_hat}, y: {y}')
             raise e
@@ -430,7 +434,7 @@ class WeightedHeadParams(trunks_mod.BuilderParams):
     @classmethod
     def from_dict(cls, d: Dict):
         obj = copy.deepcopy(cls())
-        assert 'weights' in d
+        assert 'head_weights' in d
         obj.head_weights = d['head_weights']
         assert 'head_params' in d
         assert isinstance(d['head_params'], dict)
@@ -548,7 +552,9 @@ class WeightedHead(Head):
         head_weights = hp.head_weights
 
         assert heads.keys() == head_weights.keys(), \
-            f'heads.keys() = {heads.keys()} != head_weights.keys() = {head_weights.keys()}'
+            f'heads.keys() = {heads.keys()} != head_weights.keys() = {head_weights.keys()} \n' \
+            f'heads: {heads} \n' \
+            f'head_weights: {head_weights}'
 
         self.heads = nn.ModuleDict(modules={
             head_name: head

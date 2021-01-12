@@ -368,7 +368,7 @@ if __name__ == '__main__':
     hp.neck.requires_grad = True
 
     hp.head = head_mod.WeightedHeadParams(
-        weights={
+        head_weights={
             constants.Y_KORV_BASE_NAME: 0.3,
             constants.Y_WHICH_KV_BASE_NAME: 1.0,
         },
