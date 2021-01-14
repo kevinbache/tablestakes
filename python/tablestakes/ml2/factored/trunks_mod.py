@@ -2,6 +2,8 @@ import abc
 import copy
 from typing import *
 
+import numpy as np
+
 import torch
 from torch import nn as nn
 from torch.nn import functional as F
@@ -245,11 +247,16 @@ class ConvBlock(pl.LightningModule):
         stride: int = 1
         pool_size: int = 2
         num_groups: int = 32
+        do_sqrt_groups: bool = True
         num_blocks_per_pool: int = 2
         num_blocks_per_skip: int = 2
         activation: nn.Module = nn.LeakyReLU
         do_include_first_norm: bool = True
         requires_grad: bool = True
+
+        def __post_init__(self):
+            if self.do_sqrt_groups or self.num_groups > self.num_features:
+                self.num_groups == 2 ** (np.log2(self.num_features) // 2)
 
         def build(self, num_input_features: int, do_error_if_group_div_off=False):
             return ConvBlock(
@@ -339,12 +346,20 @@ class SlabNet(FullyConv1Resnet, Sized):
         num_features: int = 32
         num_layers: int = 4
         num_groups: int = 32
+        do_sqrt_groups: bool = True
         num_blocks_per_residual: int = 2
         num_blocks_per_dropout: int = 2
         dropout_p: float = 0.5
         activation: nn.Module = nn.LeakyReLU
         do_include_first_norm: bool = True
         requires_grad: bool = True
+
+        def __post_init__(self):
+            # if self.num_features_per_group is not None:
+            #     assert self.num_features % self.num_features_per_group == 0
+            #     self.num_groups = self.num_features // self.num_features_per_group
+            if self.do_sqrt_groups or self.num_groups > self.num_features:
+                self.num_groups == 2 ** (np.log2(self.num_features) // 2)
 
         def build(self, num_input_features: int):
             return SlabNet(

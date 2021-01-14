@@ -453,17 +453,6 @@ class BetterAccuracy(pl.metrics.Accuracy):
                 f"ignore: {target.eq(self.Y_VALUE_TO_IGNORE).sum()}"
             )
 
-        """
-        (pid=12777, ip=172.31.40.104) =============================================================
-        (pid=12777, ip=172.31.40.104)   BetterAccuracy is set to print every 100 and you at 3900:
-        (pid=12777, ip=172.31.40.104) =============================================================
-        (pid=12777, ip=172.31.40.104) BetterAccuracy: preds:
-        (pid=12777, ip=172.31.40.104) tensor([[0.01, 0.15, 0.58, 0.12, 0.09, 0.04, 0.01]], device='cuda:0', grad_fn=<SoftmaxBackward>)
-        (pid=12777, ip=172.31.40.104) BetterAccuracy: target:
-        (pid=12777, ip=172.31.40.104) tensor([[0, 0, 0, 0, 1, 0, 0]], device='cuda:0')
-        (pid=12777, ip=172.31.40.104) BetterAccuracy: new_correct: 0, numel: 7, ignore: 0
-        """
-
         self.correct = self.correct + torch.sum(eqs)
         self.total = self.total + target.shape[0]
 
