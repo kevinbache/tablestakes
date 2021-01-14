@@ -430,11 +430,30 @@ class BetterAccuracy(pl.metrics.Accuracy):
         preds, target = _input_format_classification(preds, target, self.threshold)
         assert preds.shape == target.shape, f'preds.shape = {preds.shape} != target.shape = {target.shape}'
 
+        print(f"BetterAccuracy: preds pre argmax: \n{preds}")
+        print(f"BetterAccuracy: target pre argmax: \n{target}")
+
         preds = preds.argmax(dim=1)
         target = target.argmax(dim=1)
+
+        print(f"BetterAccuracy: preds post argmax: \n{preds}")
+        print(f"BetterAccuracy: target post argmax: \n{target}")
+
+
         assert target.dim() == 1, f'got target of shape {target.shape}'
 
         eqs = preds.eq(target)
+
+        """
+        (pid=12777, ip=172.31.40.104) =============================================================
+        (pid=12777, ip=172.31.40.104)   BetterAccuracy is set to print every 100 and you at 3900:
+        (pid=12777, ip=172.31.40.104) =============================================================
+        (pid=12777, ip=172.31.40.104) BetterAccuracy: preds:
+        (pid=12777, ip=172.31.40.104) tensor([[0.01, 0.15, 0.58, 0.12, 0.09, 0.04, 0.01]], device='cuda:0', grad_fn=<SoftmaxBackward>)
+        (pid=12777, ip=172.31.40.104) BetterAccuracy: target:
+        (pid=12777, ip=172.31.40.104) tensor([[0, 0, 0, 0, 1, 0, 0]], device='cuda:0')
+        (pid=12777, ip=172.31.40.104) BetterAccuracy: new_correct: 0, numel: 7, ignore: 0
+"""
 
         self.correct = self.correct + torch.sum(eqs)
         self.total = self.total + target.shape[0]
