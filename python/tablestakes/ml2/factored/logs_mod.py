@@ -422,7 +422,9 @@ class BetterAccuracy(pl.metrics.Accuracy):
             print(f"BetterAccuracy: target: \n{target}")
             print(
                 f"BetterAccuracy: new_correct: {torch.sum(preds.eq(target))}, "
-                f"numel: {target.numel()}, ignore: {target.eq(self.Y_VALUE_TO_IGNORE).sum()}"
+                f"numel: {target.numel()}, "
+                f"shape[0]: {target.shape[0]}, "
+                f"ignore: {target.eq(self.Y_VALUE_TO_IGNORE).sum()}"
             )
             print()
         self.counter += 1
