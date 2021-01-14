@@ -421,12 +421,6 @@ class BetterAccuracy(pl.metrics.Accuracy):
             utils.hprint(f'BetterAccuracy is set to print every {self.print_every} and you at {self.counter}:')
             print(f"BetterAccuracy: preds: \n{preds}")
             print(f"BetterAccuracy: target: \n{target}")
-            print(
-                f"BetterAccuracy: new_correct: {torch.sum(preds.eq(target))}, "
-                f"numel: {target.numel()}, "
-                f"shape[0]: {target.shape[0]}, "
-                f"ignore: {target.eq(self.Y_VALUE_TO_IGNORE).sum()}"
-            )
             print()
         self.counter += 1
 
@@ -450,6 +444,14 @@ class BetterAccuracy(pl.metrics.Accuracy):
         assert target.dim() == 1, f'got target of shape {target.shape}'
 
         eqs = preds.eq(target)
+
+        if do_print:
+            print(
+                f"BetterAccuracy: new_correct: {eqs.sum()}, "
+                f"numel: {target.numel()}, "
+                f"shape[0]: {target.shape[0]}, "
+                f"ignore: {target.eq(self.Y_VALUE_TO_IGNORE).sum()}"
+            )
 
         """
         (pid=12777, ip=172.31.40.104) =============================================================
