@@ -130,7 +130,7 @@ class TuneRunner:
         utils.print_dict(config)
         print()
 
-        utils.set_pandas_disp(width=300)
+        utils.set_pandas_disp(width=200)
 
         hp = self._model_param_class.from_dict(config)
         assert isinstance(hp, self._model_param_class)

@@ -326,7 +326,7 @@ if __name__ == '__main__':
     utils.print_dict(hp.to_dict())
 
     callbacks = [
-        logs_mod.ClassCounter(
+        logs_mod.ClassCounterCallback(
             field_names=[None],
             total_hp=hp,
         ),

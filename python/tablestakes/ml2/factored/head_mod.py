@@ -119,7 +119,7 @@ class HeadParams(trunks_mod.BuilderParams):
     y_field_name: str
     # weight between classes
     class_name_to_weight: Dict[str, float]
-    # equalize pos/neg within a class
+    # equalize pos/neg within a class.  only for sigmoid head.
     pos_class_weights: Optional[np.array] = None
 
     type: str = 'DEFAULT_TYPE'
@@ -127,7 +127,6 @@ class HeadParams(trunks_mod.BuilderParams):
     # See get_reducer() for x_ and loss_ reducer options
     x_reducer_name: str = ''
     loss_reducer_name: str = 'mean-0'
-    do_permute_head_out: bool = True
 
     neck: Optional[trunks_mod.SlabNet.ModelParams] = None
 
@@ -174,7 +173,6 @@ class EmptyHeadParams(HeadParams):
     type: str = 'none'
     num_classes: int = -1
     x_reducer_name: str = 'none'
-    do_permute_head_out: bool = False
 
 
 class Head(LossMetrics, pl.LightningModule, abc.ABC):
@@ -207,13 +205,15 @@ class Head(LossMetrics, pl.LightningModule, abc.ABC):
     def forward_for_loss(self, x: torch.Tensor) -> torch.Tensor:
         # x = x.squeeze(1)
         x = self.x_reducer_fn(x)
-        x = self.postproc_head_out_for_loss_fn(self.head(x))
+        x = self.head(x)
+        x = self.postproc_head_out_for_loss_fn(x)
         return x
 
     def forward_for_pred(self, x: torch.Tensor) -> torch.Tensor:
         # x = x.squeeze(1)
         x = self.x_reducer_fn(x)
-        x = self.postproc_head_out_for_pred(self.head(x))
+        x = self.head(x)
+        x = self.postproc_head_out_for_pred(x)
         return x
 
     def forward_for_loss_and_pred(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -287,20 +287,19 @@ class SigmoidHead(Head):
 
         self.num_classes = num_classes
 
-        # these are for balancing pos/neg within classes
+        # these are for balancing between classes
         class_weights = list(hp.class_name_to_weight.values()) or np.ones(num_classes)
         self.register_buffer('class_weights', torch.tensor(class_weights, dtype=torch.float))
         self.class_weights /= self.class_weights.sum()
 
-        # these are for balancing between classes
-        pos_class_weights = hp.pos_class_weights or np.ones(num_classes)
+        # these are for balancing pos/neg within classes
+        self.did_set_pos_class_weights = hp.pos_class_weights is not None
+        pos_class_weights = hp.pos_class_weights if self.did_set_pos_class_weights else np.ones(num_classes)
         self.register_buffer('pos_class_weights', torch.tensor(pos_class_weights, dtype=torch.float))
         self.loss_fn = nn.BCEWithLogitsLoss(reduction='none', pos_weight=self.pos_class_weights)
 
         self.x_reducer_fn = x_reducer
         self.loss_reducer_fn = loss_reducer
-
-        self.do_permute_head_out = hp.do_permute_head_out
 
         self.s = nn.Sigmoid()
 
@@ -337,7 +336,7 @@ class _SoftmaxHead(Head):
             num_input_features,
             num_classes,
             metrics_dict={
-                'acc': logs_mod.BetterAccuracy(),
+                'acc': logs_mod.BetterAccuracy(class_name_to_weight=hp.class_name_to_weight),
             },
             hp=hp,
         )
@@ -346,7 +345,7 @@ class _SoftmaxHead(Head):
         self.loss_reducer_fn = loss_reducer
 
         self.head = head
-        self.loss_fn = nn.NLLLoss(reduction='mean', ignore_index=constants.Y_VALUE_TO_IGNORE)
+        self.loss_fn = nn.NLLLoss(ignore_index=constants.Y_VALUE_TO_IGNORE)
 
     def loss(self, y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         try:
@@ -398,27 +397,27 @@ class LinearSoftmaxHead(_SoftmaxHead):
         x_reducer, loss_reducer, num_input_features = self._get_reducers(num_input_features, hp)
 
         num_classes = hp.num_classes
-        head = nn.Linear(num_input_features, num_classes)
         super().__init__(
             num_input_features=num_input_features,
             num_classes=num_classes,
-            head=head,
+            head=nn.Linear(num_input_features, num_classes),
             hp=hp,
             x_reducer=x_reducer,
             loss_reducer=loss_reducer,
         )
-        self.lsm = nn.LogSoftmax(dim=1)
-        self.do_permute_head_out = hp.do_permute_head_out
 
-    def postproc_head_out_for_loss_fn(self, head_output):
-        if self.do_permute_head_out:
-            return self.lsm(head_output.permute(0, 2, 1))
-        else:
-            return self.lsm(head_output)
+        self.register_buffer('class_weights', torch.tensor(list(hp.class_name_to_weight.values()), dtype=torch.float))
+        # takes output of linear layer, applies logsoftmax + nll
+        self.loss_fn = nn.CrossEntropyLoss(weight=self.class_weights, reduction='none')
+        # takes output of linear layer
+        self.sm = nn.Softmax(dim=1)
 
     def postproc_head_out_for_pred(self, head_output):
-        return self.postproc_head_out_for_loss_fn(head_output)
+        out = self.sm(head_output)
+        return out
 
+    def postproc_head_out_for_loss_fn(self, head_output):
+        return head_output
 
 YDP = TypeVar('YDP', bound=datapoints.YDatapoint)
 
@@ -427,6 +426,12 @@ class WeightedHeadParams(trunks_mod.BuilderParams):
     head_weights: Dict[str, float] = {}
     head_params: Dict[str, HeadParams] = {}
     type: str = 'weighted'
+
+    def get_head_name_to_field_name(self):
+        return {head_name: hp.get_y_field_name() for head_name, hp in self.head_params.items()}
+
+    def get_field_name_to_head_name(self):
+        return {v: k for k, v in self.get_head_name_to_field_name().items()}
 
     def get_y_field_name_from_head_name(self, head_name: str):
         return self.head_params[head_name].get_y_field_name()
@@ -451,7 +456,7 @@ class WeightedHeadParams(trunks_mod.BuilderParams):
         return WeightedHead(num_input_features=num_input_features, hp=self)
 
 
-class MyConfusionMatrix(pl.metrics.ConfusionMatrix):
+class DeviceBasedConfusionMatrixMetric(pl.metrics.ConfusionMatrix):
     """Just like the normal one but with device transfer"""
 
     def update(self, preds: torch.Tensor, target: torch.Tensor):
@@ -476,7 +481,7 @@ class SigmoidConfusionMatrixCallback(pl.Callback):
         if sub_hp.type == constants.SIGMOID_TYPE_NAME:
             try:
                 col_name_to_cm = {
-                    col_name: MyConfusionMatrix(
+                    col_name: DeviceBasedConfusionMatrixMetric(
                         num_classes=2,
                         normalize=None,
                         compute_on_step=False,
@@ -534,6 +539,83 @@ class SigmoidConfusionMatrixCallback(pl.Callback):
         self.cmdict_per_epoch.append(self.head_name_to_col_dicts)
         self.head_name_to_col_dicts = self._get_head_name_to_col_dicts(self.hp)
 
+
+class ConfusionMatrixCallback(pl.Callback):
+    """Maintain confusion matrix"""
+    DEFAULT_HEAD_NAME = 'DEFAULT'
+
+    def __init__(self, hp: Union[HeadParams, WeightedHeadParams]):
+        super().__init__()
+        self.hp = copy.deepcopy(hp)
+
+        self.head_names_to_track = [
+            head_name
+            for head_name, head_params in self.hp.head_params.items()
+            if head_params.type in ('softmax', 'adaptivesoftmax')
+        ]
+
+        self.head_name_to_cm = self._get_head_name_to_cm(self.hp, self.head_names_to_track)
+        self.per_epoch_head_name_to_cm = []
+
+    @staticmethod
+    def _get_head_name_to_cm(hp, head_names_to_track: List[str]):
+        head_name_to_cm = {}
+        for head_name in head_names_to_track:
+            head_params = hp.head_params[head_name]
+            head_name_to_cm[head_name] = DeviceBasedConfusionMatrixMetric(
+                num_classes=head_params.num_classes,
+                normalize=None,
+                compute_on_step=False,
+            )
+        return head_name_to_cm
+
+    def on_validation_batch_end(
+            self,
+            trainer: pl.Trainer,
+            pl_module: pl.LightningModule,
+            outputs,
+            batch: datapoints.XYMetaDatapoint,
+            batch_idx,
+            dataloader_idx,
+    ):
+        batch = batch.transfer_to_device(pl_module.device)
+
+        _, head_to_y_hats = pl_module(batch.x)
+
+        for head_name, cm in self.head_name_to_cm.items():
+            y_field_name = self.hp.head_params[head_name].get_y_field_name()
+
+            preds: torch.Tensor = head_to_y_hats[head_name]
+            target: torch.Tensor = batch.y[y_field_name]
+
+            cm.update(preds, target)
+            self.head_name_to_cm[head_name] = cm
+
+    @staticmethod
+    def _predtrue_names(class_names: List[str]):
+        pred_names = [f'pred={cn}' for cn in class_names]
+        true_names = [f'true={cn}' for cn in class_names]
+        return pred_names, true_names
+
+    def on_validation_epoch_end(self, trainer, pl_module):
+        for head_name, cm in self.head_name_to_cm.items():
+            vals = cm.compute().numpy()
+            class_names = list(self.hp.head_params[head_name].class_name_to_weight.keys())
+            pred_names, true_names = self._predtrue_names(class_names)
+            df = pd.DataFrame(vals, columns=pred_names, index=true_names)
+
+            self.head_name_to_cm[head_name] = df
+
+        # log confusion matrices
+        head_name_to_cm = copy.deepcopy(self.head_name_to_cm)
+        d = {'cm': head_name_to_cm}
+        pl_module.log_lossmetrics_dict(phase=utils.Phase.valid, d=d)
+
+        # save whole head_name_to_cm dict
+        self.per_epoch_head_name_to_cm.append(head_name_to_cm)
+
+        # reset
+        self.head_name_to_cm = self._get_head_name_to_cm(self.hp, self.head_names_to_track)
 
 # HeadMaker = Callable[[int], Head]
 
@@ -756,6 +838,15 @@ class NeckHead(pl.LightningModule, LossMetrics):
 
     def set_pos_class_weights(self, pos_class_weights: torch.Tensor):
         return self.head.set_pos_class_weights(pos_class_weights)
+
+    @property
+    def did_set_pos_class_weights(self):
+        return self.head.did_set_pos_class_weights
+
+    @property
+    def pos_class_weights(self):
+        return self.head.pos_class_weights
+
 
     # def __getattr__(self, item):
     #     assert hasattr(self, 'head')

@@ -190,6 +190,26 @@ def hprint(s: str, sep_char='=', do_include_pre_break_line=True):
     print(f'  {s}  ')
     print(h)
 
+# def smoosh(items: Iterable[Any], **print_kwargs):
+#     """horizontally stacked printing"""
+#     # name higher level variables based on their smallest elements
+#     line_strs_per_item = [str(i).split('\n') for i in items]
+#
+#     lines_per_item = [len(line) for line in str_lines]
+#     max_lines_in_item = max([len(line) for line in str_lines])
+#     missing_lines_per_item = [max_lines_in_item - lines_this_item for lines_this_item in lines_per_item]
+#
+#
+#
+#     for strs_this_line in zip(*str_lines):
+#         print('  '.join(*strs_this_line), **print_kwargs)
+#
+#     n1, n2 = len(s1), len(s2)
+#
+#     if n1 == n2:
+#         return
+#     elif n1 > n2:
+
 
 # ref: https://stackoverflow.com/questions/1662351/problem-with-newlines-when-i-use-toprettyxml/39984422#39984422
 def root_2_pretty_str(root: etree._Element):
@@ -291,6 +311,11 @@ def set_pandas_disp(width=200, max_col_width=50, max_rows=200, max_columns=100):
     pd.set_option('display.max_colwidth', max_col_width)
     pd.set_option('display.max_rows', max_rows)
     pd.set_option('display.max_columns', max_columns)
+    torch.set_printoptions(
+        precision=2,
+        edgeitems=4,
+        linewidth=200,
+    )
 
 
 class PdfHandler:

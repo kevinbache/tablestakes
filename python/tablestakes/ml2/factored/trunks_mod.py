@@ -277,9 +277,6 @@ class ConvBlock(pl.LightningModule):
 
         # neurons which are added to each layer to ensure that layer sizes are divisible by num_groups
         self._extra_counts = [self.hp.num_groups - r if r else 0 for r in remainders]
-        print('ConvBlock all_counts:  ', all_counts)
-        print('ConvBlock remainders:  ', remainders)
-        print('ConvBlock extra counts:', self._extra_counts)
         all_counts = [c + e for c, e in zip(all_counts, self._extra_counts)]
 
         blocks = OrderedDict()

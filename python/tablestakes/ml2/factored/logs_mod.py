@@ -297,7 +297,7 @@ class CounterTimerLrCallback(pl.Callback):
         trainer.logger.log_metrics(d, step=trainer.global_step)
 
 
-class ClassCounter(pl.Callback):
+class ClassCounterCallback(pl.Callback):
     """Count the number of datapoints belonging to each class.
 
     Right now, designed for binary multi-feild problems (i.e.: `SigmoidHead`s)
@@ -309,7 +309,7 @@ class ClassCounter(pl.Callback):
     def __init__(
             self,
             field_names: List[str],
-            total_hp: Optional[params.ParameterSet] = None,
+            head_params: Optional[params.ParameterSet] = None,
             do_update_pos_class_weights=True,
             max_pos_class_weight=10.0,
             verbose=True,
@@ -317,12 +317,9 @@ class ClassCounter(pl.Callback):
         super().__init__()
         self.field_names = field_names
         self.verbose = verbose
-        self.hp = total_hp
-        self.head_name_to_field_name = {
-            head_name: head.get_y_field_name()
-            for head_name, head in self.hp.head.head_params.items()
-        }
-        self.field_name_to_head_name = {v: k for k, v in self.head_name_to_field_name.items()}
+        self.hp = head_params
+        assert self.hp.type == 'weighted', f'bad hp type: {self.hp.type}'
+        self.field_name_to_head_name = self.hp.get_field_name_to_head_name()
 
         self.do_update_pos_class_weights = do_update_pos_class_weights
         self.max_pos_class_weight = max_pos_class_weight
@@ -331,8 +328,8 @@ class ClassCounter(pl.Callback):
         y = torch.cat(y, dim=0)
         num_datapoints = len(y)
         counts = y.sum(dim=0).detach().numpy()
-        if head_name in self.hp.head.head_params.keys():
-            cols = list(self.hp.head.head_params[head_name].class_name_to_weight.keys()) or None
+        if head_name in self.hp.head_params.keys():
+            cols = list(self.hp.head_params[head_name].class_name_to_weight.keys()) or None
             assert len(cols) == len(counts)
         else:
             cols = None
@@ -344,7 +341,7 @@ class ClassCounter(pl.Callback):
             index=['counts', self.PORTIONS, self.INV_PORTIONS],
         )
 
-    def _inner(self, dataloader: DataLoader):
+    def get_field_to_class_counts(self, dataloader: DataLoader):
         field_name_to_y_lists = defaultdict(list)
         for batch in dataloader:
             for field_name in self.field_names:
@@ -357,7 +354,7 @@ class ClassCounter(pl.Callback):
         return field_to_class_counts
 
     def on_train_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule):
-        field_to_class_counts = self._inner(dataloader=pl_module.train_dataloader())
+        field_to_class_counts = self.get_field_to_class_counts(dataloader=pl_module.train_dataloader())
         if self.verbose:
             utils.hprint('ClassCounterCallback Class Counts:')
             utils.print_dict(field_to_class_counts)
@@ -367,29 +364,31 @@ class ClassCounter(pl.Callback):
             if self.verbose:
                 print(f'  Not setting head_params.pos_class_weights because you did not pass hp to my init')
         else:
-            if self.hp.head.type != 'weighted':
+            if self.hp.type != 'weighted':
                 raise NotImplementedError(
-                    f'hp.head == {self.hp.head} but this is only implemented for WeightedHeadParams'
+                    f'hp == {self.hp} but this is only implemented for WeightedHeadParams'
                 )
-            assert hasattr(pl_module, 'head')
             for field_name, class_counts_df in field_to_class_counts.items():
-                pos_class_weights = class_counts_df.loc[self.PORTIONS].values
-
-                zero_inds = np.where(pos_class_weights == 0)[0]
-                pos_class_weights[zero_inds] = 1.0
-
-                pos_class_weights = 1. / pos_class_weights
-
-                max_inds = np.where(pos_class_weights > self.max_pos_class_weight)[0]
-                pos_class_weights[max_inds] = self.max_pos_class_weight
-
                 head_name = self.field_name_to_head_name[field_name]
                 head = pl_module.head.heads[head_name]
-                head.set_pos_class_weights(torch.tensor(pos_class_weights, dtype=torch.float, device=pl_module.device))
-                if self.verbose:
-                    weights_str = ', '.join([f'{e:.2f}' for e in pos_class_weights])
-                    print(f'  Setting head_params["{field_name}"].pos_class_weights = [{weights_str}]')
-                    print()
+
+                if head.did_set_pos_class_weights:
+                    pos_class_weights = head.pos_class_weights
+                    if self.verbose:
+                        weights_str = ', '.join([f'{e:.2f}' for e in pos_class_weights])
+                        print(f'  head_params["{field_name}"].pos_class_weights was already set to [{weights_str}]')
+                        print()
+
+                else:
+                    pos_class_weights = class_counts_df.loc[self.INV_PORTIONS].values
+                    max_inds = np.where(pos_class_weights > self.max_pos_class_weight)[0]
+                    pos_class_weights[max_inds] = self.max_pos_class_weight
+
+                    head.set_pos_class_weights(torch.tensor(pos_class_weights, dtype=torch.float, device=pl_module.device))
+                    if self.verbose:
+                        weights_str = ', '.join([f'{e:.2f}' for e in pos_class_weights])
+                        print(f'  Setting head_params["{field_name}"].pos_class_weights = [{weights_str}]')
+                        print()
 
         pl_module.log_lossmetrics_dict(
             phase=utils.Phase.train,
@@ -406,22 +405,46 @@ class BetterAccuracy(pl.metrics.Accuracy):
         - Respect Y_VALUE_TO_IGNORE
     """
     Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
+    def __init__(self, class_name_to_weight: OrderedDict[str, float], print_every: Optional[int] = 100):
+        super().__init__()
+        self.register_buffer('class_weights', torch.tensor(list(class_name_to_weight.values()), dtype=torch.float))
+
+        self.add_state("correct_weighted", default=torch.tensor(0), dist_reduce_fx="sum")
+        self.add_state("total_weighted", default=torch.tensor(0), dist_reduce_fx="sum")
+
+        self.print_every = print_every
+        self.counter = 1
 
     def update(self, preds: torch.Tensor, target: torch.Tensor):
+        if self.print_every is not None and not self.counter % self.print_every:
+            utils.hprint(f'BetterAccuracy is set to print every {self.print_every} and you at {self.counter}:')
+            print(f"BetterAccuracy: preds: \n{preds}")
+            print(f"BetterAccuracy: target: \n{target}")
+            print(
+                f"BetterAccuracy: new_correct: {torch.sum(preds.eq(target))}, "
+                f"numel: {target.numel()}, ignore: {target.eq(self.Y_VALUE_TO_IGNORE).sum()}"
+            )
+            print()
+        self.counter += 1
+
         preds, target = _input_format_classification(preds, target, self.threshold)
         assert preds.shape == target.shape, f'preds.shape = {preds.shape} != target.shape = {target.shape}'
 
-        self.correct = self.correct + torch.sum(preds.eq(target))
-        self.total = self.total + target.numel() - target.eq(self.Y_VALUE_TO_IGNORE).sum()
+        preds = preds.argmax(dim=1)
+        target = target.argmax(dim=1)
+        assert target.dim() == 1, f'got target of shape {target.shape}'
 
+        eqs = preds.eq(target)
 
-# class SigmoidConfusionMatrixCallback(pl.Callback):
-#     def __init__(self, num_classes: int, columns: Tuple[str]):
-#         super().__init__()
-#
-#
-#     def on_validation_epoch_end(self, trainer, pl_module):
-#         pl_module.head
+        self.correct = self.correct + torch.sum(eqs)
+        self.total = self.total + target.shape[0]
+
+        # self.correct_weighted = self.correct + torch.sum(eqs * self.class_weights)
+        # # self.total_weighted = self.
+        # counts = torch.ones_like(target) * self.class_weights
+        #
+        # self.total_weighted = self.total + target.numel() - target.eq(self.Y_VALUE_TO_IGNORE).sum()
+
 
 
 class SigmoidBetterAccuracy(pl.metrics.Accuracy):
@@ -442,9 +465,14 @@ class SigmoidBetterAccuracy(pl.metrics.Accuracy):
 
     def update(self, preds: torch.Tensor, target: torch.Tensor):
         # preds = self.s(preds)
-        preds = preds > self.THRESHOLD
+        preds = 1. * (preds > self.THRESHOLD)
         # preds, target = _input_format_classification(preds, target, self.threshold)
         # assert preds.shape == target.shape, f"preds.shape: {preds.shape}, target.shape: {target.shape}"
+
+        # print()
+        # print(f"SigmoidBetterAccuracy: new_correct: {torch.sum(preds.eq(target))}, numel: {target.numel()}, ignore: {target.eq(self.Y_VALUE_TO_IGNORE).sum()}")
+        # print(f"SigmoidBetterAccuracy: preds: \n  {preds}")
+        # print(f"SigmoidBetterAccuracy: target: \n  {target}")
         try:
             self.correct = self.correct + torch.sum(preds.eq(target))
         except BaseException as e:
