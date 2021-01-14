@@ -416,7 +416,8 @@ class BetterAccuracy(pl.metrics.Accuracy):
         self.counter = 1
 
     def update(self, preds: torch.Tensor, target: torch.Tensor):
-        if self.print_every is not None and not self.counter % self.print_every:
+        do_print = self.print_every is not None and not self.counter % self.print_every
+        if do_print:
             utils.hprint(f'BetterAccuracy is set to print every {self.print_every} and you at {self.counter}:')
             print(f"BetterAccuracy: preds: \n{preds}")
             print(f"BetterAccuracy: target: \n{target}")
@@ -432,14 +433,18 @@ class BetterAccuracy(pl.metrics.Accuracy):
         preds, target = _input_format_classification(preds, target, self.threshold)
         assert preds.shape == target.shape, f'preds.shape = {preds.shape} != target.shape = {target.shape}'
 
-        print(f"BetterAccuracy: preds pre argmax: \n{preds}")
-        print(f"BetterAccuracy: target pre argmax: \n{target}")
+        if do_print:
+            print(f"BetterAccuracy: preds pre argmax: \n{preds}")
+            print(f"BetterAccuracy: target pre argmax: \n{target}")
+            print()
 
         preds = preds.argmax(dim=1)
         target = target.argmax(dim=1)
 
-        print(f"BetterAccuracy: preds post argmax: \n{preds}")
-        print(f"BetterAccuracy: target post argmax: \n{target}")
+        if do_print:
+            print(f"BetterAccuracy: preds post argmax: \n{preds}")
+            print(f"BetterAccuracy: target post argmax: \n{target}")
+            print()
 
 
         assert target.dim() == 1, f'got target of shape {target.shape}'
