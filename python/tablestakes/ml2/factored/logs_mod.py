@@ -430,13 +430,13 @@ class BetterAccuracy(pl.metrics.Accuracy):
             print()
         self.counter += 1
 
-        preds, target = _input_format_classification(preds, target, self.threshold)
+        # preds, target = _input_format_classification(preds, target, self.threshold)
         assert preds.shape == target.shape, f'preds.shape = {preds.shape} != target.shape = {target.shape}'
 
-        if do_print:
-            print(f"BetterAccuracy: preds pre argmax: \n{preds}")
-            print(f"BetterAccuracy: target pre argmax: \n{target}")
-            print()
+        # if do_print:
+        #     print(f"BetterAccuracy: preds pre argmax: \n{preds}")
+        #     print(f"BetterAccuracy: target pre argmax: \n{target}")
+        #     print()
 
         preds = preds.argmax(dim=1)
         target = target.argmax(dim=1)
@@ -460,7 +460,7 @@ class BetterAccuracy(pl.metrics.Accuracy):
         (pid=12777, ip=172.31.40.104) BetterAccuracy: target:
         (pid=12777, ip=172.31.40.104) tensor([[0, 0, 0, 0, 1, 0, 0]], device='cuda:0')
         (pid=12777, ip=172.31.40.104) BetterAccuracy: new_correct: 0, numel: 7, ignore: 0
-"""
+        """
 
         self.correct = self.correct + torch.sum(eqs)
         self.total = self.total + target.shape[0]

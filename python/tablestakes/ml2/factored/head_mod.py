@@ -588,6 +588,9 @@ class ConfusionMatrixCallback(pl.Callback):
             preds: torch.Tensor = head_to_y_hats[head_name]
             target: torch.Tensor = batch.y[y_field_name]
 
+            preds = preds.argmax(dim=1)
+            target = target.argmax(dim=1)
+
             cm.update(preds, target)
             self.head_name_to_cm[head_name] = cm
 
