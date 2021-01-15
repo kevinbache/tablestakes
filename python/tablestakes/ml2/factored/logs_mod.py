@@ -369,6 +369,9 @@ class ClassCounterCallback(pl.Callback):
                     f'hp == {self.hp} but this is only implemented for WeightedHeadParams'
                 )
             for field_name, class_counts_df in field_to_class_counts.items():
+                if field_name not in self.field_name_to_head_name:
+                    # we might not be using all fields in heads
+                    continue
                 head_name = self.field_name_to_head_name[field_name]
                 head = pl_module.head.heads[head_name]
 
