@@ -456,6 +456,7 @@ class WeightedBetterAccuracy(pl.metrics.Accuracy):
     def __init__(self, class_name_to_weight: OrderedDict[str, float], print_every: Optional[int] = 100):
         super().__init__()
         self.register_buffer('class_weights', torch.tensor(list(class_name_to_weight.values()), dtype=torch.float))
+        self.register_buffer('batch_weights')
 
         self.print_every = print_every
         self.counter = 1
@@ -484,21 +485,22 @@ class WeightedBetterAccuracy(pl.metrics.Accuracy):
 
         eqs = preds.eq(target)
 
-        batch_weights = self.class_weights[target]
+        self.batch_weights = self.class_weights[target]
 
         if do_print:
             print(
                 f"WeightedBetterAccuracy:"
-                f" batch_weights: {batch_weights}, "
-                f" eqs * batch_w: {eqs * batch_weights}, "
-                f" new_correct: {torch.sum(eqs * batch_weights)}, "
+                f" batch_weights: {self.batch_weights}, "
+                f" eqs * batch_w: {eqs * self.batch_weights}, "
+                f" new_correct: {torch.sum(eqs * self.batch_weights)}, "
                 f" numel: {target.numel()}, "
                 f" shape[0]: {target.shape[0]}, "
                 f" ignore: {target.eq(self.Y_VALUE_TO_IGNORE).sum()}"
             )
 
-        self.correct = self.correct + torch.sum(eqs * batch_weights)
-        self.total = self.total + batch_weights.sum() - target.eq(self.Y_VALUE_TO_IGNORE).sum()
+        new_correct = eqs * self.batch_weights
+        self.correct = self.correct + new_correct.sum()
+        self.total = self.total + self.batch_weights.sum() - target.eq(self.Y_VALUE_TO_IGNORE).sum()
 
 
 
