@@ -73,7 +73,7 @@ class XYMetaHandlerDatasetModule(pl.LightningDataModule):
     def get_dataset(self, hp: DataParams) -> data.XYMetaDirHandlerDataset:
         pass
 
-    def get_y_col_names(self):
+    def get_field_name_to_y_col_names(self):
         out = {}
         for name, value in self.ds.datapoints[0].y:
             if isinstance(value, pd.DataFrame):

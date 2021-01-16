@@ -147,7 +147,7 @@ class PredictionSaver(pl.Callback):
         self.meta_vals_to_keep = dir_suffixes_to_keep
         self.p_keep = p_keep
         self.dir_to_head_outputs = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-        self.head_name_to_y_cols = {}
+        self.field_name_to_y_col_names = {}
 
     def _get_meta_vals_to_keep(self, pl_module):
         kept_dirs = []
@@ -159,7 +159,7 @@ class PredictionSaver(pl.Callback):
         return kept_dirs
 
     def on_sanity_check_start(self, trainer, pl_module):
-        self.head_name_to_y_cols = pl_module.dm.get_y_col_names()
+        self.field_name_to_y_col_names = pl_module.dm.get_field_name_to_y_col_names()
         if not self.meta_vals_to_keep:
             self.meta_vals_to_keep = self._get_meta_vals_to_keep(pl_module)
 
@@ -219,7 +219,7 @@ class PredictionSaver(pl.Callback):
                 y_field_name = self.weighted_head_params.get_y_field_name_from_head_name(head_name)
                 df = pd.DataFrame(
                     [head_outs['y']] + head_outs['y_hats'],
-                    columns=self.head_name_to_y_cols[y_field_name]
+                    columns=self.field_name_to_y_col_names[y_field_name]
                 )
                 dd[head_name] = df
             d[datapoint_dir] = dd
@@ -231,13 +231,12 @@ class PredictionSaver(pl.Callback):
         pl_module.log_lossmetrics_dict(phase=utils.Phase.valid, d=d)
 
     def print_preds(self):
-        pd.set_option('display.width', 200)
-        pd.set_option('display.max_columns', 200)
         for datapoint_dir_name, head_dfs in self.get_df_dict().items():
             print()
             print(datapoint_dir_name)
             for head_name, df in head_dfs.items():
                 print(f'  {head_name}')
+                print()
                 s = str(df)
                 s = s.replace('\n', '\n    ')
                 print(f'    {s}')
@@ -408,12 +407,9 @@ class BetterAccuracy(pl.metrics.Accuracy):
         - Respect Y_VALUE_TO_IGNORE
     """
     Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
-    def __init__(self, class_name_to_weight: OrderedDict[str, float], print_every: Optional[int] = 100):
+    # def __init__(self, class_name_to_weight: OrderedDict[str, float], print_every: Optional[int] = 100):
+    def __init__(self, print_every: Optional[int] = 100):
         super().__init__()
-        self.register_buffer('class_weights', torch.tensor(list(class_name_to_weight.values()), dtype=torch.float))
-
-        self.add_state("correct_weighted", default=torch.tensor(0), dist_reduce_fx="sum")
-        self.add_state("total_weighted", default=torch.tensor(0), dist_reduce_fx="sum")
 
         self.print_every = print_every
         self.counter = 1
@@ -430,11 +426,6 @@ class BetterAccuracy(pl.metrics.Accuracy):
         # preds, target = _input_format_classification(preds, target, self.threshold)
         assert preds.shape == target.shape, f'preds.shape = {preds.shape} != target.shape = {target.shape}'
 
-        # if do_print:
-        #     print(f"BetterAccuracy: preds pre argmax: \n{preds}")
-        #     print(f"BetterAccuracy: target pre argmax: \n{target}")
-        #     print()
-
         preds = preds.argmax(dim=1)
         target = target.argmax(dim=1)
 
@@ -443,7 +434,6 @@ class BetterAccuracy(pl.metrics.Accuracy):
             print(f"BetterAccuracy: target post argmax: \n{target}")
             print()
 
-
         assert target.dim() == 1, f'got target of shape {target.shape}'
 
         eqs = preds.eq(target)
@@ -451,19 +441,64 @@ class BetterAccuracy(pl.metrics.Accuracy):
         if do_print:
             print(
                 f"BetterAccuracy: new_correct: {eqs.sum()}, "
-                f"numel: {target.numel()}, "
-                f"shape[0]: {target.shape[0]}, "
-                f"ignore: {target.eq(self.Y_VALUE_TO_IGNORE).sum()}"
+                f" numel: {target.numel()}, "
+                f" shape[0]: {target.shape[0]}, "
+                f" ignore: {target.eq(self.Y_VALUE_TO_IGNORE).sum()}"
             )
 
         self.correct = self.correct + torch.sum(eqs)
         self.total = self.total + target.shape[0]
 
-        # self.correct_weighted = self.correct + torch.sum(eqs * self.class_weights)
-        # # self.total_weighted = self.
-        # counts = torch.ones_like(target) * self.class_weights
-        #
-        # self.total_weighted = self.total + target.numel() - target.eq(self.Y_VALUE_TO_IGNORE).sum()
+
+class WeightedBetterAccuracy(pl.metrics.Accuracy):
+    Y_VALUE_TO_IGNORE = constants.Y_VALUE_TO_IGNORE
+
+    def __init__(self, class_name_to_weight: OrderedDict[str, float], print_every: Optional[int] = 100):
+        super().__init__()
+        self.register_buffer('class_weights', torch.tensor(list(class_name_to_weight.values()), dtype=torch.float))
+
+        self.print_every = print_every
+        self.counter = 1
+
+    def update(self, preds: torch.Tensor, target: torch.Tensor):
+        do_print = self.print_every is not None and not self.counter % self.print_every
+        if do_print:
+            utils.hprint(f'WeightedBetterAccuracy is set to print every {self.print_every} and you at {self.counter}:')
+            print(f"WeightedBetterAccuracy: preds: \n{preds}")
+            print(f"WeightedBetterAccuracy: target: \n{target}")
+            print()
+        self.counter += 1
+
+        # preds, target = _input_format_classification(preds, target, self.threshold)
+        assert preds.shape == target.shape, f'preds.shape = {preds.shape} != target.shape = {target.shape}'
+
+        preds = preds.argmax(dim=1)
+        target = target.argmax(dim=1)
+
+        if do_print:
+            print(f"WeightedBetterAccuracy: preds post argmax: \n{preds}")
+            print(f"WeightedBetterAccuracy: target post argmax: \n{target}")
+            print()
+
+        assert target.dim() == 1, f'got target of shape {target.shape}'
+
+        eqs = preds.eq(target)
+
+        batch_weights = self.class_weights[target]
+
+        if do_print:
+            print(
+                f"WeightedBetterAccuracy:"
+                f" batch_weights: {batch_weights}, "
+                f" eqs * batch_w: {eqs * batch_weights}, "
+                f" new_correct: {torch.sum(eqs * batch_weights)}, "
+                f" numel: {target.numel()}, "
+                f" shape[0]: {target.shape[0]}, "
+                f" ignore: {target.eq(self.Y_VALUE_TO_IGNORE).sum()}"
+            )
+
+        self.correct = self.correct + torch.sum(eqs * batch_weights)
+        self.total = self.total + batch_weights.sum() - target.eq(self.Y_VALUE_TO_IGNORE).sum()
 
 
 

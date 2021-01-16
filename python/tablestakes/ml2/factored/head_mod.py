@@ -336,7 +336,8 @@ class _SoftmaxHead(Head):
             num_input_features,
             num_classes,
             metrics_dict={
-                'acc': logs_mod.BetterAccuracy(class_name_to_weight=hp.class_name_to_weight),
+                'acc': logs_mod.BetterAccuracy(),
+                'wacc': logs_mod.WeightedBetterAccuracy(class_name_to_weight=hp.class_name_to_weight),
             },
             hp=hp,
         )

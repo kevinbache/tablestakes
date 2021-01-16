@@ -360,7 +360,7 @@ class SlabNet(FullyConv1Resnet, Sized):
             #     self.num_groups = self.num_features // self.num_features_per_group
             if isinstance(self.num_features, (int, float)) \
                     and (self.do_sqrt_groups or self.num_groups > self.num_features):
-                self.num_groups = 2 ** (np.log2(self.num_features) // 2)
+                self.num_groups = int(2 ** (np.log2(self.num_features) // 2))
 
         def build(self, num_input_features: int):
             return SlabNet(
