@@ -459,6 +459,8 @@ class WeightedBetterAccuracy(pl.metrics.Accuracy):
             'class_weights',
             tensor=torch.tensor(list(class_name_to_weight.values()), dtype=torch.float)
         )
+        # probably doesn't need to be a buffer since it's not persisted between runs and you have to call
+        # batch_weights.type_as anyway.
         self.register_buffer(
             'batch_weights',
             tensor=None,
