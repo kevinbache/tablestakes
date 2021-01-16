@@ -462,6 +462,7 @@ class WeightedBetterAccuracy(pl.metrics.Accuracy):
         self.register_buffer(
             'batch_weights',
             tensor=None,
+            persistent=False,
         )
 
         self.print_every = print_every
@@ -492,6 +493,7 @@ class WeightedBetterAccuracy(pl.metrics.Accuracy):
         eqs = preds.eq(target)
 
         self.batch_weights = self.class_weights[target]
+        self.batch_weights = self.batch_weights.type_as(target)
 
         if do_print:
             print(
