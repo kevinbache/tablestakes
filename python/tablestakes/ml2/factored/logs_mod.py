@@ -455,8 +455,14 @@ class WeightedBetterAccuracy(pl.metrics.Accuracy):
 
     def __init__(self, class_name_to_weight: OrderedDict[str, float], print_every: Optional[int] = 100):
         super().__init__()
-        self.register_buffer('class_weights', torch.tensor(list(class_name_to_weight.values()), dtype=torch.float))
-        self.register_buffer('batch_weights')
+        self.register_buffer(
+            'class_weights',
+            tensor=torch.tensor(list(class_name_to_weight.values()), dtype=torch.float)
+        )
+        self.register_buffer(
+            'batch_weights',
+            tensor=None,
+        )
 
         self.print_every = print_every
         self.counter = 1
@@ -501,7 +507,6 @@ class WeightedBetterAccuracy(pl.metrics.Accuracy):
         new_correct = eqs * self.batch_weights
         self.correct = self.correct + new_correct.sum()
         self.total = self.total + self.batch_weights.sum() - target.eq(self.Y_VALUE_TO_IGNORE).sum()
-
 
 
 class SigmoidBetterAccuracy(pl.metrics.Accuracy):
