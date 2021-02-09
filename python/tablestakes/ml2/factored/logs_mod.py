@@ -219,7 +219,7 @@ class PredictionSaver(pl.Callback):
                 y_field_name = self.weighted_head_params.get_y_field_name_from_head_name(head_name)
                 df = pd.DataFrame(
                     [head_outs['y']] + head_outs['y_hats'],
-                    columns=self.field_name_to_y_col_names[y_field_name]
+                    columns=self.field_name_to_y_col_names[y_field_name],
                 )
                 dd[head_name] = df
             d[datapoint_dir] = dd
@@ -386,7 +386,9 @@ class ClassCounterCallback(pl.Callback):
                     max_inds = np.where(pos_class_weights > self.max_pos_class_weight)[0]
                     pos_class_weights[max_inds] = self.max_pos_class_weight
 
-                    head.set_pos_class_weights(torch.tensor(pos_class_weights, dtype=torch.float, device=pl_module.device))
+                    head.set_pos_class_weights(
+                        torch.tensor(pos_class_weights, dtype=torch.float, device=pl_module.device)
+                    )
                     if self.verbose:
                         weights_str = ', '.join([f'{e:.2f}' for e in pos_class_weights])
                         print(f'  Setting head_params["{field_name}"].pos_class_weights = [{weights_str}]')

@@ -8,7 +8,7 @@ T = TypeVar('T')
 
 
 class LoadMaker(abc.ABC, Generic[T]):
-    """A LoadMaker is designed to make caching easeir.  If If the cached object isn't there, then it'll make it"""
+    """A LoadMaker is designed to make caching easier.  If the cached object isn't there, then it'll make it"""
 
     def __init__(self, files_to_load: Union[List[str], str], verbose=False):
         super().__init__()

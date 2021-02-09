@@ -36,7 +36,7 @@ class ListDataset(Dataset, Generic[D]):
 DP = TypeVar('DP')
 
 
-class SubtypeCsvHandler(Generic[DP], abc.ABC):
+class SubtypeCsvJsonHandler(Generic[DP], abc.ABC):
     def __init__(
             self,
             subtype_name: str,
@@ -46,7 +46,7 @@ class SubtypeCsvHandler(Generic[DP], abc.ABC):
     ):
         prefix = f'{subtype_name}_'
         if patterns is None:
-            patterns = [f'{prefix}*.csv']
+            patterns = [f'{prefix}*.csv', f'{prefix}*.json']
 
         self.glob_recursive = glob_recursive
         self.patterns = patterns
@@ -64,7 +64,7 @@ class SubtypeCsvHandler(Generic[DP], abc.ABC):
 
     @staticmethod
     def _match_between_prefix_and_ext(filename: str, prefix: str) -> str:
-        m = re.match(fr'.*{prefix}(\w+).csv$', filename)
+        m = re.match(fr'.*{prefix}(\w+).(csv|json)$', filename)
         after_prefix = m.groups()[0]
         if after_prefix.endswith('.csv'):
             after_prefix = after_prefix.replace('.csv', '')
@@ -75,7 +75,7 @@ class SubtypeCsvHandler(Generic[DP], abc.ABC):
         pass
 
 
-class BaseVocabXHandler(SubtypeCsvHandler[datapoints.BaseVocabDatapoint]):
+class BaseVocabXHandler(SubtypeCsvJsonHandler[datapoints.BaseVocabDatapoint]):
     def __init__(self):
         super().__init__(subtype_name='x', patterns=['**/*.x_*.csv'], glob_recursive=True)
 
@@ -91,7 +91,7 @@ class BaseVocabXHandler(SubtypeCsvHandler[datapoints.BaseVocabDatapoint]):
         )
 
 
-class BaseVocabMultiXHandler(SubtypeCsvHandler[datapoints.BaseVocabMultiDatapoint]):
+class BaseVocabMultiXHandler(SubtypeCsvJsonHandler[datapoints.BaseVocabMultiDatapoint]):
     """Converts a directory into a datapoint.  Multiple docs per datapoint."""
     def __init__(self):
         super().__init__(subtype_name='x', patterns=['**/*x_*.csv'], glob_recursive=True)
@@ -148,7 +148,7 @@ class BaseVocabMultiXHandler(SubtypeCsvHandler[datapoints.BaseVocabMultiDatapoin
         return name
 
 
-class KorvWhichYHandler(SubtypeCsvHandler[datapoints.KorvWhichDatapoint]):
+class KorvWhichYHandler(SubtypeCsvJsonHandler[datapoints.KorvWhichDatapoint]):
     def __init__(self):
         super().__init__(subtype_name='y', patterns=['**/y_*.csv'], glob_recursive=True)
 
@@ -159,7 +159,7 @@ class KorvWhichYHandler(SubtypeCsvHandler[datapoints.KorvWhichDatapoint]):
         )
 
 
-class ShortMetaHandler(SubtypeCsvHandler[datapoints.MetaDatapoint]):
+class ShortMetaHandler(SubtypeCsvJsonHandler[datapoints.MetaDatapoint]):
     def __init__(self):
         super().__init__(subtype_name='meta', patterns=['**/meta_short.csv'], glob_recursive=True)
 
@@ -198,9 +198,9 @@ class XYMetaDirHandlerDataset(DirHandlerDataset[datapoints.XYMetaDatapoint]):
     def __init__(
             self,
             base_dir: utils.DirtyPath,
-            x_handler: SubtypeCsvHandler,
-            y_handler: SubtypeCsvHandler,
-            meta_handler: SubtypeCsvHandler,
+            x_handler: SubtypeCsvJsonHandler,
+            y_handler: SubtypeCsvJsonHandler,
+            meta_handler: SubtypeCsvJsonHandler,
             data_dir_glob_patterns: Optional[List[utils.DirtyPath]] = None,
             data_dir_glob_recursive=False,
     ):

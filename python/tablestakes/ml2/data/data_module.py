@@ -78,6 +78,8 @@ class XYMetaHandlerDatasetModule(pl.LightningDataModule):
         for name, value in self.ds.datapoints[0].y:
             if isinstance(value, pd.DataFrame):
                 cols = value.columns
+            elif isinstance(value, (MutableMapping, Mapping)):
+                cols = list(value.keys())
             else:
                 cols = [None]
             out[name] = cols

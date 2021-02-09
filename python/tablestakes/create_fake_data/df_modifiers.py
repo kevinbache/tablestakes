@@ -1,6 +1,7 @@
 import abc
 from typing import List
 import re
+import sys
 
 import nltk
 import numpy as np
@@ -120,16 +121,37 @@ class MyBertTokenizer(DfModifier):
         df[join_col] = new_df_ind
         df.index = new_df_ind.copy()
 
+        # doesn't work
+        # import warnings
+        # with warnings.catch_warnings():
+        #     warnings.filterwarnings(
+        #         "ignore",
+        #         message=r".*indices sequence length is longer.*",
+        #         append=True,
+        #     )
+        #     out = self.tok(
+        #         org_text_values,
+        #         is_split_into_words=True,
+        #         return_offsets_mapping=True,
+        #         # max_length=sys.maxsize,
+        #         truncation=False,
+        #         padding=False,
+        #     )
+
         try:
             out = self.tok(
                 org_text_values,
                 is_split_into_words=True,
                 return_offsets_mapping=True,
+                # max_length=sys.maxsize,
+                truncation=False,
+                padding=False,
             )
         except BaseException as e:
+            print("MyBertTokenizer exception!!")
             print(org_text_values)
             print(type(org_text_values))
-            for ind, e in enumerate(org_text_values):
+            for ind, e in enumerate (org_text_values):
                 if not isinstance(e, str):
                     print(f'element at position {ind}, is {e} which has type {type(e)}')
             raise e
