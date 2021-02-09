@@ -233,9 +233,9 @@ class PredictionSaver(pl.Callback):
     def print_preds(self):
         for datapoint_dir_name, head_dfs in self.get_df_dict().items():
             print()
-            print(datapoint_dir_name)
+            print('datapoint dir name:', datapoint_dir_name)
             for head_name, df in head_dfs.items():
-                print(f'  {head_name}')
+                print(f'  head: {head_name}')
                 print()
                 s = str(df)
                 s = s.replace('\n', '\n    ')
